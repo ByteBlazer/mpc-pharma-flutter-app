@@ -12,6 +12,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/common_widgets.dart';
 import 'trip_map/portal_trip_map_view.dart';
 import 'web_portal_providers.dart';
+import 'trip_map/trip_dashboard_guidance.dart';
+import 'web_portal_styles.dart';
 import 'web_portal_utils.dart';
 
 class WebPortalTripsScreen extends ConsumerStatefulWidget {
@@ -26,10 +28,6 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   int? _selectedTripId;
-  int _refreshCountdown = 20;
-  Timer? _countdownTimer;
-  Timer? _autoRefreshTimer;
-  bool _refreshing = false;
   final _docSearchController = TextEditingController();
   final _tripCardKeys = <int, GlobalKey>{};
   bool _showGuidance = false;
@@ -42,18 +40,6 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       setState(() => _selectedTripId = null);
-    });
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      setState(() {
-        _refreshCountdown = _refreshCountdown <= 1 ? 20 : _refreshCountdown - 1;
-      });
-    });
-    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
-      ref.invalidate(portalAllTripsProvider);
-      if (_selectedTripId != null) {
-        ref.invalidate(portalTripDetailProvider(_selectedTripId!));
-      }
     });
     _initGuidance();
   }
@@ -70,8 +56,6 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _countdownTimer?.cancel();
-    _autoRefreshTimer?.cancel();
     _guidanceTimer?.cancel();
     _docSearchController.dispose();
     super.dispose();
@@ -117,18 +101,6 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
         1 => AppConstants.tripStatusScheduled,
         _ => 'ENDED',
       };
-
-  Future<void> _manualRefresh() async {
-    setState(() => _refreshing = true);
-    ref.invalidate(portalAllTripsProvider);
-    if (_selectedTripId != null) {
-      ref.invalidate(portalTripDetailProvider(_selectedTripId!));
-    }
-    setState(() {
-      _refreshing = false;
-      _refreshCountdown = 20;
-    });
-  }
 
   Future<void> _forceEnd(int tripId) async {
     final ok = await showConfirmDialog(
@@ -272,41 +244,33 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
           filteredTrips: filtered,
           selectedTripId: _selectedTripId,
           selectedTrip: selectedTrip,
-          refreshing: _refreshing,
-          refreshCountdown: _refreshCountdown,
-          onRefresh: _manualRefresh,
           onTripSelected: (id) => _selectTrip(id),
           onClearTripSelection: () => setState(() => _selectedTripId = null),
           mapHeight: mapHeight,
         );
 
         return Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Trip Dashboard',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppColors.primary,
-                    ),
-              ),
-              const SizedBox(height: 16),
+              Text('Trip Dashboard', style: WebPortalStyles.pageTitle(context)),
+              const SizedBox(height: 24),
               Expanded(
                 child: isWide
                     ? Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(flex: 4, child: listPane),
-                          const SizedBox(width: 16),
-                          Expanded(flex: 6, child: mapPane),
+                          Expanded(flex: 1, child: listPane),
+                          const SizedBox(width: 24),
+                          Expanded(flex: 2, child: mapPane),
                         ],
                       )
                     : Column(
                         children: [
                           Expanded(child: listPane),
                           const SizedBox(height: 12),
-                          mapPane,
+                          Expanded(flex: 2, child: mapPane),
                         ],
                       ),
               ),
@@ -324,39 +288,48 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
       _ => 'Ended',
     };
 
-    return Card(
+    return WebPortalPaper(
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Text('$tabLabel Trips (${trips.length})',
-                    style: Theme.of(context).textTheme.titleMedium),
-                const Spacer(),
-                TextButton(
-                  onPressed: _openDocSearchDialog,
-                  child: const Text('Find By Doc ID'),
-                ),
-              ],
-            ),
+          Row(
+            children: [
+              Text(
+                '$tabLabel Trips (${trips.length})',
+                style: WebPortalStyles.sectionTitle(context),
+              ),
+              const Spacer(),
+              WebPortalLinkText(
+                label: 'Find By Doc ID',
+                onTap: _openDocSearchDialog,
+              ),
+            ],
           ),
+          const SizedBox(height: 16),
           TabBar(
             controller: _tabController,
             labelColor: AppColors.primary,
+            unselectedLabelColor: Colors.black54,
+            indicatorColor: AppColors.primary,
+            dividerColor: WebPortalStyles.borderColor,
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            unselectedLabelStyle:
+                const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             tabs: const [
               Tab(text: 'Ongoing'),
               Tab(text: 'Scheduled'),
               Tab(text: 'Ended'),
             ],
           ),
+          const SizedBox(height: 8),
           Expanded(
             child: trips.isEmpty
                 ? const EmptyState(message: 'No trips in this tab.')
                 : Stack(
+                    clipBehavior: Clip.none,
                     children: [
                       ListView.builder(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
                         itemCount: trips.length,
                         itemBuilder: (context, i) {
                           final trip = trips[i];
@@ -364,7 +337,7 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
                             trip.tripId,
                             GlobalKey.new,
                           );
-                          return _TripCard(
+                          final card = _TripCard(
                             key: key,
                             trip: trip,
                             selected: _selectedTripId == trip.tripId,
@@ -374,55 +347,23 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
                                 ? () => _forceEnd(trip.tripId)
                                 : null,
                           );
+                          if (i == 0 &&
+                              _showGuidance &&
+                              _tabController.index == 0) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const TripDashboardGuidance(),
+                                const SizedBox(height: 8),
+                                card,
+                              ],
+                            );
+                          }
+                          return card;
                         },
                       ),
-                      if (_showGuidance &&
-                          _tabController.index == 0 &&
-                          trips.isNotEmpty)
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          right: 8,
-                          child: Material(
-                            elevation: 4,
-                            borderRadius: BorderRadius.circular(8),
-                            color: AppColors.primary,
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '👋 The map is now showing all driver locations. '
-                                      'Click on a trip card to view that trip\'s details alone.',
-                                      style: const TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.close,
-                                        color: Colors.white),
-                                    onPressed: () =>
-                                        setState(() => _showGuidance = false),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: OutlinedButton.icon(
-              onPressed: _refreshing ? null : _manualRefresh,
-              icon: const Icon(Icons.refresh),
-              label: Text(
-                _refreshing
-                    ? 'Refreshing...'
-                    : 'Refresh (${_refreshCountdown.toString().padLeft(2, '0')})',
-              ),
-            ),
           ),
         ],
       ),
@@ -450,107 +391,158 @@ class _TripCard extends StatefulWidget {
 
 class _TripCardState extends State<_TripCard> {
   bool _expanded = false;
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final trip = widget.trip;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        side: BorderSide(
-          color: widget.selected ? AppColors.primary : Colors.grey.shade300,
-          width: widget.selected ? 2 : 1,
-        ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: InkWell(
-        onTap: widget.onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Trip #${trip.tripId} ${trip.route}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          transform: Matrix4.translationValues(0, _hovered ? -2 : 0, 0),
+          decoration: BoxDecoration(
+            color: widget.selected
+                ? WebPortalStyles.selectedTripCardBg
+                : Colors.white,
+            border: Border.all(
+              color: widget.selected
+                  ? AppColors.primary
+                  : WebPortalStyles.borderColor,
+              width: widget.selected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(4),
+            boxShadow: _hovered
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Trip #${trip.tripId} ${trip.route}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    if (!_expanded) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          WebPortalTripStatusChip(status: trip.status),
+                          const Spacer(),
+                          WebPortalLinkText(
+                            label: 'View More',
+                            onTap: () => setState(() => _expanded = true),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.directions_car,
+                            size: 16,
+                            color: WebPortalStyles.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${trip.vehicleNumber} - ${trip.driverName} - Mob: ${trip.driverPhoneNumber}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.43,
+                                color: WebPortalStyles.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(height: 1),
+                      ),
+                      Text(
+                        'Created: ${WebPortalUtils.formatTripTimestamp(trip.createdAt)} by ${trip.createdBy}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.66,
+                          color: WebPortalStyles.textSecondary,
+                        ),
+                      ),
+                      if (trip.status != AppConstants.tripStatusScheduled)
+                        Text(
+                          'Started: ${WebPortalUtils.formatTripTimestamp(trip.startedAt)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.66,
+                            color: WebPortalStyles.textSecondary,
+                          ),
+                        ),
+                      if (trip.status == 'ENDED')
+                        Text(
+                          'Ended: ${WebPortalUtils.formatTripTimestamp(trip.lastUpdatedAt)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.66,
+                            color: WebPortalStyles.textSecondary,
+                          ),
+                        ),
+                      if (widget.onForceEnd != null) ...[
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Divider(height: 1),
+                        ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: widget.onForceEnd,
+                            icon: const Icon(Icons.stop_circle, size: 20),
+                            label: const Text('Force End Trip'),
+                            style: WebPortalStyles.forceEndTripOutlinedButton(),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          WebPortalTripStatusChip(status: trip.status),
+                          const Spacer(),
+                          WebPortalLinkText(
+                            label: 'View Less',
+                            onTap: () => setState(() => _expanded = false),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              if (!_expanded) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _StatusChip(status: trip.status),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () => setState(() => _expanded = true),
-                      child: const Text('View More'),
-                    ),
-                  ],
-                ),
-              ] else ...[
-                const SizedBox(height: 8),
-                Text(
-                  '${trip.vehicleNumber} - ${trip.driverName} - Mob: ${trip.driverPhoneNumber}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                Text(
-                  'Created: ${WebPortalUtils.formatTripTimestamp(trip.createdAt)} by ${trip.createdBy}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (trip.status != AppConstants.tripStatusScheduled)
-                  Text(
-                    'Started: ${WebPortalUtils.formatTripTimestamp(trip.startedAt)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                if (trip.status == 'ENDED')
-                  Text(
-                    'Ended: ${WebPortalUtils.formatTripTimestamp(trip.lastUpdatedAt)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                if (widget.onForceEnd != null) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: widget.onForceEnd,
-                    icon: const Icon(Icons.stop_circle_outlined, color: Colors.red),
-                    label: const Text('Force End Trip'),
-                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                  ),
-                ],
-                Row(
-                  children: [
-                    _StatusChip(status: trip.status),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () => setState(() => _expanded = false),
-                      child: const Text('View Less'),
-                    ),
-                  ],
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
-
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (status) {
-      'STARTED' => Colors.blue,
-      'SCHEDULED' => Colors.orange,
-      'ENDED' => Colors.grey,
-      _ => Colors.grey,
-    };
-    return Chip(
-      label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 12)),
-      backgroundColor: color,
-      padding: EdgeInsets.zero,
     );
   }
 }

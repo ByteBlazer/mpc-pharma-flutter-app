@@ -26,6 +26,11 @@ dependencies:
   flutter_local_notifications: ^19.1.0
   collection: ^1.19.1
   google_maps_flutter: ^2.12.1
+  flutter_svg: ^2.2.0
+  web: ^1.1.1
+  pointer_interceptor: ^0.10.1
+  google_fonts: ^6.2.1
+  excel: ^4.0.6
 
 dev_dependencies:
   flutter_test:
@@ -36,3 +41,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/map/
+    - assets/images/package_emoji.png
+    - assets/pharma-tracker-logo.svg

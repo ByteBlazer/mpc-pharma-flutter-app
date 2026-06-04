@@ -334,6 +334,21 @@ class ApiClient {
     return WebPortalDeliveryStatusResponse.fromJson(response.data ?? {});
   }
 
+  /// Public customer tracking page — no auth required.
+  Future<WebPortalDocTrackingResponse> getDocTracking(String token) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'doc/tracking',
+      queryParameters: {'token': token},
+    );
+    final data = WebPortalDocTrackingResponse.fromJson(response.data ?? {});
+    if (!data.success) {
+      throw ApiException(
+        data.message ?? 'Failed to retrieve tracking information',
+      );
+    }
+    return data;
+  }
+
   Future<WebPortalBackupListResponse> listBackups() async {
     final response = await _dio.get<Map<String, dynamic>>(
       'setting/backups',
@@ -396,7 +411,7 @@ class ApiClient {
     return (response.data ?? []).map((e) => e.toString()).toList();
   }
 
-  Future<WebPortalDeliveryReportResponse> getDeliveryReport(
+  Future<Map<String, dynamic>> getDeliveryReportJson(
     WebPortalDeliveryReportFilters filters,
   ) async {
     final response = await _dio.get<Map<String, dynamic>>(
@@ -404,7 +419,15 @@ class ApiClient {
       queryParameters: filters.toQueryParams(),
       options: Options(headers: {'Authorization': _authHeader}),
     );
-    return WebPortalDeliveryReportResponse.fromJson(response.data ?? {});
+    return response.data ?? {};
+  }
+
+  Future<WebPortalDeliveryReportResponse> getDeliveryReport(
+    WebPortalDeliveryReportFilters filters,
+  ) async {
+    return WebPortalDeliveryReportResponse.fromJson(
+      await getDeliveryReportJson(filters),
+    );
   }
 
   Future<WebPortalSignatureResponse> getDocSignature(String docId) async {

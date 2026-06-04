@@ -68,19 +68,3 @@ final portalSettingProvider =
   (ref, name) => ref.watch(apiClientProvider).getPortalSetting(name),
 );
 
-final deliveryReportFiltersProvider =
-    StateProvider<WebPortalDeliveryReportFilters>(
-  (ref) => WebPortalDeliveryReportFilters(),
-);
-
-final deliveryReportQueryProvider =
-    StateProvider<WebPortalDeliveryReportFilters?>(
-  (ref) => null,
-);
-
-final deliveryReportDataProvider =
-    FutureProvider.autoDispose<WebPortalDeliveryReportResponse?>((ref) async {
-  final query = ref.watch(deliveryReportQueryProvider);
-  if (query == null) return null;
-  return ref.watch(apiClientProvider).getDeliveryReport(query);
-});

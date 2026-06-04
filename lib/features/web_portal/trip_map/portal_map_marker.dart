@@ -39,7 +39,8 @@ class PortalMapMarker {
       position: position,
       icon: type == PortalMarkerType.driver ? driverIcon : customerIcon,
       zIndexInt: type == PortalMarkerType.customer ? 2 : 1,
-      infoWindow: InfoWindow(title: title),
+      consumeTapEvents: true,
+      infoWindow: InfoWindow.noText,
       onTap: () {
         if (type == PortalMarkerType.driver && !driverClickable) return;
         onTap(this);
@@ -86,6 +87,9 @@ class PortalTripMapLogic {
   PortalTripMapLogic._();
 
   static const defaultCenter = LatLng(9.9312, 76.2673);
+
+  /// React `@keyframes driverBlink` runs over 1.5s (opacity 1→0→1); toggle every half-cycle.
+  static const driverBlinkToggleInterval = Duration(milliseconds: 750);
 
   static int _statusPriority(String status) {
     return switch (status) {
@@ -256,6 +260,20 @@ class PortalTripMapLogic {
       minLng = minLng < m.position.longitude ? minLng : m.position.longitude;
       maxLng = maxLng > m.position.longitude ? maxLng : m.position.longitude;
     }
+
+    // Avoid max zoom when all markers share one point (e.g. driver only).
+    const minSpan = 0.015;
+    if (maxLat - minLat < minSpan) {
+      final mid = (maxLat + minLat) / 2;
+      minLat = mid - minSpan / 2;
+      maxLat = mid + minSpan / 2;
+    }
+    if (maxLng - minLng < minSpan) {
+      final mid = (maxLng + minLng) / 2;
+      minLng = mid - minSpan / 2;
+      maxLng = mid + minSpan / 2;
+    }
+
     return LatLngBounds(
       southwest: LatLng(minLat, minLng),
       northeast: LatLng(maxLat, maxLng),
@@ -283,6 +301,6 @@ class PortalTripMapLogic {
   static String generateTrackingUrl(String docId) {
     final token = base64.encode(utf8.encode(docId));
     final origin = Uri.base.origin;
-    return '$origin/track?t=$token';
+    return '$origin/track?t=${Uri.encodeComponent(token)}';
   }
 }

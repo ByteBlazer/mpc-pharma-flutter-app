@@ -18,4 +18,5 @@ class AppRoutes {
   static const profile = '/profile';
   static const scheduleTrip = '/schedule-trip';
   static const tripDetails = '/trip-details';
+  static const track = '/track';
 }

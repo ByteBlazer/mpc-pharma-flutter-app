@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <!-- 3D Shadow filter -->
+    <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="3" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+    
+    <!-- Inner shadow filter -->
+    <filter id="innerShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feFlood flood-color="#000000" flood-opacity="0.3"/>
+      <feComposite in="SourceGraphic"/>
+    </filter>
+    
+    <!-- Gradient for red top half -->
+    <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f87171;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#dc2626;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#991b1b;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for blue bottom half -->
+    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for center line -->
+    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#e5e7eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d1d5db;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 3D Shadow background -->
+  <path d="M 37 52 L 37 32 Q 37 17, 52 17 Q 67 17, 67 32 L 67 52 Z" fill="#000000" opacity="0.15" filter="url(#dropShadow)"/>
+  <path d="M 37 52 L 37 72 Q 37 87, 52 87 Q 67 87, 67 72 L 67 52 Z" fill="#000000" opacity="0.15" filter="url(#dropShadow)"/>
+  
+  <!-- Red top half with gradient and 3D effect -->
+  <path d="M 35 50 L 35 30 Q 35 15, 50 15 Q 65 15, 65 30 L 65 50 Z" fill="url(#redGradient)" filter="url(#dropShadow)"/>
+  
+  <!-- Blue bottom half with gradient and 3D effect -->
+  <path d="M 35 50 L 35 70 Q 35 85, 50 85 Q 65 85, 65 70 L 65 50 Z" fill="url(#blueGradient)" filter="url(#dropShadow)"/>
+  
+  <!-- 3D Center dividing line with gradient -->
+  <line x1="35" y1="50" x2="65" y2="50" stroke="url(#lineGradient)" stroke-width="3" opacity="0.9"/>
+  
+  
+</svg>

@@ -501,3 +501,87 @@ class WebPortalUserFormData {
     return map;
   }
 }
+
+class WebPortalDocTrackingLocation {
+  WebPortalDocTrackingLocation({
+    required this.latitude,
+    required this.longitude,
+    this.receivedAt,
+  });
+
+  final String latitude;
+  final String longitude;
+  final DateTime? receivedAt;
+
+  factory WebPortalDocTrackingLocation.fromJson(Map<String, dynamic> json) =>
+      WebPortalDocTrackingLocation(
+        latitude: json['latitude']?.toString() ?? '',
+        longitude: json['longitude']?.toString() ?? '',
+        receivedAt: DateTime.tryParse(json['receivedAt']?.toString() ?? ''),
+      );
+}
+
+class WebPortalDocTrackingResponse {
+  WebPortalDocTrackingResponse({
+    required this.success,
+    this.message,
+    this.docId,
+    this.docAmount,
+    this.customerFirmName,
+    this.customerAddress,
+    this.customerCity,
+    this.customerPincode,
+    this.status,
+    this.comment,
+    this.deliveryTimestamp,
+    this.customerLocation,
+    this.driverLastKnownLocation,
+    this.numEnrouteCustomers,
+    this.eta,
+  });
+
+  final bool success;
+  final String? message;
+  final String? docId;
+  final String? docAmount;
+  final String? customerFirmName;
+  final String? customerAddress;
+  final String? customerCity;
+  final String? customerPincode;
+  final String? status;
+  final String? comment;
+  final DateTime? deliveryTimestamp;
+  final WebPortalDocTrackingLocation? customerLocation;
+  final WebPortalDocTrackingLocation? driverLastKnownLocation;
+  final int? numEnrouteCustomers;
+  final double? eta;
+
+  factory WebPortalDocTrackingResponse.fromJson(Map<String, dynamic> json) =>
+      WebPortalDocTrackingResponse(
+        success: json['success'] == true,
+        message: json['message']?.toString(),
+        docId: json['docId']?.toString(),
+        docAmount: json['docAmount']?.toString(),
+        customerFirmName: json['customerFirmName']?.toString(),
+        customerAddress: json['customerAddress']?.toString(),
+        customerCity: json['customerCity']?.toString(),
+        customerPincode: json['customerPincode']?.toString(),
+        status: json['status']?.toString(),
+        comment: json['comment']?.toString(),
+        deliveryTimestamp:
+            DateTime.tryParse(json['deliveryTimestamp']?.toString() ?? ''),
+        customerLocation: json['customerLocation'] is Map<String, dynamic>
+            ? WebPortalDocTrackingLocation.fromJson(
+                json['customerLocation'] as Map<String, dynamic>,
+              )
+            : null,
+        driverLastKnownLocation:
+            json['driverLastKnownLocation'] is Map<String, dynamic>
+                ? WebPortalDocTrackingLocation.fromJson(
+                    json['driverLastKnownLocation'] as Map<String, dynamic>,
+                  )
+                : null,
+        numEnrouteCustomers: (json['numEnrouteCustomers'] as num?)?.toInt(),
+        eta: (json['eta'] as num?)?.toDouble(),
+      );
+}
