@@ -1,11 +1,11 @@
 {
-    "name": "pharma_tracker",
-    "short_name": "pharma_tracker",
+    "name": "MPC Pharma",
+    "short_name": "MPC Pharma",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#49979B",
+    "theme_color": "#49979B",
+    "description": "MPC Pharma — logistics app for scanning, dispatch, and delivery.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

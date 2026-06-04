@@ -1,4 +1,4 @@
-package com.pharmatracker.pharma_tracker
+package com.mpc.pharma
 
 import io.flutter.embedding.android.FlutterActivity
 

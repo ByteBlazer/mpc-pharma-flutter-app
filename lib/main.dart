@@ -1,42 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() {
-  runApp(const HelloWorldApp());
-}
+import 'app.dart';
+import 'core/services/location_tracking_service.dart';
+import 'core/utils/platform_utils.dart';
 
-class HelloWorldApp extends StatelessWidget {
-  const HelloWorldApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Hello World',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      home: const HelloWorldPage(),
-    );
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (supportsNativeLocationService) {
+    await LocationTrackingService.initialize();
   }
-}
-
-class HelloWorldPage extends StatelessWidget {
-  const HelloWorldPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hello World'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Center(
-        child: Text(
-          'Hello, World!',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-      ),
-    );
-  }
+  runApp(const ProviderScope(child: MpcPharmaApp()));
 }

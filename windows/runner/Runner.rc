@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.pharmatracker" "\0"
-            VALUE "FileDescription", "pharma_tracker" "\0"
+            VALUE "CompanyName", "MPC Pharma" "\0"
+            VALUE "FileDescription", "mpc_pharma" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "pharma_tracker" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.pharmatracker. All rights reserved." "\0"
-            VALUE "OriginalFilename", "pharma_tracker.exe" "\0"
-            VALUE "ProductName", "pharma_tracker" "\0"
+            VALUE "InternalName", "mpc_pharma" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 MPC Pharma. All rights reserved." "\0"
+            VALUE "OriginalFilename", "mpc_pharma.exe" "\0"
+            VALUE "ProductName", "MPC Pharma" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

@@ -1,12 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:pharma_tracker/main.dart';
+import 'package:mpc_pharma/config/app_constants.dart';
+import 'package:mpc_pharma/core/utils/jwt_utils.dart';
 
 void main() {
-  testWidgets('displays Hello, World!', (WidgetTester tester) async {
-    await tester.pumpWidget(const HelloWorldApp());
+  test('UserType maps API role strings', () {
+    expect(UserType.fromApiValue('app-admin'), UserType.appAdmin);
+    expect(UserType.fromApiValue('app-trip-driver'), UserType.appTripDriver);
+    expect(UserType.fromApiValue('unknown'), isNull);
+  });
 
-    expect(find.text('Hello, World!'), findsOneWidget);
-    expect(find.text('Hello World'), findsOneWidget);
+  test('JwtUtils rejects empty token', () {
+    expect(JwtUtils.isValidToken(null), isFalse);
+    expect(JwtUtils.isValidToken(''), isFalse);
   });
 }
