@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 
-/// MUI-aligned colors and widgets for the web portal (React pharma-tracker-ui).
+/// MUI-aligned colors and widgets for the web portal (React ui).
 abstract final class WebPortalStyles {
   static const borderColor = Color(0xFFE0E0E0);
   static const warning = Color(0xFFED6C02);
+
   /// MUI default `palette.error.main`.
   static const errorMain = Color(0xFFD32F2F);
   static const textSecondary = Color(0xFF757575);
@@ -17,24 +18,24 @@ abstract final class WebPortalStyles {
       AppColors.primary.withValues(alpha: 0.12);
 
   static TextStyle pageTitle(BuildContext context) => TextStyle(
-        fontSize: 34,
-        fontWeight: FontWeight.w400,
-        color: AppColors.primary,
-        height: 1.2,
-      );
+    fontSize: 34,
+    fontWeight: FontWeight.w400,
+    color: AppColors.primary,
+    height: 1.2,
+  );
 
   static TextStyle sectionTitle(BuildContext context) => const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.w500,
-        color: Colors.black87,
-      );
+    fontSize: 20,
+    fontWeight: FontWeight.w500,
+    color: Colors.black87,
+  );
 
   static ButtonStyle outlinedPrimaryButton() => OutlinedButton.styleFrom(
-        foregroundColor: AppColors.primary,
-        side: const BorderSide(color: AppColors.primary),
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      );
+    foregroundColor: AppColors.primary,
+    side: const BorderSide(color: AppColors.primary),
+    visualDensity: VisualDensity.compact,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+  );
 
   /// Trip card expanded section — MUI `Button` outlined error small fullWidth.
   /// Delivery report filter panel title (MUI `h3` ~1.1rem).
@@ -63,39 +64,33 @@ abstract final class WebPortalStyles {
   static const filterInputConstraints = BoxConstraints(minHeight: 40);
 
   /// Every filter grid control occupies the same slot.
-  static Widget filterFieldSlot({required Widget child}) => SizedBox(
-        height: filterFieldHeight,
-        width: double.infinity,
-        child: child,
-      );
+  static Widget filterFieldSlot({required Widget child}) =>
+      SizedBox(height: filterFieldHeight, width: double.infinity, child: child);
 
   static ButtonStyle filterGridFilledButton() => FilledButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        minimumSize: const Size(0, filterButtonHeight),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        textStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          letterSpacing: 0.28,
-        ),
-      );
+    backgroundColor: AppColors.primary,
+    foregroundColor: Colors.white,
+    minimumSize: const Size(0, filterButtonHeight),
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    textStyle: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      letterSpacing: 0.28,
+    ),
+  );
 
   static ButtonStyle filterGridOutlinedButton() => OutlinedButton.styleFrom(
-        foregroundColor: AppColors.primary,
-        iconColor: AppColors.primary,
-        minimumSize: const Size(0, filterButtonHeight),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        side: const BorderSide(color: borderColor),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        textStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
-      );
+    foregroundColor: AppColors.primary,
+    iconColor: AppColors.primary,
+    minimumSize: const Size(0, filterButtonHeight),
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    side: const BorderSide(color: borderColor),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+  );
 
   static const _filterOutlineBorder = OutlineInputBorder(
     borderRadius: BorderRadius.all(Radius.circular(4)),
@@ -107,53 +102,49 @@ abstract final class WebPortalStyles {
     String? hint,
     Widget? prefixIcon,
     Widget? suffixIcon,
-  }) =>
-      InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: prefixIcon,
-        suffixIcon: suffixIcon,
-        floatingLabelBehavior: FloatingLabelBehavior.always,
-        isDense: false,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        constraints: filterInputConstraints,
-        border: _filterOutlineBorder,
-        enabledBorder: _filterOutlineBorder,
-        focusedBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(4)),
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
-        ),
-      );
+  }) => InputDecoration(
+    labelText: label,
+    hintText: hint,
+    prefixIcon: prefixIcon,
+    suffixIcon: suffixIcon,
+    floatingLabelBehavior: FloatingLabelBehavior.always,
+    isDense: false,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    constraints: filterInputConstraints,
+    border: _filterOutlineBorder,
+    enabledBorder: _filterOutlineBorder,
+    focusedBorder: const OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(4)),
+      borderSide: BorderSide(color: AppColors.primary, width: 2),
+    ),
+  );
 
   static ButtonStyle deliveryReportClearButton() => OutlinedButton.styleFrom(
-        foregroundColor: errorMain,
-        iconColor: errorMain,
-        side: const BorderSide(color: borderColor),
-        visualDensity: VisualDensity.compact,
-        minimumSize: const Size(0, 36),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        textStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
-      );
+    foregroundColor: errorMain,
+    iconColor: errorMain,
+    side: const BorderSide(color: borderColor),
+    visualDensity: VisualDensity.compact,
+    minimumSize: const Size(0, 36),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+  );
 
   static ButtonStyle forceEndTripOutlinedButton() => OutlinedButton.styleFrom(
-        foregroundColor: errorMain,
-        iconColor: errorMain,
-        side: const BorderSide(color: errorMain),
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        minimumSize: const Size(double.infinity, 30),
-        iconSize: 20,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        textStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          letterSpacing: 0.28,
-        ),
-      );
+    foregroundColor: errorMain,
+    iconColor: errorMain,
+    side: const BorderSide(color: errorMain),
+    visualDensity: VisualDensity.compact,
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    minimumSize: const Size(double.infinity, 30),
+    iconSize: 20,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    textStyle: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      letterSpacing: 0.28,
+    ),
+  );
 }
 
 /// White panel with light elevation (MUI `Paper`).

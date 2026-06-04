@@ -102,7 +102,8 @@ class _PortalTripMapViewState extends State<PortalTripMapView> {
   void didUpdateWidget(PortalTripMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
     final selectionChanged = oldWidget.selectedTripId != widget.selectedTripId;
-    final detailLoaded = widget.selectedTripId != null &&
+    final detailLoaded =
+        widget.selectedTripId != null &&
         oldWidget.selectedTrip?.docGroups == null &&
         widget.selectedTrip?.docGroups != null;
 
@@ -161,8 +162,9 @@ class _PortalTripMapViewState extends State<PortalTripMapView> {
 
   Set<Marker> _googleMarkers(bool driverBlinkOn) {
     final portalMarkers = _portalMarkers;
-    final needsCustomerIcon =
-        portalMarkers.any((p) => p.type == PortalMarkerType.customer);
+    final needsCustomerIcon = portalMarkers.any(
+      (p) => p.type == PortalMarkerType.customer,
+    );
 
     // Custom assets only — default pins are red/green teardrops, not truck/customer.
     if (_driverIcon == null || (needsCustomerIcon && _customerIcon == null)) {
@@ -245,7 +247,8 @@ class _PortalTripMapViewState extends State<PortalTripMapView> {
   }
 
   void _onMarkerTap(PortalMapMarker marker) {
-    if (marker.type == PortalMarkerType.customer && marker.customerInfo != null) {
+    if (marker.type == PortalMarkerType.customer &&
+        marker.customerInfo != null) {
       _showCustomerPanel(marker);
       return;
     }
@@ -293,8 +296,10 @@ class _PortalTripMapViewState extends State<PortalTripMapView> {
     double panelHeight,
   ) {
     const padding = 8.0;
-    final effectiveHeight =
-        panelHeight.clamp(0.0, (mapSize.height - padding * 2).clamp(0.0, double.infinity));
+    final effectiveHeight = panelHeight.clamp(
+      0.0,
+      (mapSize.height - padding * 2).clamp(0.0, double.infinity),
+    );
 
     // Prefer above the pin (React InfoWindow); flip below if needed.
     var top = anchor.dy - effectiveHeight - 24;
@@ -368,6 +373,8 @@ class _PortalTripMapViewState extends State<PortalTripMapView> {
                             target: PortalTripMapLogic.defaultCenter,
                             zoom: 10,
                           ),
+                          myLocationEnabled: false,
+                          myLocationButtonEnabled: false,
                           markers: _googleMarkers(driverBlinkOn),
                           onMapCreated: (c) {
                             _mapController = c;
@@ -543,7 +550,9 @@ class _MapRefreshToolbarState extends ConsumerState<_MapRefreshToolbar> {
           ),
         const Spacer(),
         OutlinedButton.icon(
-          onPressed: _refreshing ? null : () => unawaited(_refreshData(resetCountdown: true)),
+          onPressed: _refreshing
+              ? null
+              : () => unawaited(_refreshData(resetCountdown: true)),
           style: WebPortalStyles.outlinedPrimaryButton(),
           icon: _refreshing
               ? const SizedBox(
@@ -613,4 +622,3 @@ class _PanelHeightReporterState extends State<_PanelHeightReporter> {
     return KeyedSubtree(key: _key, child: widget.child);
   }
 }
-

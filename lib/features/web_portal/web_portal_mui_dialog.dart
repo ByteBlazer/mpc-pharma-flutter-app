@@ -7,7 +7,7 @@ typedef WebPortalDialogActionsBuilder = List<Widget> Function(
   BuildContext dialogContext,
 );
 
-/// MUI [Dialog] layout for the web portal (matches pharma-tracker-ui).
+/// MUI [Dialog] layout for the web portal 
 abstract final class WebPortalMuiDialog {
   static const _titleStyle = TextStyle(
     fontSize: 20,

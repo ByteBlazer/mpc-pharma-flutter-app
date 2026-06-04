@@ -1,0 +1,11 @@
+# Copy to android/local.properties (gitignored) and set your SDK path + Maps key.
+sdk.dir=/path/to/Android/sdk
+
+# Required for native Maps on Android (Trip Dashboard, public tracking).
+# Create in Google Cloud Console → APIs & Services → Credentials → Create API key
+# - Enable "Maps SDK for Android"
+# - Application restriction: Android apps
+#   - Package: com.mpc.pharma
+#   - SHA-1: run  scripts/print_android_maps_setup.sh
+# Do NOT use the browser-only key from web/index.html (tiles stay blank on Android).
+GOOGLE_MAPS_API_KEY_ANDROID=your-android-maps-key-here

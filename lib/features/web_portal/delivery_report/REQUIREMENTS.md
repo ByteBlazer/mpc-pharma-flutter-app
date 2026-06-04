@@ -1,6 +1,6 @@
 # Delivery Report — requirements (React parity + Flutter performance)
 
-## Behavior (from `pharma-tracker-ui`)
+## Behavior (from old ui)
 
 - Filters: dates (both or neither, max 30 days), doc ID, dropdowns via `WebPortalFilterDropdown` (single + multi city), route, trip ID, etc.
 - Search applies filters; Clear resets filters and results.
@@ -13,12 +13,12 @@
 
 ## Flutter implementation
 
-| Concern | Approach |
-|--------|----------|
-| Filter UI rebuilds | Local `StatefulWidget`; never watches report state |
-| API + JSON parse | `DeliveryReportController.search()` + `compute()` isolate |
-| Table (web) | HTML `<table>` via `HtmlElementView` (DOM, like React) |
-| Table (non-web) | Simple list fallback |
-| Loading state | Ends when isolate returns; DOM paint is separate |
-| Date filters (web) | Native `<input type="date">` + `showPicker()` via `WebPortalDateField` |
-| Date filters (mobile) | Material `showDatePicker` fallback |
+| Concern               | Approach                                                               |
+| --------------------- | ---------------------------------------------------------------------- |
+| Filter UI rebuilds    | Local `StatefulWidget`; never watches report state                     |
+| API + JSON parse      | `DeliveryReportController.search()` + `compute()` isolate              |
+| Table (web)           | HTML `<table>` via `HtmlElementView` (DOM, like React)                 |
+| Table (non-web)       | Simple list fallback                                                   |
+| Loading state         | Ends when isolate returns; DOM paint is separate                       |
+| Date filters (web)    | Native `<input type="date">` + `showPicker()` via `WebPortalDateField` |
+| Date filters (mobile) | Material `showDatePicker` fallback                                     |

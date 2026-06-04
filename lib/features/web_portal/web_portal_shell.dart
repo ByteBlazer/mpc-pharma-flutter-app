@@ -72,14 +72,14 @@ class WebPortalShell extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 SvgPicture.asset(
-                  'assets/pharma-tracker-logo.svg',
+                  'assets/mpc-pharma-logo.svg',
                   height: 32,
                   width: 32,
                 ),
                 if (isWide) ...[
                   const SizedBox(width: 8),
                   const Text(
-                    'Pharma Tracker',
+                    'MPC Pharma',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
                   ),
                 ],

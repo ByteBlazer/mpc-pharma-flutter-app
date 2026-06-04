@@ -465,6 +465,8 @@ class _PublicTrackingScreenState extends ConsumerState<PublicTrackingScreen> {
                             zoom: 12,
                           ),
                           minMaxZoomPreference: const MinMaxZoomPreference(4, 18),
+                          myLocationEnabled: false,
+                          myLocationButtonEnabled: false,
                           markers: _buildMapMarkers(driverBlinkOn),
                           onMapCreated: (c) {
                             _mapController = c;
