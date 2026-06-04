@@ -61,6 +61,12 @@ class PrefsService {
     await _prefs.remove(PrefsKeys.currentTripId);
   }
 
+  bool get tripDashboardGuidanceSeen =>
+      _prefs.getBool(PrefsKeys.tripDashboardGuidanceSeen) ?? false;
+
+  Future<void> setTripDashboardGuidanceSeen(bool value) =>
+      _prefs.setBool(PrefsKeys.tripDashboardGuidanceSeen, value);
+
   Set<UserType> get userTypes {
     final raw = roles;
     if (raw == null || raw.isEmpty) return {};

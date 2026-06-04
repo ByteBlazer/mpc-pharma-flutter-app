@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/auth/app_workflow.dart';
 import '../core/auth/auth_manager.dart';
 import '../core/providers/providers.dart';
 import '../core/services/location_tracking_service.dart';
@@ -16,6 +17,16 @@ import '../features/profile/profile_screen.dart';
 import '../features/schedule_trip/schedule_trip_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/trip_details/trip_details_screen.dart';
+import '../features/web_portal/web_portal_base_locations_screen.dart';
+import '../features/web_portal/web_portal_delivery_report_screen.dart';
+import '../features/web_portal/web_portal_home_screen.dart';
+import '../features/web_portal/web_portal_reports_screen.dart';
+import '../features/web_portal/web_portal_settings_screen.dart';
+import '../features/web_portal/web_portal_shell.dart';
+import '../features/web_portal/web_portal_trips_screen.dart';
+import '../features/web_portal/web_portal_users_screen.dart';
+import '../features/workflow_selection/placeholder_workflow_screen.dart';
+import '../features/workflow_selection/workflow_selection_screen.dart';
 import 'app_routes.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -48,6 +59,65 @@ final routerProvider = Provider<GoRouter>((ref) {
           final phone = state.uri.queryParameters['phone'] ?? '';
           return OtpScreen(phoneNumber: phone);
         },
+      ),
+      GoRoute(
+        path: AppRoutes.workflowSelect,
+        builder: (context, state) => const WorkflowSelectionScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.workflowCustomer,
+        builder: (context, state) => const PlaceholderWorkflowScreen(
+          workflow: AppWorkflow.customer,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.workflowWeb,
+        redirect: (context, state) {
+          if (state.uri.path == AppRoutes.workflowWeb) {
+            return AppRoutes.workflowWebHome;
+          }
+          return null;
+        },
+        routes: [
+          ShellRoute(
+            builder: (context, state, child) =>
+                WebPortalShell(child: child),
+            routes: [
+              GoRoute(
+                path: 'home',
+                builder: (context, state) => const WebPortalHomeScreen(),
+              ),
+              GoRoute(
+                path: 'users',
+                builder: (context, state) => const WebPortalUsersScreen(),
+              ),
+              GoRoute(
+                path: 'base-locations',
+                builder: (context, state) =>
+                    const WebPortalBaseLocationsScreen(),
+              ),
+              GoRoute(
+                path: 'trips',
+                builder: (context, state) => const WebPortalTripsScreen(),
+              ),
+              GoRoute(
+                path: 'reports',
+                builder: (context, state) => const WebPortalReportsScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'delivery',
+                    builder: (context, state) =>
+                        const WebPortalDeliveryReportScreen(),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: 'settings',
+                builder: (context, state) => const WebPortalSettingsScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: AppRoutes.home,

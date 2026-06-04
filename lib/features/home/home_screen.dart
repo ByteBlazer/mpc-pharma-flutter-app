@@ -79,6 +79,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final roles = ref.watch(userRolesProvider);
+    final workflows = ref.watch(eligibleWorkflowsProvider);
+    final showWorkflowSwitcher = workflows.length > 1;
 
     if (roles.isEmpty) {
       return Scaffold(
@@ -121,6 +123,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
+          if (showWorkflowSwitcher)
+            IconButton(
+              icon: const Icon(Icons.apps),
+              tooltip: 'Switch workflow',
+              onPressed: () => context.go(AppRoutes.workflowSelect),
+            ),
           if (_tabs[_currentIndex] != HomeTab.scan)
             IconButton(
               icon: const Icon(Icons.refresh),

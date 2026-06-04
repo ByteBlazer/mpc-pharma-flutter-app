@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/app_constants.dart';
 import '../api/api_client.dart';
+import '../auth/app_workflow.dart';
 import '../storage/prefs_service.dart';
 
 final prefsProvider = FutureProvider<PrefsService>((ref) async {
@@ -19,6 +20,11 @@ final userRolesProvider = Provider<Set<UserType>>((ref) {
     data: (p) => p.userTypes,
     orElse: () => {},
   );
+});
+
+final eligibleWorkflowsProvider = Provider<List<AppWorkflow>>((ref) {
+  final roles = ref.watch(userRolesProvider);
+  return AppWorkflowResolver.eligible(roles);
 });
 
 class HomeRefreshNotifier extends StateNotifier<int> {

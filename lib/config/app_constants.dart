@@ -13,6 +13,7 @@ class AppConstants {
 }
 
 enum UserType {
+  customer('customer'),
   webAccess('web-access'),
   appScanner('app-scanner'),
   appTripCreator('app-trip-creator'),

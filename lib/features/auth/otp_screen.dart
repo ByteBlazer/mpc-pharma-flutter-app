@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:sms_autofill/sms_autofill.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/auth/app_workflow.dart';
 import '../../core/providers/providers.dart';
 import '../../core/services/session_service.dart';
 import '../../core/widgets/common_widgets.dart';
@@ -106,7 +107,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> with CodeAutoFill {
       final prefs = await ref.read(prefsProvider.future);
       await SessionService(prefs).saveLoginSession(response);
       ref.read(lastLoginTimeProvider.notifier).state = DateTime.now();
-      if (mounted) context.go(AppRoutes.home);
+      if (mounted) {
+        context.go(AppWorkflowResolver.destinationRoute(prefs.userTypes));
+      }
     } on DioException catch (e) {
       setState(() => _error = ApiClient.parseError(e));
     } catch (e) {

@@ -7,6 +7,8 @@ class JwtPayload {
     this.mobile,
     this.roles,
     this.locationHeartBeatFrequencyInSeconds,
+    this.baseLocationId,
+    this.baseLocationName,
     required this.iat,
     required this.exp,
   });
@@ -16,6 +18,8 @@ class JwtPayload {
   final String? mobile;
   final String? roles;
   final int? locationHeartBeatFrequencyInSeconds;
+  final String? baseLocationId;
+  final String? baseLocationName;
   final int iat;
   final int exp;
 
@@ -33,6 +37,8 @@ class JwtPayload {
         roles: map['roles']?.toString(),
         locationHeartBeatFrequencyInSeconds:
             (map['locationHeartBeatFrequencyInSeconds'] as num?)?.toInt(),
+        baseLocationId: map['baseLocationId']?.toString(),
+        baseLocationName: map['baseLocationName']?.toString(),
         iat: (map['iat'] as num).toInt(),
         exp: (map['exp'] as num).toInt(),
       );

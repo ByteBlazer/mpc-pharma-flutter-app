@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../config/app_config.dart';
 import '../../config/app_constants.dart';
 import '../models/models.dart';
+import '../models/web_portal_models.dart';
 import '../storage/prefs_service.dart';
 import '../utils/jwt_utils.dart';
 import 'auth_interceptor.dart';
@@ -202,6 +204,228 @@ class ApiClient {
     return RecentSignatureResponse.fromJson(response.data ?? {});
   }
 
+  // --- Web portal ---
+
+  Future<List<WebPortalUser>> getPortalUsers() async {
+    final response = await _dio.get<List<dynamic>>(
+      'auth/users',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return (response.data ?? [])
+        .map((e) => WebPortalUser.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<WebPortalUserRole>> getPortalUserRoles() async {
+    final response = await _dio.get<List<dynamic>>(
+      'auth/user-roles',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return (response.data ?? [])
+        .map((e) => WebPortalUserRole.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<WebPortalBaseLocation>> getPortalBaseLocations() async {
+    final response = await _dio.get<List<dynamic>>(
+      'auth/base-locations',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return (response.data ?? [])
+        .map((e) => WebPortalBaseLocation.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> createPortalUser(WebPortalUserFormData data) async {
+    await _dio.post<void>(
+      'auth/users',
+      data: data.toJson(includeIsActive: false),
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+  }
+
+  Future<void> updatePortalUser(
+    String userId,
+    WebPortalUserFormData data,
+  ) async {
+    await _dio.put<void>(
+      'auth/users/$userId',
+      data: data.toJson(),
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+  }
+
+  Future<void> createPortalBaseLocation({required String name}) async {
+    await _dio.post<void>(
+      'auth/base-locations',
+      data: {'name': name},
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+  }
+
+  Future<void> updatePortalBaseLocation(
+    String locationId, {
+    required String name,
+  }) async {
+    await _dio.put<void>(
+      'auth/base-locations/$locationId',
+      data: {'name': name},
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+  }
+
+  Future<WebPortalSetting> getPortalSetting(String settingName) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'setting/$settingName',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return WebPortalSetting.fromJson(response.data ?? {});
+  }
+
+  Future<void> updatePortalSetting({
+    required String settingName,
+    required String settingValue,
+  }) async {
+    await _dio.put<void>(
+      'setting',
+      data: {'settingName': settingName, 'settingValue': settingValue},
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+  }
+
+  Future<WebPortalAllTripsResponse> getAllTrips() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'trip/all-trips',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return WebPortalAllTripsResponse.fromJson(response.data ?? {});
+  }
+
+  Future<WebPortalTrip> getPortalTripDetail(int tripId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'trip/$tripId',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return WebPortalTrip.fromJson(response.data ?? {});
+  }
+
+  Future<void> forceEndTrip(int tripId) async {
+    await _dio.post<void>(
+      'trip/force-end/$tripId',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+  }
+
+  Future<WebPortalDocSearchResponse> searchDoc(String docId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'trip/doc-search/$docId',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return WebPortalDocSearchResponse.fromJson(response.data ?? {});
+  }
+
+  Future<WebPortalDeliveryStatusResponse> getDocDeliveryStatus(
+    String docId,
+  ) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'doc/delivery-status/$docId',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return WebPortalDeliveryStatusResponse.fromJson(response.data ?? {});
+  }
+
+  Future<WebPortalBackupListResponse> listBackups() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'setting/backups',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return WebPortalBackupListResponse.fromJson(response.data ?? {});
+  }
+
+  Future<WebPortalCreateBackupResponse> createBackup() async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'setting/backup',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return WebPortalCreateBackupResponse.fromJson(response.data ?? {});
+  }
+
+  Future<void> restoreBackup({
+    required String filename,
+    required String passkey,
+  }) async {
+    await _dio.post<void>(
+      'setting/restore',
+      data: {'filename': filename, 'passkey': passkey},
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+  }
+
+  String backupDownloadUrl(String filename) =>
+      '${AppConfig.baseUrl}setting/backup/download/$filename';
+
+  Future<List<WebPortalLightweightCustomer>>
+      getLightweightCustomers() async {
+    final response = await _dio.get<List<dynamic>>(
+      'customers',
+      queryParameters: {'lightweight': 'true'},
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return (response.data ?? [])
+        .map(
+          (e) => WebPortalLightweightCustomer.fromJson(
+            e as Map<String, dynamic>,
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<String>> getRoutes() async {
+    final response = await _dio.get<List<dynamic>>(
+      'routes',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return (response.data ?? []).map((e) => e.toString()).toList();
+  }
+
+  Future<List<String>> getOriginWarehouses() async {
+    final response = await _dio.get<List<dynamic>>(
+      'origin-warehouses',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return (response.data ?? []).map((e) => e.toString()).toList();
+  }
+
+  Future<WebPortalDeliveryReportResponse> getDeliveryReport(
+    WebPortalDeliveryReportFilters filters,
+  ) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'report/delivery-report-data',
+      queryParameters: filters.toQueryParams(),
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return WebPortalDeliveryReportResponse.fromJson(response.data ?? {});
+  }
+
+  Future<WebPortalSignatureResponse> getDocSignature(String docId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'doc/signature/$docId',
+      options: Options(headers: {'Authorization': _authHeader}),
+    );
+    return WebPortalSignatureResponse.fromJson(response.data ?? {});
+  }
+
+  Future<List<int>> downloadBackupBytes(String filename) async {
+    final response = await _dio.get<List<int>>(
+      'setting/backup/download/$filename',
+      options: Options(
+        headers: {'Authorization': _authHeader},
+        responseType: ResponseType.bytes,
+      ),
+    );
+    return response.data ?? [];
+  }
+
   static String parseError(DioException error) {
     final data = error.response?.data;
     if (data is Map<String, dynamic>) {
@@ -209,6 +433,16 @@ class ApiClient {
           data['error']?.toString() ??
           AppConstants.networkLossMessage;
     }
+
+    if (kIsWeb &&
+        (error.type == DioExceptionType.connectionError ||
+            error.type == DioExceptionType.unknown)) {
+      return 'Cannot reach the API from the browser (CORS). '
+          'Run on Android/iOS, use a local API with '
+          '--dart-define=API_BASE_URL=http://localhost:3000/api/, '
+          'or run ./scripts/run_web_dev.sh for local Chrome testing.';
+    }
+
     return error.message ?? AppConstants.networkLossMessage;
   }
 }

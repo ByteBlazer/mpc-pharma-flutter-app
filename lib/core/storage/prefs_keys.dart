@@ -10,4 +10,5 @@ class PrefsKeys {
       'LOCATION_HEART_BEAT_FREQUENCY_IN_SECONDS';
   static const currentTripId = 'CURRENT_TRIP_ID';
   static const lastLocationUpdateTimeMs = 'LAST_LOCATION_UPDATE_TIME_IN_MILLS';
+  static const tripDashboardGuidanceSeen = 'TRIP_DASHBOARD_GUIDANCE_SEEN';
 }

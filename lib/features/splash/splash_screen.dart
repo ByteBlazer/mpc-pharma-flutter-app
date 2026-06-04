@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth/app_workflow.dart';
 import '../../core/providers/providers.dart';
 import '../../core/services/session_service.dart';
 import '../../core/storage/prefs_service.dart';
@@ -38,7 +39,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (session.isLoggedIn) {
       _storePayload(prefs);
       ref.read(lastLoginTimeProvider.notifier).state = DateTime.now();
-      if (mounted) context.go(AppRoutes.home);
+      if (mounted) {
+        context.go(AppWorkflowResolver.destinationRoute(prefs.userTypes));
+      }
     } else {
       ref.read(lastLoginTimeProvider.notifier).state = null;
       final phone = prefs.phoneNumber;
