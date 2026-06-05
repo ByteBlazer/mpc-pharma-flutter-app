@@ -17,8 +17,17 @@ abstract final class WebPortalTheme {
       borderSide: const BorderSide(color: _outlineGrey),
     );
     return base.copyWith(
+      scaffoldBackgroundColor: Colors.white,
       textTheme: inter,
       primaryTextTheme: inter,
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.primary;
+          }
+          return null;
+        }),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: false,
         isDense: true,
@@ -71,6 +80,36 @@ abstract final class WebPortalTheme {
         elevation: 1,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(4)),
+        ),
+      ),
+    );
+  }
+
+  /// MUI `Dialog` form fields — medium outlined, aligned with DOM dropdowns.
+  static ThemeData dialogForm() {
+    const outlineGrey = Color(0xFFBDBDBD);
+    final outlineBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(4),
+      borderSide: const BorderSide(color: outlineGrey),
+    );
+    final base = light();
+    final fieldHeight = WebPortalStyles.dialogFormFieldHeight;
+    return base.copyWith(
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        isDense: false,
+        contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        constraints: BoxConstraints(
+          minHeight: fieldHeight,
+          maxHeight: fieldHeight,
+        ),
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        labelStyle: WebPortalStyles.dialogFormFloatingLabelStyle,
+        floatingLabelStyle: WebPortalStyles.dialogFormFloatingLabelStyle,
+        border: outlineBorder,
+        enabledBorder: outlineBorder,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
       ),
     );

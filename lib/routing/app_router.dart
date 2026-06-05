@@ -38,7 +38,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       AuthManager.instance.authEvents,
     ),
     redirect: (context, state) {
-      if (prefsAsync.isLoading) return null;
+      if (prefsAsync.isLoading && state.uri.path != AppRoutes.splash) {
+        return AppRoutes.splash;
+      }
       return null;
     },
     routes: [

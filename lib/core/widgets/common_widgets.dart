@@ -72,23 +72,56 @@ class AppConfirmationDialog extends StatelessWidget {
 }
 
 class LoadingOverlay extends StatelessWidget {
-  const LoadingOverlay({super.key, this.message});
+  const LoadingOverlay({super.key, this.message, this.modal = false});
 
   final String? message;
 
+  /// Full-screen dimmed backdrop with a white card (MUI `ModalInfiniteSpinner`).
+  final bool modal;
+
+  Widget _content() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const CircularProgressIndicator(),
+        if (message != null) ...[
+          const SizedBox(height: 24),
+          Text(
+            message!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          if (message != null) ...[
-            const SizedBox(height: 12),
-            Text(message!),
-          ],
-        ],
-      ),
+    if (!modal) {
+      return Center(child: _content());
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ModalBarrier(dismissible: false, color: Color(0x80000000)),
+        Center(
+          child: Material(
+            elevation: 24,
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: _content(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

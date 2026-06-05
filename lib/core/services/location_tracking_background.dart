@@ -1,7 +1,6 @@
 import 'dart:async';
-import 'dart:ui';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -15,13 +14,13 @@ import '../utils/jwt_utils.dart';
 @pragma('vm:entry-point')
 Future<bool> locationTrackingIosBackground(ServiceInstance service) async {
   WidgetsFlutterBinding.ensureInitialized();
-  DartPluginRegistrant.ensureInitialized();
   return true;
 }
 
 @pragma('vm:entry-point')
 void locationTrackingOnStart(ServiceInstance service) async {
-  DartPluginRegistrant.ensureInitialized();
+  // Plugins are already registered by the service entrypoint — do not call
+  // DartPluginRegistrant.ensureInitialized() here (_isMainIsolate is false).
 
   Timer? timer;
   final prefs = await PrefsService.create();

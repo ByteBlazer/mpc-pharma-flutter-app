@@ -6,7 +6,7 @@ import 'web_portal_filter_dropdown.dart';
 import 'web_portal_filter_text_field.dart';
 import 'web_portal_styles.dart';
 
-/// MUI filter grid for Delivery Report — fixed columns via [Table] (stable on web).
+/// MUI filter grid for Delivery Report — responsive columns (React `gridTemplateColumns`).
 class DeliveryReportFilterSection extends StatelessWidget {
   const DeliveryReportFilterSection({
     super.key,
@@ -126,114 +126,81 @@ class DeliveryReportFilterSection extends StatelessWidget {
               const gap = 12.0;
               final cellW = (constraints.maxWidth - gap * (cols - 1)) / cols;
 
-              final columnWidths = <int, TableColumnWidth>{
-                for (var i = 0; i < cols; i++) i: FixedColumnWidth(cellW),
-              };
-
-              Widget cell(Widget child) => SizedBox(
-                    height: WebPortalStyles.filterFieldHeight,
+              Widget gridCell(Widget child) => SizedBox(
                     width: cellW,
+                    height: WebPortalStyles.filterFieldHeight,
                     child: child,
                   );
 
-              Widget padCell(Widget child) => Padding(
-                    padding: EdgeInsets.only(
-                      right: gap,
-                      bottom: gap,
-                    ),
-                    child: cell(child),
-                  );
-
-              TableRow tableRow(List<Widget> fields) {
-                final cells = <Widget>[];
-                for (var i = 0; i < cols; i++) {
-                  final isLastCol = i == cols - 1;
-                  final field = i < fields.length ? fields[i] : const SizedBox.shrink();
-                  final wrapped = isLastCol
-                      ? Padding(
-                          padding: const EdgeInsets.only(bottom: gap),
-                          child: cell(field),
-                        )
-                      : padCell(field);
-                  cells.add(wrapped);
-                }
-                return TableRow(children: cells);
-              }
-
-              return Table(
-                columnWidths: columnWidths,
-                defaultVerticalAlignment: TableCellVerticalAlignment.bottom,
+              // Flat grid (React: all fields in one `display:grid` — not row chunks).
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
                 children: [
-                  tableRow([
-                    WebPortalDateField(
-                      label: 'From Date',
-                      value: fromDate,
-                      max: toDate,
-                      onChanged: onFromDateChanged,
-                    ),
-                    WebPortalDateField(
-                      label: 'To Date',
-                      value: toDate,
-                      min: fromDate,
-                      onChanged: onToDateChanged,
-                    ),
-                    WebPortalFilterTextField(
-                      controller: docIdController,
-                      label: 'Doc ID',
-                      hint: 'Last 3 digits or more',
-                      onCleared: onDocIdClear,
-                    ),
-                    WebPortalFilterDropdown(
-                      label: 'Customer',
-                      options: customerOptions,
-                      selectedId: customerId,
-                      onSelected: onCustomerChanged,
-                    ),
-                  ]),
-                  tableRow([
-                    WebPortalFilterDropdown.multi(
-                      label: 'Customer City',
-                      options: WebPortalDropdownOption.fromStrings(cities),
-                      selectedIds: selectedCities,
-                      onSelectionChanged: onCitiesChanged,
-                    ),
-                    WebPortalFilterDropdown(
-                      label: 'Origin Warehouse',
-                      options:
-                          WebPortalDropdownOption.fromStrings(originWarehouses),
-                      selectedId: originWarehouse,
-                      onSelected: onOriginWarehouseChanged,
-                    ),
-                    WebPortalFilterDropdown(
-                      label: 'Route',
-                      options: WebPortalDropdownOption.fromStrings(routes),
-                      selectedId: route,
-                      onSelected: onRouteChanged,
-                    ),
-                    WebPortalFilterTextField(
-                      controller: tripIdController,
-                      label: 'Trip ID',
-                      keyboardType: TextInputType.number,
-                      onCleared: onTripIdClear,
-                    ),
-                  ]),
-                  tableRow([
-                    WebPortalFilterDropdown(
-                      label: 'Driver',
-                      options: driverOptions,
-                      selectedId: driverUserId,
-                      onSelected: onDriverChanged,
-                    ),
-                    WebPortalFilterDropdown(
-                      label: 'Parent Trip Originated From',
-                      options: _locationOptions,
-                      selectedId: _locationOptions.any((o) => o.id == tripStartLocation)
-                          ? tripStartLocation
-                          : null,
-                      onSelected: onTripStartLocationChanged,
-                    ),
-                    _actionButtons(),
-                  ]),
+                  gridCell(WebPortalDateField(
+                    label: 'From Date',
+                    value: fromDate,
+                    max: toDate,
+                    onChanged: onFromDateChanged,
+                  )),
+                  gridCell(WebPortalDateField(
+                    label: 'To Date',
+                    value: toDate,
+                    min: fromDate,
+                    onChanged: onToDateChanged,
+                  )),
+                  gridCell(WebPortalFilterTextField(
+                    controller: docIdController,
+                    label: 'Doc ID',
+                    hint: 'Last 3 digits or more',
+                    onCleared: onDocIdClear,
+                  )),
+                  gridCell(WebPortalFilterDropdown(
+                    label: 'Customer',
+                    options: customerOptions,
+                    selectedId: customerId,
+                    onSelected: onCustomerChanged,
+                  )),
+                  gridCell(WebPortalFilterDropdown.multi(
+                    label: 'Customer City',
+                    options: WebPortalDropdownOption.fromStrings(cities),
+                    selectedIds: selectedCities,
+                    onSelectionChanged: onCitiesChanged,
+                  )),
+                  gridCell(WebPortalFilterDropdown(
+                    label: 'Origin Warehouse',
+                    options:
+                        WebPortalDropdownOption.fromStrings(originWarehouses),
+                    selectedId: originWarehouse,
+                    onSelected: onOriginWarehouseChanged,
+                  )),
+                  gridCell(WebPortalFilterDropdown(
+                    label: 'Route',
+                    options: WebPortalDropdownOption.fromStrings(routes),
+                    selectedId: route,
+                    onSelected: onRouteChanged,
+                  )),
+                  gridCell(WebPortalFilterTextField(
+                    controller: tripIdController,
+                    label: 'Trip ID',
+                    keyboardType: TextInputType.number,
+                    onCleared: onTripIdClear,
+                  )),
+                  gridCell(WebPortalFilterDropdown(
+                    label: 'Driver',
+                    options: driverOptions,
+                    selectedId: driverUserId,
+                    onSelected: onDriverChanged,
+                  )),
+                  gridCell(WebPortalFilterDropdown(
+                    label: 'Parent Trip Originated From',
+                    options: _locationOptions,
+                    selectedId: _locationOptions.any((o) => o.id == tripStartLocation)
+                        ? tripStartLocation
+                        : null,
+                    onSelected: onTripStartLocationChanged,
+                  )),
+                  gridCell(_actionButtons()),
                 ],
               );
             },

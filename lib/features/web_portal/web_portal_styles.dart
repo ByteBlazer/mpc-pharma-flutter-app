@@ -30,6 +30,131 @@ abstract final class WebPortalStyles {
     color: Colors.black87,
   );
 
+  /// MUI `TableHead` — bold column labels in React UI.
+  static const usersTableHeaderStyle = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: Color(0xDE000000), // rgba(0,0,0,0.87)
+  );
+
+  /// MUI augmented `palette.primary.dark` / `primary.light`.
+  static const usersPrimaryDark = Color(0xFF3A7A7E);
+  static const usersPrimaryLight = Color(0xFF7AB3B6);
+
+  /// MUI contained `Button` — uppercase label, hover darkens + slight elevation.
+  static const usersAddUserLabelStyle = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 0.75,
+    color: Colors.white,
+  );
+
+  /// MUI `DialogActions` text button — uppercase primary label.
+  static const dialogActionTextLabelStyle = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 0.75,
+    color: AppColors.primary,
+  );
+
+  /// MUI `DialogActions` contained button — uppercase white label.
+  static const dialogActionContainedLabelStyle = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 0.75,
+    color: Colors.white,
+  );
+
+  /// MUI `ToggleButton` `size="small"` label.
+  static TextStyle usersRolesToggleLabelStyle({required bool selected}) =>
+      TextStyle(
+        fontSize: 13,
+        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+        letterSpacing: 0.75,
+      );
+
+  /// MUI row `Edit` button label (`size="small"` contained).
+  static const usersRowEditLabelStyle = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 0.75,
+    color: Colors.white,
+  );
+
+  /// MUI `TableBody` cell text.
+  static const usersTableCellStyle = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    color: Color(0xDE000000),
+  );
+
+  static const usersTableHeaderBg = Color(0xFFF5F5F5);
+  static const usersTableHoverBg = Color(0xFFF5F5F5);
+
+  /// Settings section title — MUI `Typography` `variant="h5"`.
+  static const settingsSectionTitle = TextStyle(
+    fontSize: 24,
+    fontWeight: FontWeight.w400,
+    color: Colors.black87,
+    height: 1.2,
+  );
+
+  /// Settings section subtitle — MUI `body1` `text.secondary`.
+  static const settingsSectionSubtitle = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
+    color: textSecondary,
+    height: 1.5,
+  );
+
+  /// Settings card title — MUI `Typography` `variant="h6"`.
+  static const settingsCardTitle = TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.w500,
+    color: Colors.black87,
+    height: 1.3,
+  );
+
+  /// Settings card body — MUI `body2` `text.secondary`.
+  static const settingsBodySecondary = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    color: textSecondary,
+    height: 1.43,
+  );
+
+  /// Small caption in settings dialogs.
+  static const settingsCaption = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: textSecondary,
+    height: 1.4,
+  );
+
+  /// MUI `DialogContent` `gap: 2` between stacked fields.
+  static const dialogFormFieldGap = 16.0;
+
+  /// MUI inner `Box` `pt: 1` below dialog title.
+  static const dialogFormContentTop = 8.0;
+
+  /// Outlined dialog control height — shared by TextField and DOM dropdowns.
+  static const dialogFormFieldHeight = 52.0;
+
+  /// Notch label on dialog text fields — DOM dropdowns use 12px; Inter needs 13px
+  /// to read the same size after Flutter scales labels in the shorter field slot.
+  static const dialogFormFloatingLabelStyle = TextStyle(
+    fontSize: 13,
+    color: textSecondary,
+    height: 1.2,
+  );
+
+  /// Fixed slot for dialog form fields (TextField siblings and DOM dropdowns).
+  static Widget dialogFormFieldSlot({required Widget child}) => SizedBox(
+        height: dialogFormFieldHeight,
+        width: double.infinity,
+        child: child,
+      );
+
   static ButtonStyle outlinedPrimaryButton() => OutlinedButton.styleFrom(
     foregroundColor: AppColors.primary,
     side: const BorderSide(color: AppColors.primary),
@@ -97,27 +222,39 @@ abstract final class WebPortalStyles {
     borderSide: BorderSide(color: borderColor),
   );
 
+  static const _errorOutlineBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.all(Radius.circular(4)),
+    borderSide: BorderSide(color: errorMain),
+  );
+
   static InputDecoration muiOutlinedField({
     required String label,
     String? hint,
     Widget? prefixIcon,
     Widget? suffixIcon,
-  }) => InputDecoration(
-    labelText: label,
-    hintText: hint,
-    prefixIcon: prefixIcon,
-    suffixIcon: suffixIcon,
-    floatingLabelBehavior: FloatingLabelBehavior.always,
-    isDense: false,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    constraints: filterInputConstraints,
-    border: _filterOutlineBorder,
-    enabledBorder: _filterOutlineBorder,
-    focusedBorder: const OutlineInputBorder(
-      borderRadius: BorderRadius.all(Radius.circular(4)),
-      borderSide: BorderSide(color: AppColors.primary, width: 2),
-    ),
-  );
+    bool error = false,
+  }) =>
+      InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: prefixIcon,
+        suffixIcon: suffixIcon,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        isDense: false,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        constraints: filterInputConstraints,
+        border: error ? _errorOutlineBorder : _filterOutlineBorder,
+        enabledBorder: error ? _errorOutlineBorder : _filterOutlineBorder,
+        focusedBorder: error
+            ? _errorOutlineBorder
+            : const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(4)),
+                borderSide: BorderSide(color: AppColors.primary, width: 2),
+              ),
+        errorBorder: _errorOutlineBorder,
+        focusedErrorBorder: _errorOutlineBorder,
+      );
 
   static ButtonStyle deliveryReportClearButton() => OutlinedButton.styleFrom(
     foregroundColor: errorMain,
@@ -147,19 +284,59 @@ abstract final class WebPortalStyles {
   );
 }
 
-/// White panel with light elevation (MUI `Paper`).
+/// MUI `Card`-style shadows — Material [elevation] is too faint on Flutter web.
+abstract final class WebPortalCardShadows {
+  static const standard = [
+    BoxShadow(
+      color: Color(0x1A000000),
+      blurRadius: 3,
+      offset: Offset(0, 1),
+    ),
+  ];
+
+  /// Settings cards on a white page — visible depth without a heavy outline.
+  static const elevated = [
+    BoxShadow(
+      color: Color(0x26000000),
+      blurRadius: 8,
+      offset: Offset(0, 3),
+    ),
+    BoxShadow(
+      color: Color(0x12000000),
+      blurRadius: 2,
+      offset: Offset(0, 1),
+    ),
+  ];
+}
+
+/// White panel with light elevation (MUI `Paper` / `Card`).
 class WebPortalPaper extends StatelessWidget {
-  const WebPortalPaper({super.key, required this.child, this.padding});
+  const WebPortalPaper({
+    super.key,
+    required this.child,
+    this.padding,
+    this.elevated = false,
+  });
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
 
+  /// Settings-style cards: explicit box shadow (renders reliably on web).
+  final bool elevated;
+
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 1,
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(4),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: elevated
+            ? Border.all(color: WebPortalStyles.borderColor)
+            : null,
+        boxShadow: elevated
+            ? WebPortalCardShadows.elevated
+            : WebPortalCardShadows.standard,
+      ),
       child: Padding(
         padding: padding ?? const EdgeInsets.all(16),
         child: child,

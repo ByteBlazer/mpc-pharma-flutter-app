@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers/providers.dart';
+import '../../core/widgets/mpc_pharma_logo.dart';
 import '../../core/services/location_tracking_service.dart';
 import '../../core/services/session_service.dart';
 import '../../core/theme/app_colors.dart';
@@ -44,19 +44,30 @@ class WebPortalShell extends ConsumerWidget {
     ),
   ];
 
-  int _selectedIndex(String location) {
+  /// Main nav highlight index, or `null` when no tab applies (e.g. Settings).
+  int? _selectedNavIndex(String location) {
+    if (location.startsWith(AppRoutes.workflowWebSettings)) return null;
     if (location.startsWith(AppRoutes.workflowWebReports)) return 4;
     if (location.startsWith(AppRoutes.workflowWebTrips)) return 3;
     if (location.startsWith(AppRoutes.workflowWebBaseLocations)) return 2;
     if (location.startsWith(AppRoutes.workflowWebUsers)) return 1;
-    return 0;
+    if (location.startsWith(AppRoutes.workflowWebHome) ||
+        location == AppRoutes.workflowWeb) {
+      return 0;
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).uri.path;
-    final selected = _selectedIndex(location);
-    final isWide = MediaQuery.sizeOf(context).width >= 600;
+    final selectedIndex = _selectedNavIndex(location);
+    final onSettings = location.startsWith(AppRoutes.workflowWebSettings);
+    final width = MediaQuery.sizeOf(context).width;
+    // Text nav needs ~1100px; icon row needs ~768px before crowding.
+    final useTextNav = width >= 1100;
+    final useIconNav = width >= 768;
+    final showBrandText = width >= 520;
 
     return Theme(
       data: WebPortalTheme.light(),
@@ -69,61 +80,98 @@ class WebPortalShell extends ConsumerWidget {
           title: InkWell(
             onTap: () => context.go(AppRoutes.workflowWebHome),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                SvgPicture.asset(
-                  'assets/mpc-pharma-logo.svg',
-                  height: 32,
-                  width: 32,
-                ),
-                if (isWide) ...[
+                const MpcPharmaLogo(size: 32),
+                if (showBrandText) ...[
                   const SizedBox(width: 8),
-                  const Text(
-                    'MPC Pharma',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                  const Expanded(
+                    child: Text(
+                      'MPC Pharma',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
                 ],
               ],
             ),
           ),
           actions: [
-            if (isWide)
+            if (useTextNav)
               for (var i = 0; i < _navItems.length; i++)
                 _AppBarNavButton(
                   item: _navItems[i],
-                  selected: selected == i,
+                  selected: selectedIndex == i,
                   onTap: () => context.go(_navItems[i].route),
                 )
-            else
+            else if (useIconNav)
               for (var i = 0; i < _navItems.length; i++)
                 IconButton(
                   icon: Icon(_navItems[i].icon),
                   tooltip: _navItems[i].label,
                   onPressed: () => context.go(_navItems[i].route),
                   style: IconButton.styleFrom(
-                    backgroundColor: selected == i
+                    backgroundColor: selectedIndex == i
                         ? Colors.white.withValues(alpha: 0.2)
                         : Colors.transparent,
+                    visualDensity: VisualDensity.compact,
                   ),
-                ),
+                )
+            else
+              PopupMenuButton<int>(
+                icon: const Icon(Icons.menu),
+                tooltip: 'Navigation',
+                onSelected: (i) => context.go(_navItems[i].route),
+                itemBuilder: (context) => [
+                  for (var i = 0; i < _navItems.length; i++)
+                    PopupMenuItem(
+                      value: i,
+                      child: Row(
+                        children: [
+                          Icon(
+                            _navItems[i].icon,
+                            size: 20,
+                            color: selectedIndex == i
+                                ? AppColors.primary
+                                : Colors.black87,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _navItems[i].label,
+                            style: TextStyle(
+                              fontWeight: selectedIndex == i
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             IconButton(
               icon: Icon(
-                location == AppRoutes.workflowWebSettings
-                    ? Icons.settings
-                    : Icons.settings_outlined,
+                onSettings ? Icons.settings : Icons.settings_outlined,
               ),
               tooltip: 'Settings',
               onPressed: () => context.go(AppRoutes.workflowWebSettings),
               style: IconButton.styleFrom(
-                backgroundColor: location == AppRoutes.workflowWebSettings
+                backgroundColor: onSettings
                     ? Colors.white.withValues(alpha: 0.2)
                     : Colors.transparent,
+                visualDensity: VisualDensity.compact,
               ),
             ),
             IconButton(
               icon: const Icon(Icons.logout),
               tooltip: 'Logout',
               onPressed: () => _confirmLogout(context, ref),
+              style: IconButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+              ),
             ),
           ],
         ),

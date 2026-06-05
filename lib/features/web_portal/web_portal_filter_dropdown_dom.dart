@@ -1,6 +1,7 @@
 import 'package:web/web.dart' as web;
 
 import 'web_portal_filter_field_dom.dart';
+import 'web_portal_styles.dart';
 
 /// Shared DOM helpers for web filter dropdowns.
 abstract final class WebPortalFilterDropdownDom {
@@ -18,17 +19,46 @@ abstract final class WebPortalFilterDropdownDom {
   static String escapeAttr(String s) =>
       s.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 
-  static String sharedStyles(String safeLabel) => '''
+  static String sharedStyles(String safeLabel, {bool dialogForm = false}) {
+    final wrapHeight = dialogForm
+        ? WebPortalStyles.dialogFormFieldHeight.round()
+        : 40;
+    final triggerPadding =
+        dialogForm ? '0 36px 0 12px' : '0 4px 0 12px';
+    final displaySize = dialogForm ? 16 : 14;
+    final rootLayout = dialogForm
+        ? 'overflow:visible'
+        : 'overflow:hidden;display:flex;align-items:flex-end';
+    final arrowCss = dialogForm
+        ? '.wp-dd-arrow-outside{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;color:rgba(0,0,0,0.54);pointer-events:none}'
+        : '';
+    final triggerHtml = dialogForm
+        ? '''
+<div class="wp-dd-trigger" role="button" tabindex="0">
+<span class="wp-dd-display placeholder"></span>
+${WebPortalFilterFieldDom.clearButtonHtml}
+</div>
+<svg class="wp-dd-arrow-outside" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+'''
+        : '''
+<div class="wp-dd-trigger" role="button" tabindex="0">
+<span class="wp-dd-display placeholder"></span>
+${WebPortalFilterFieldDom.clearButtonHtml}
+<svg class="wp-dd-arrow" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+</div>
+''';
+    return '''
 <style>
 ${WebPortalFilterFieldDom.clearCss}
-.wp-dd-root{position:relative;width:100%;height:100%;font-family:Roboto,Helvetica,Arial,sans-serif;box-sizing:border-box;overflow:hidden}
-.wp-dd-wrap{position:relative;width:100%;height:40px}
+.wp-dd-root{position:relative;width:100%;height:100%;font-family:Roboto,Helvetica,Arial,sans-serif;box-sizing:border-box;$rootLayout}
+.wp-dd-wrap{position:relative;width:100%;height:${wrapHeight}px;overflow:visible}
 .wp-dd-label{position:absolute;top:0;left:12px;transform:translateY(-50%);font-size:12px;color:#757575;background:#fff;padding:0 4px;z-index:2;line-height:1.2;white-space:nowrap;pointer-events:none}
-.wp-dd-trigger{width:100%;height:40px;border:1px solid rgba(0,0,0,0.23);border-radius:4px;background:#fff;box-sizing:border-box;display:flex;align-items:center;padding:0 4px 0 12px;gap:0;cursor:pointer}
+.wp-dd-trigger{width:100%;height:${wrapHeight}px;border:1px solid rgba(0,0,0,0.23);border-radius:4px;background:#fff;box-sizing:border-box;display:flex;align-items:center;padding:$triggerPadding;gap:0;cursor:pointer}
 .wp-dd-trigger:hover{border-color:rgba(0,0,0,0.87)}
-.wp-dd-display{flex:1;min-width:0;font-size:14px;color:#212121;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wp-dd-display{flex:1;min-width:0;font-size:${displaySize}px;color:#212121;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wp-dd-display.placeholder{color:#757575}
 .wp-dd-arrow{flex-shrink:0;width:20px;height:20px;color:#757575;pointer-events:none}
+$arrowCss
 .wp-dd-menu{display:none;position:fixed;z-index:10000;background:#fff;border:1px solid #e0e0e0;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);box-sizing:border-box;overflow:hidden;flex-direction:column}
 .wp-dd-menu.open{display:flex}
 .wp-dd-search-wrap{padding:8px 8px 4px;border-bottom:1px solid #e0e0e0;flex-shrink:0;box-sizing:border-box}
@@ -50,14 +80,13 @@ ${WebPortalFilterFieldDom.clearCss}
 .wp-dd-empty{padding:16px 12px;color:#757575;font-size:14px}
 .wp-dd-no-match{display:none;padding:16px 12px;color:#757575;font-size:14px}
 .wp-dd-no-match.visible{display:block}
+.wp-dd-trigger.error{border:1px solid #d32f2f}
+.wp-dd-trigger.error:hover{border:1px solid #d32f2f}
+.wp-dd-label.error{color:#d32f2f}
 </style>
 <div class="wp-dd-wrap">
 <span class="wp-dd-label">$safeLabel</span>
-<div class="wp-dd-trigger" role="button" tabindex="0">
-<span class="wp-dd-display placeholder"></span>
-${WebPortalFilterFieldDom.clearButtonHtml}
-<svg class="wp-dd-arrow" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
-</div>
+$triggerHtml
 </div>
 <div class="wp-dd-menu" role="listbox">
 <div class="wp-dd-search-wrap">
@@ -66,6 +95,7 @@ ${WebPortalFilterFieldDom.clearButtonHtml}
 <div class="wp-dd-scroll"></div>
 </div>
 ''';
+  }
 
   static void positionAndOpenMenu({
     required web.HTMLDivElement root,

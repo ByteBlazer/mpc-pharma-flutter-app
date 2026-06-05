@@ -35,10 +35,12 @@ class DeliveryReportPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final hPad = MediaQuery.sizeOf(context).width >= 600 ? 24.0 : 12.0;
+
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
@@ -52,16 +54,37 @@ class DeliveryReportPage extends ConsumerWidget {
                 label: const Text('Back to Reports'),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Delivery Report',
-                style: WebPortalStyles.reportPageTitle,
+              const Flexible(
+                child: Text(
+                  'Delivery Report',
+                  style: WebPortalStyles.reportPageTitle,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const DeliveryReportFilters(),
-          const SizedBox(height: 16),
-          const Expanded(child: _DeliveryReportResults()),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Scroll when filters stack (narrow) so content does not overflow.
+                final resultsHeight = constraints.maxHeight.clamp(240.0, 640.0);
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const DeliveryReportFilters(),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: resultsHeight,
+                        child: const _DeliveryReportResults(),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -120,9 +143,6 @@ class _ResultsContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bodyHeight =
-        (MediaQuery.sizeOf(context).height - 475).clamp(240.0, 640.0);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -162,14 +182,11 @@ class _ResultsContent extends ConsumerWidget {
           Expanded(
             child: WebPortalPaper(
               padding: EdgeInsets.zero,
-              child: SizedBox(
-                height: bodyHeight,
-                child: DeliveryReportTableView(
-                  tableHtml: tableHtml,
-                  rows: report.data,
-                  onViewSignature: (docId) => _showSignature(context, ref, docId),
-                  onViewComment: (docId) => _showComment(context, report, docId),
-                ),
+              child: DeliveryReportTableView(
+                tableHtml: tableHtml,
+                rows: report.data,
+                onViewSignature: (docId) => _showSignature(context, ref, docId),
+                onViewComment: (docId) => _showComment(context, report, docId),
               ),
             ),
           ),

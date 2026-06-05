@@ -18,6 +18,8 @@ class WebPortalFilterDropdown extends StatelessWidget {
     this.onSelected,
     this.selectedIds,
     this.onSelectionChanged,
+    this.hasError = false,
+    this.dialogForm = false,
     required this.multi,
   });
 
@@ -29,6 +31,8 @@ class WebPortalFilterDropdown extends StatelessWidget {
     required String? selectedId,
     required ValueChanged<String?> onSelected,
     double menuMaxHeight = 280,
+    bool hasError = false,
+    bool dialogForm = false,
   }) {
     return WebPortalFilterDropdown._(
       key: key,
@@ -37,6 +41,8 @@ class WebPortalFilterDropdown extends StatelessWidget {
       selectedId: selectedId,
       onSelected: onSelected,
       menuMaxHeight: menuMaxHeight,
+      hasError: hasError,
+      dialogForm: dialogForm,
       multi: false,
     );
   }
@@ -71,6 +77,8 @@ class WebPortalFilterDropdown extends StatelessWidget {
 
   final Set<String>? selectedIds;
   final ValueChanged<Set<String>>? onSelectionChanged;
+  final bool hasError;
+  final bool dialogForm;
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +97,8 @@ class WebPortalFilterDropdown extends StatelessWidget {
       selectedId: selectedId,
       onSelected: onSelected!,
       menuMaxHeight: menuMaxHeight,
+      hasError: hasError,
+      dialogForm: dialogForm,
     );
   }
 }

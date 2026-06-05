@@ -18,6 +18,8 @@ class WebPortalFilterDropdownSingle extends StatefulWidget {
     required this.selectedId,
     required this.onSelected,
     required this.menuMaxHeight,
+    this.hasError = false,
+    this.dialogForm = false,
   });
 
   final String label;
@@ -25,6 +27,8 @@ class WebPortalFilterDropdownSingle extends StatefulWidget {
   final String? selectedId;
   final ValueChanged<String?> onSelected;
   final double menuMaxHeight;
+  final bool hasError;
+  final bool dialogForm;
 
   @override
   State<WebPortalFilterDropdownSingle> createState() =>
@@ -52,6 +56,7 @@ class _WebPortalFilterDropdownSingleState
   web.HTMLInputElement? _searchInput;
   web.HTMLDivElement? _trigger;
   web.HTMLSpanElement? _display;
+  web.HTMLSpanElement? _label;
   web.HTMLButtonElement? _clearBtn;
   bool _registered = false;
   bool _menuOpen = false;
@@ -71,6 +76,9 @@ class _WebPortalFilterDropdownSingleState
     super.didUpdateWidget(oldWidget);
     if (!_sameOptions(oldWidget.options, widget.options)) {
       _scheduleMenuSync();
+    }
+    if (oldWidget.hasError != widget.hasError) {
+      _syncErrorState();
     }
     _syncDisplay();
     _highlightSelected();
@@ -120,17 +128,26 @@ class _WebPortalFilterDropdownSingleState
     if (_registered) return;
     _registered = true;
     final label = widget.label;
+    final dialogForm = widget.dialogForm;
+    final fieldHeight = dialogForm
+        ? WebPortalStyles.dialogFormFieldHeight
+        : WebPortalStyles.filterFieldHeight;
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (_) {
       final root = web.HTMLDivElement()
         ..className = 'wp-dd-root'
         ..style.width = '100%'
-        ..style.height = '${WebPortalStyles.filterFieldHeight}px'
-        ..style.display = 'flex'
-        ..style.alignItems = 'flex-end'
-        ..style.boxSizing = 'border-box'
-        ..style.overflow = 'hidden';
+        ..style.height = '${fieldHeight}px'
+        ..style.boxSizing = 'border-box';
+      if (dialogForm) {
+        root.style.overflow = 'visible';
+      } else {
+        root.style.display = 'flex';
+        root.style.alignItems = 'flex-end';
+        root.style.overflow = 'hidden';
+      }
       root.innerHTML = WebPortalFilterDropdownDom.sharedStyles(
         WebPortalFilterDropdownDom.escapeText(label),
+        dialogForm: dialogForm,
       ).toJS;
 
       _root = root;
@@ -139,7 +156,13 @@ class _WebPortalFilterDropdownSingleState
       _searchInput = root.querySelector('.wp-dd-search') as web.HTMLInputElement?;
       _trigger = root.querySelector('.wp-dd-trigger') as web.HTMLDivElement?;
       _display = root.querySelector('.wp-dd-display') as web.HTMLSpanElement?;
+      _label = root.querySelector('.wp-dd-label') as web.HTMLSpanElement?;
       _clearBtn = root.querySelector('.wp-field-clear') as web.HTMLButtonElement?;
+
+      final body = web.document.body;
+      if (body != null && _menu != null) {
+        body.appendChild(_menu!);
+      }
 
       _trigger?.addEventListener('click', _onTriggerClick.toJS);
       _clearBtn?.addEventListener('click', _onClearClick.toJS);
@@ -149,8 +172,21 @@ class _WebPortalFilterDropdownSingleState
       _searchInput?.addEventListener('keydown', _onSearchKeydown.toJS);
 
       _syncDisplay();
+      _syncErrorState();
       return root;
     });
+  }
+
+  void _syncErrorState() {
+    final trigger = _trigger;
+    if (trigger == null) return;
+    if (widget.hasError) {
+      trigger.classList.add('error');
+      _label?.classList.add('error');
+    } else {
+      trigger.classList.remove('error');
+      _label?.classList.remove('error');
+    }
   }
 
   void _onClearClick(web.Event event) {
@@ -338,7 +374,11 @@ class _WebPortalFilterDropdownSingleState
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncDisplay();
+      if (!mounted) return;
+      _syncDisplay();
+      _syncErrorState();
+      _highlightSelected();
+      _updateClearVisibility();
     });
     return HtmlElementView(viewType: _viewType);
   }

@@ -13,6 +13,7 @@ import '../../core/widgets/common_widgets.dart';
 import 'trip_map/portal_trip_map_view.dart';
 import 'web_portal_providers.dart';
 import 'trip_map/trip_dashboard_guidance.dart';
+import 'web_portal_mui_dialog.dart';
 import 'web_portal_styles.dart';
 import 'web_portal_utils.dart';
 
@@ -28,10 +29,11 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   int? _selectedTripId;
-  final _docSearchController = TextEditingController();
   final _tripCardKeys = <int, GlobalKey>{};
   bool _showGuidance = false;
   Timer? _guidanceTimer;
+  String? _docSearchSuccessMessage;
+  Timer? _docSearchSuccessTimer;
 
   @override
   void initState() {
@@ -57,7 +59,6 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
   void dispose() {
     _tabController.dispose();
     _guidanceTimer?.cancel();
-    _docSearchController.dispose();
     super.dispose();
   }
 
@@ -103,12 +104,9 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
       };
 
   Future<void> _forceEnd(int tripId) async {
-    final ok = await showConfirmDialog(
-      context,
-      title: 'Force End Trip',
-      message:
-          'This cannot be undone. Pending deliveries will be marked FAILED. Force end Trip #$tripId?',
-      confirmText: 'Force End',
+    final ok = await WebPortalMuiDialog.showForceEndTripWarning(
+      context: context,
+      tripId: tripId,
     );
     if (ok != true) return;
 
@@ -118,7 +116,12 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
       setState(() => _selectedTripId = null);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip force ended successfully.')),
+          const SnackBar(
+            content: Text(
+              'Trip has been force ended successfully. All pending deliveries '
+              'have been marked as undelivered.',
+            ),
+          ),
         );
       }
     } on DioException catch (e) {
@@ -130,71 +133,53 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
     }
   }
 
-  Future<void> _docSearch() async {
-    final docId = _docSearchController.text.trim();
-    if (docId.isEmpty) return;
-
+  Future<FindByDocIdOutcome> _searchDocById(String docId) async {
     try {
       final result = await ref.read(apiClientProvider).searchDoc(docId);
       if (result.docStatus == 'READY_FOR_DISPATCH') {
-        _snack(
+        return FindByDocIdOutcome.validation(
           'Document was scanned but not scheduled on a trip yet.',
         );
-        return;
       }
       if (result.docStatus == 'AT_TRANSIT_HUB') {
-        _snack('Document is at a transit hub and not on the next trip yet.');
-        return;
+        return FindByDocIdOutcome.validation(
+          'Document is at a transit hub and not scheduled on the next trip yet.',
+        );
       }
       if (result.tripId != null) {
+        final tripId = result.tripId!;
+        _docSearchSuccessTimer?.cancel();
         setState(() {
           _tabController.index = switch (result.tripStatus) {
             'SCHEDULED' => 1,
             'ENDED' => 2,
             _ => 0,
           };
-          _selectedTripId = result.tripId;
+          _selectedTripId = tripId;
+          _docSearchSuccessMessage =
+              'Doc found in Trip #$tripId. Trip selected.';
         });
-        _snack('Doc found in Trip #${result.tripId}. Trip selected.');
+        _docSearchSuccessTimer = Timer(const Duration(seconds: 6), () {
+          if (mounted) setState(() => _docSearchSuccessMessage = null);
+        });
+        _scrollToTrip(tripId);
+        return FindByDocIdOutcome.found;
       }
+      return FindByDocIdOutcome.error('Doc ID not found.');
     } on DioException catch (_) {
-      _snack('Doc ID not found.');
+      return FindByDocIdOutcome.error('Doc ID not found.');
     }
   }
 
-  void _snack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  void _dismissDocSearchSuccess() {
+    _docSearchSuccessTimer?.cancel();
+    setState(() => _docSearchSuccessMessage = null);
   }
 
   void _openDocSearchDialog() {
-    _docSearchController.clear();
-    showDialog<void>(
+    WebPortalMuiDialog.showFindByDocId(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Find By Doc ID'),
-        content: TextField(
-          controller: _docSearchController,
-          decoration: const InputDecoration(labelText: 'Document ID'),
-          onSubmitted: (_) {
-            Navigator.pop(ctx);
-            _docSearch();
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _docSearch();
-            },
-            child: const Text('Find'),
-          ),
-        ],
-      ),
+      onSearch: _searchDocById,
     );
   }
 
@@ -362,6 +347,16 @@ class _WebPortalTripsScreenState extends ConsumerState<WebPortalTripsScreen>
                           return card;
                         },
                       ),
+                      if (_docSearchSuccessMessage != null)
+                        Positioned.fill(
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: _DocSearchSuccessAlert(
+                              message: _docSearchSuccessMessage!,
+                              onClose: _dismissDocSearchSuccess,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
           ),
@@ -541,6 +536,69 @@ class _TripCardState extends State<_TripCard> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// MUI success [Alert] shown over trip cards after doc search — React parity.
+class _DocSearchSuccessAlert extends StatelessWidget {
+  const _DocSearchSuccessAlert({
+    required this.message,
+    required this.onClose,
+  });
+
+  final String message;
+  final VoidCallback onClose;
+
+  static const _successGreen = Color(0xFF4CAF50);
+  static const _successBg = Color(0xFFE8F5E9);
+  static const _successFg = Color(0xFF1B5E20);
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final alertWidth = width < 600 ? 300.0 : 400.0;
+    final fontSize = width < 600 ? 14.4 : 17.6;
+
+    return Material(
+      elevation: 12,
+      shadowColor: Colors.black.withValues(alpha: 0.3),
+      borderRadius: BorderRadius.circular(4),
+      color: _successBg,
+      child: Container(
+        width: alertWidth,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: _successGreen, width: 2),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.check_circle_outline, color: _successGreen, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w700,
+                  height: 1.4,
+                  color: _successFg,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: onClose,
+              icon: const Icon(Icons.close, size: 20),
+              color: _successFg,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              tooltip: 'Close',
+            ),
+          ],
         ),
       ),
     );

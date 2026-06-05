@@ -14,6 +14,8 @@ class WebPortalFilterDropdownSingle extends StatefulWidget {
     required this.selectedId,
     required this.onSelected,
     required this.menuMaxHeight,
+    this.hasError = false,
+    this.dialogForm = false,
   });
 
   final String label;
@@ -21,6 +23,8 @@ class WebPortalFilterDropdownSingle extends StatefulWidget {
   final String? selectedId;
   final ValueChanged<String?> onSelected;
   final double menuMaxHeight;
+  final bool hasError;
+  final bool dialogForm;
 
   @override
   State<WebPortalFilterDropdownSingle> createState() =>
@@ -133,12 +137,21 @@ class _WebPortalFilterDropdownSingleState
           ),
         ],
       ],
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: SizedBox(
-          height: 40,
-          width: double.infinity,
-          child: InkWell(
+      child: SizedBox(
+        height: widget.dialogForm
+            ? WebPortalStyles.dialogFormFieldHeight
+            : 40,
+        width: double.infinity,
+        child: Align(
+          alignment: widget.dialogForm
+              ? Alignment.center
+              : Alignment.bottomCenter,
+          child: SizedBox(
+            height: widget.dialogForm
+                ? WebPortalStyles.dialogFormFieldHeight
+                : 40,
+            width: double.infinity,
+            child: InkWell(
             onTap: () {
               if (_menuController.isOpen) {
                 _menuController.close();
@@ -152,6 +165,7 @@ class _WebPortalFilterDropdownSingleState
             child: InputDecorator(
               decoration: WebPortalStyles.muiOutlinedField(
                 label: widget.label,
+                error: widget.hasError,
                 suffixIcon: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -169,11 +183,16 @@ class _WebPortalFilterDropdownSingleState
                   ],
                 ),
               ).copyWith(
-                isCollapsed: true,
-                constraints:
-                    const BoxConstraints(minHeight: 40, maxHeight: 40),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                isCollapsed: !widget.dialogForm,
+                constraints: widget.dialogForm
+                    ? BoxConstraints(
+                        minHeight: WebPortalStyles.dialogFormFieldHeight,
+                        maxHeight: WebPortalStyles.dialogFormFieldHeight,
+                      )
+                    : const BoxConstraints(minHeight: 40, maxHeight: 40),
+                contentPadding: widget.dialogForm
+                    ? const EdgeInsets.fromLTRB(12, 0, 36, 0)
+                    : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -181,7 +200,7 @@ class _WebPortalFilterDropdownSingleState
                   selectedLabel ?? ' ',
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: widget.dialogForm ? 16 : 14,
                     color: selectedLabel == null
                         ? WebPortalStyles.textSecondary
                         : Colors.black87,
@@ -191,6 +210,7 @@ class _WebPortalFilterDropdownSingleState
             ),
           ),
         ),
+      ),
       ),
     );
   }

@@ -13,6 +13,10 @@ class WebPortalUtils {
     return '$date, $time';
   }
 
+  /// React `new Date(createdAt).toLocaleString()` (en-US).
+  static String formatUserCreatedAt(DateTime dt) =>
+      DateFormat.yMd('en_US').add_jms().format(dt.toLocal());
+
   static String formatDateString(String? value) {
     if (value == null || value.isEmpty) return '-';
     final dt = DateTime.tryParse(value);
