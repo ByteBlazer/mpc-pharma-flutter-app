@@ -22,7 +22,7 @@ import 'delivery_report_table.dart';
 
 /// Delivery Report — React parity with Flutter-optimized rendering:
 /// - Loading ends when API + JSON parse finish (not when the table paints).
-/// - On web, all rows render in a DOM table (like React MUI TableBody).
+/// - Results table uses the same Flutter widget on web and mobile.
 class DeliveryReportPage extends ConsumerWidget {
   const DeliveryReportPage({super.key});
 

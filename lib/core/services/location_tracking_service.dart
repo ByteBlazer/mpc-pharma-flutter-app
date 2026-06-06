@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../config/app_config.dart';
 import '../../config/app_constants.dart';
@@ -50,15 +52,26 @@ class LocationTrackingService {
         permission == LocationPermission.whileInUse;
   }
 
+  /// Android 13+ requires notification permission before [startForeground].
+  static Future<bool> _ensureNotificationPermission() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return true;
+
+    final status = await Permission.notification.status;
+    if (status.isGranted) return true;
+
+    final result = await Permission.notification.request();
+    return result.isGranted;
+  }
+
   Future<void> start() async {
     if (!supportsNativeLocationService) return;
     if (!await _hasLocationPermission()) return;
+    if (!await _ensureNotificationPermission()) return;
 
     final service = FlutterBackgroundService();
-    final isRunning = await service.isRunning();
-    if (!isRunning) {
-      await service.startService();
-    }
+    if (await service.isRunning()) return;
+
+    await service.startService();
   }
 
   Future<void> stop() async {

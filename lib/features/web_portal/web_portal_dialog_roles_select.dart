@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'web_portal_dropdown_option.dart';
-import 'web_portal_dialog_roles_select_menu.dart'
-    if (dart.library.js_interop) 'web_portal_dialog_roles_select_web.dart';
+import 'web_portal_dialog_roles_select_impl.dart';
 import 'web_portal_styles.dart';
 
 /// Multi-select roles field for MUI dialog forms — chips in the trigger,
-/// checkboxes in the menu. On web uses a DOM dropdown for instant toggles.
+/// checkboxes in the menu below the field.
 class WebPortalDialogRolesSelect extends StatelessWidget {
   const WebPortalDialogRolesSelect({
     super.key,

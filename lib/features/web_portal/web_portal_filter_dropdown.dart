@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'web_portal_dropdown_option.dart';
 export 'web_portal_dropdown_option.dart';
-import 'web_portal_filter_dropdown_multi_menu.dart'
-    if (dart.library.js_interop) 'web_portal_filter_dropdown_multi_web.dart';
-import 'web_portal_filter_dropdown_single_menu.dart'
-    if (dart.library.js_interop) 'web_portal_filter_dropdown_single_web.dart';
+import 'web_portal_filter_dropdown_multi.dart';
+import 'web_portal_filter_dropdown_single.dart';
 
 /// Outlined filter dropdown — menu opens below the field (single or multi-select).
 class WebPortalFilterDropdown extends StatelessWidget {

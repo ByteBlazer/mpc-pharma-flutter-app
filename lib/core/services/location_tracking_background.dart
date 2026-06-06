@@ -22,6 +22,10 @@ void locationTrackingOnStart(ServiceInstance service) async {
   // Plugins are already registered by the service entrypoint — do not call
   // DartPluginRegistrant.ensureInitialized() here (_isMainIsolate is false).
 
+  if (service is AndroidServiceInstance) {
+    await service.setAsForegroundService();
+  }
+
   Timer? timer;
   final prefs = await PrefsService.create();
   final api = ApiClient(prefs);
