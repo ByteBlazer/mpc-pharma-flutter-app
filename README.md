@@ -244,6 +244,7 @@ Required GitHub Actions secrets:
 ```text
 EC2_HOST
 EC2_SSH_PRIVATE_KEY
+EC2_USER
 DOMAIN_NAME
 ANDROID_KEYSTORE_BASE64
 ANDROID_KEYSTORE_PASSWORD
@@ -252,7 +253,14 @@ ANDROID_KEY_ALIAS
 
 `DOMAIN_NAME` is the base domain, for example `byteblazer.com`. The workflow derives the deployment hostnames from it.
 
-The workflow assumes the EC2 SSH user is `ubuntu`. If your EC2 AMI uses another user, update `EC2_USER` in `.github/workflows/deploy.yml`.
+`EC2_USER` is optional. If it is not set, the workflow defaults to `ubuntu`. Use `ec2-user` for Amazon Linux AMIs, `ubuntu` for Ubuntu AMIs, and the correct SSH username for any other AMI.
+
+If the deploy fails with `Permission denied (publickey,...)`, check:
+
+- `EC2_SSH_PRIVATE_KEY` contains the private key for the key pair attached to the EC2 instance.
+- `EC2_USER` matches the EC2 AMI username.
+- The EC2 security group allows SSH from GitHub Actions runners or from a network path that can reach the instance.
+- `EC2_HOST` points to the correct EC2 public IP or public DNS name.
 
 The workflow bootstraps a fresh Ubuntu EC2 instance on every web deploy. It installs `nginx` and `rsync` if needed, removes the default Nginx site, writes a managed Nginx config for `<DOMAIN_NAME>` and `staging.<DOMAIN_NAME>`, validates Nginx, and reloads/restarts it.
 
@@ -415,6 +423,7 @@ Need the following as GitHub Actions secrets:
 
 - `EC2_HOST` - IPv4 address or hostname of the EC2 instance. If this changes, update the Route 53 records in the hosted zone for the domain.
 - `EC2_SSH_PRIVATE_KEY` - contents of the private key used to SSH into EC2.
+- `EC2_USER` - optional EC2 SSH username. Defaults to `ubuntu` if not set.
 - `DOMAIN_NAME` - base domain, for example `byteblazer.com`. If this changes, remove the old hosted zone records and add the required records for the new domain in Route 53.
 - `ANDROID_KEYSTORE_BASE64` - base64-encoded upload keystore file. The keystore file is kept in Google Drive under `ByteBlazer > Google & Android > Google Playstore`. You will need to convert to base64. See below for command.
 - `ANDROID_KEY_ALIAS` - upload key alias. Refer file kept in Google Drive under `Learning > GooglePlayStoreAppUpload-Notes.txt`.
