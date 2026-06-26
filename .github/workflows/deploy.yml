@@ -84,6 +84,67 @@ jobs:
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
           echo "SSH known_hosts configured"
 
+      - name: Bootstrap EC2 web server
+        run: |
+          set -euxo pipefail
+          echo "Bootstrapping fresh EC2 instance for DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}"
+          ssh -i ~/.ssh/ec2_key "${EC2_USER}@${{ secrets.EC2_HOST }}" <<EOF
+          set -euxo pipefail
+          echo "Remote host: \$(hostname)"
+          echo "Installing Nginx and rsync if needed"
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx rsync
+          echo "Creating web roots"
+          sudo mkdir -p "/var/www/${{ secrets.DOMAIN_NAME }}"
+          sudo mkdir -p "/var/www/staging.${{ secrets.DOMAIN_NAME }}"
+          echo "Removing default Nginx site if present"
+          sudo rm -f /etc/nginx/sites-enabled/default
+          sudo rm -f /etc/nginx/sites-available/default
+          echo "Writing managed Nginx config"
+          sudo tee /etc/nginx/conf.d/mpc-pharma-web.conf > /dev/null <<'NGINX'
+          server {
+              listen 80 default_server;
+              server_name _;
+
+              location = / {
+                  add_header Content-Type text/plain;
+                  return 200 "ok\n";
+              }
+          }
+
+          server {
+              listen 80;
+              server_name DOMAIN_NAME_PLACEHOLDER www.DOMAIN_NAME_PLACEHOLDER;
+
+              root /var/www/DOMAIN_NAME_PLACEHOLDER;
+              index index.html;
+
+              location / {
+                  try_files \$uri \$uri/ /index.html;
+              }
+          }
+
+          server {
+              listen 80;
+              server_name staging.DOMAIN_NAME_PLACEHOLDER;
+
+              root /var/www/staging.DOMAIN_NAME_PLACEHOLDER;
+              index index.html;
+
+              location / {
+                  try_files \$uri \$uri/ /index.html;
+              }
+          }
+          NGINX
+          sudo sed -i "s/DOMAIN_NAME_PLACEHOLDER/${{ secrets.DOMAIN_NAME }}/g" /etc/nginx/conf.d/mpc-pharma-web.conf
+          echo "Managed Nginx config:"
+          sudo cat /etc/nginx/conf.d/mpc-pharma-web.conf
+          echo "Validating and enabling Nginx"
+          sudo nginx -t
+          sudo systemctl enable nginx
+          sudo systemctl reload nginx || sudo systemctl restart nginx
+          EOF
+
       - name: Upload web bundle to EC2
         run: |
           set -euxo pipefail
@@ -146,6 +207,7 @@ jobs:
           echo "Flutter version: ${FLUTTER_VERSION}"
           echo "App environment: ${APP_ENV}"
           echo "Production signing expected: ${{ github.ref_name == 'production' }}"
+
 
       - name: Set up Java
         uses: actions/setup-java@v4
