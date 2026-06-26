@@ -191,7 +191,13 @@ jobs:
           echo "Syncing release directory into Nginx web root"
           sudo rsync -a --delete "${REMOTE_RELEASE_DIR}/" "/var/www/${DEPLOY_DOMAIN}/"
           echo "Setting web root ownership"
-          sudo chown -R www-data:www-data "/var/www/${DEPLOY_DOMAIN}"
+          if id www-data >/dev/null 2>&1; then
+            sudo chown -R www-data:www-data "/var/www/${DEPLOY_DOMAIN}"
+          elif id nginx >/dev/null 2>&1; then
+            sudo chown -R nginx:nginx "/var/www/${DEPLOY_DOMAIN}"
+          else
+            echo "No www-data or nginx user found; leaving web root ownership unchanged"
+          fi
           echo "Validating Nginx configuration"
           sudo nginx -t
           echo "Reloading Nginx"
