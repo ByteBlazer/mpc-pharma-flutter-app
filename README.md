@@ -254,6 +254,8 @@ ANDROID_KEY_ALIAS
 
 The workflow assumes the EC2 SSH user is `ubuntu`. If your EC2 AMI uses another user, update `EC2_USER` in `.github/workflows/deploy.yml`.
 
+The workflow bootstraps a fresh Ubuntu EC2 instance on every web deploy. It installs `nginx` and `rsync` if needed, removes the default Nginx site, writes a managed Nginx config for `<DOMAIN_NAME>` and `staging.<DOMAIN_NAME>`, validates Nginx, and reloads/restarts it.
+
 The workflow deploys the built web bundle to:
 
 ```text
@@ -263,12 +265,11 @@ The workflow deploys the built web bundle to:
 
 The EC2 instance should already have:
 
-- Nginx installed
-- Nginx server blocks for `staging.<DOMAIN_NAME>` and `<DOMAIN_NAME>`
-- The SSH user allowed to run the needed `sudo mkdir`, `sudo rsync`, `sudo nginx -t`, and `sudo systemctl reload nginx` commands
+- Ubuntu or another `apt-get` based image
+- The SSH user allowed to run the needed `sudo apt-get`, `sudo mkdir`, `sudo rm`, `sudo tee`, `sudo sed`, `sudo rsync`, `sudo chown`, `sudo nginx`, and `sudo systemctl` commands
 - DNS records in Route 53 pointing `staging.<DOMAIN_NAME>` and `<DOMAIN_NAME>` to the EC2 instance or to the load balancer in front of it
 
-If your AWS SSL certificate is in ACM, TLS normally terminates at an Application Load Balancer or CloudFront in front of EC2. If TLS terminates directly on Nginx, install a certificate on the instance, for example with Certbot or with certificate files available to Nginx.
+If your AWS SSL certificate is in ACM, TLS should terminate at an Application Load Balancer or CloudFront in front of EC2. In that setup, Nginx listens on plain HTTP `80` and the ALB/CloudFront handles HTTPS.
 
 ## Package for Android
 
