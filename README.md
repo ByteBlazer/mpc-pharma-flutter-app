@@ -48,6 +48,8 @@ APP_ENV=local
 API_BASE_URL=http://localhost:8080
 ```
 
+`env/staging.env` and `env/production.env` keep `API_BASE_URL=__API_BASE_URL__` in source control. GitHub Actions replaces only that placeholder at build time. `env/local.env` keeps the real local API URL and is not patched by CI.
+
 The app defaults to `local` and loads `env/local.env` when no environment is specified.
 
 To select another environment, pass only the environment name:
@@ -57,7 +59,14 @@ To select another environment, pass only the environment name:
 --dart-define=APP_ENV=production
 ```
 
-Do not pass `API_BASE_URL` on the command line. Update the `API_BASE_URL` values in the env files when the real REST API URLs are available.
+Do not pass `API_BASE_URL` on the command line.
+
+For GitHub Actions deployments, the workflow replaces the `__API_BASE_URL__` placeholder in the selected env file at build time using the `DOMAIN_NAME` secret:
+
+- `staging` branch writes `env/staging.env` with `API_BASE_URL=https://staging.<DOMAIN_NAME>/api`
+- `main` branch writes `env/production.env` with `API_BASE_URL=https://<DOMAIN_NAME>/api`
+
+`env/local.env` is never patched by GitHub Actions.
 
 ## Web-First UI Direction
 

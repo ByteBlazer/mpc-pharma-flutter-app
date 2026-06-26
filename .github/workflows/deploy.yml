@@ -58,6 +58,26 @@ jobs:
           echo "EC2 host configured: true"
           echo "EC2 SSH key configured: true"
 
+      - name: Patch environment file
+        run: |
+          set -euxo pipefail
+          if [ "${APP_ENV}" = "production" ]; then
+            ENV_FILE="env/production.env"
+            API_BASE_URL="https://${BASE_DOMAIN}/api"
+          elif [ "${APP_ENV}" = "staging" ]; then
+            ENV_FILE="env/staging.env"
+            API_BASE_URL="https://staging.${BASE_DOMAIN}/api"
+          else
+            echo "Skipping CI env patch for APP_ENV=${APP_ENV}"
+            exit 0
+          fi
+          PLACEHOLDER="__API_BASE_URL__"
+          grep -q "${PLACEHOLDER}" "${ENV_FILE}" || (echo "Placeholder ${PLACEHOLDER} not found in ${ENV_FILE}" && exit 1)
+          sed -i "s|${PLACEHOLDER}|${API_BASE_URL}|g" "${ENV_FILE}"
+          grep -q "${PLACEHOLDER}" "${ENV_FILE}" && (echo "Placeholder replacement failed in ${ENV_FILE}" && exit 1)
+          echo "Patched ${ENV_FILE}:"
+          cat "${ENV_FILE}"
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -238,6 +258,29 @@ jobs:
           echo "App environment: ${APP_ENV}"
           echo "Production signing expected: ${{ github.ref_name == 'main' }}"
 
+      - name: Patch environment file
+        env:
+          BASE_DOMAIN: ${{ secrets.DOMAIN_NAME }}
+        run: |
+          set -euxo pipefail
+          test -n "${BASE_DOMAIN}" || (echo "Missing required GitHub secret: DOMAIN_NAME" && exit 1)
+          if [ "${APP_ENV}" = "production" ]; then
+            ENV_FILE="env/production.env"
+            API_BASE_URL="https://${BASE_DOMAIN}/api"
+          elif [ "${APP_ENV}" = "staging" ]; then
+            ENV_FILE="env/staging.env"
+            API_BASE_URL="https://staging.${BASE_DOMAIN}/api"
+          else
+            echo "Skipping CI env patch for APP_ENV=${APP_ENV}"
+            exit 0
+          fi
+          PLACEHOLDER="__API_BASE_URL__"
+          grep -q "${PLACEHOLDER}" "${ENV_FILE}" || (echo "Placeholder ${PLACEHOLDER} not found in ${ENV_FILE}" && exit 1)
+          sed -i "s|${PLACEHOLDER}|${API_BASE_URL}|g" "${ENV_FILE}"
+          grep -q "${PLACEHOLDER}" "${ENV_FILE}" && (echo "Placeholder replacement failed in ${ENV_FILE}" && exit 1)
+          echo "Patched ${ENV_FILE}:"
+          cat "${ENV_FILE}"
+
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -343,6 +386,29 @@ jobs:
           echo "App environment: ${APP_ENV}"
           sw_vers
           xcodebuild -version
+
+      - name: Patch environment file
+        env:
+          BASE_DOMAIN: ${{ secrets.DOMAIN_NAME }}
+        run: |
+          set -euxo pipefail
+          test -n "${BASE_DOMAIN}" || (echo "Missing required GitHub secret: DOMAIN_NAME" && exit 1)
+          if [ "${APP_ENV}" = "production" ]; then
+            ENV_FILE="env/production.env"
+            API_BASE_URL="https://${BASE_DOMAIN}/api"
+          elif [ "${APP_ENV}" = "staging" ]; then
+            ENV_FILE="env/staging.env"
+            API_BASE_URL="https://staging.${BASE_DOMAIN}/api"
+          else
+            echo "Skipping CI env patch for APP_ENV=${APP_ENV}"
+            exit 0
+          fi
+          PLACEHOLDER="__API_BASE_URL__"
+          grep -q "${PLACEHOLDER}" "${ENV_FILE}" || (echo "Placeholder ${PLACEHOLDER} not found in ${ENV_FILE}" && exit 1)
+          sed -i "s|${PLACEHOLDER}|${API_BASE_URL}|g" "${ENV_FILE}"
+          grep -q "${PLACEHOLDER}" "${ENV_FILE}" && (echo "Placeholder replacement failed in ${ENV_FILE}" && exit 1)
+          echo "Patched ${ENV_FILE}:"
+          cat "${ENV_FILE}"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
