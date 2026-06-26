@@ -229,14 +229,14 @@ https://mpcpharma.in
 The workflow at `.github/workflows/deploy.yml` runs only when a commit is pushed to one of these branches:
 
 - `staging`
-- `production`
+- `main`
 
 Branch behavior:
 
 - `staging` loads `env/staging.env` and deploys the web app to `staging.<DOMAIN_NAME>`.
-- `production` loads `env/production.env` and deploys the web app to `<DOMAIN_NAME>`.
+- `main` loads `env/production.env` and deploys the web app to `<DOMAIN_NAME>`.
 - `staging` packages a debug Android APK.
-- `production` packages a signed release Android APK and signed release Android App Bundle that can be uploaded to Play Console.
+- `main` packages a signed release Android APK and signed release Android App Bundle that can be uploaded to Play Console.
 - iOS is built on a macOS runner and uploaded as an unsigned artifact. A signed IPA needs Apple signing certificate/profile secrets to be added later.
 
 Required GitHub Actions secrets:
@@ -321,7 +321,7 @@ For staging Android builds, use the same command with `--dart-define=APP_ENV=sta
 
 ### Android Signing Notes
 
-Production Android builds are signed by GitHub Actions. Add these repository secrets before using the production branch workflow:
+Production Android builds are signed by GitHub Actions. Add these repository secrets before using the main branch workflow:
 
 ```text
 ANDROID_KEYSTORE_BASE64
