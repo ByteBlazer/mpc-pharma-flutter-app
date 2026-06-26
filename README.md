@@ -273,8 +273,8 @@ The workflow deploys the built web bundle to:
 
 The EC2 instance should already have:
 
-- Ubuntu or another `apt-get` based image
-- The SSH user allowed to run the needed `sudo apt-get`, `sudo mkdir`, `sudo rm`, `sudo tee`, `sudo sed`, `sudo rsync`, `sudo chown`, `sudo nginx`, and `sudo systemctl` commands
+- Amazon Linux, Ubuntu, or another image with `dnf`, `yum`, or `apt-get`
+- The SSH user allowed to run the needed `sudo dnf`/`sudo yum`/`sudo apt-get`, `sudo mkdir`, `sudo rm`, `sudo tee`, `sudo sed`, `sudo rsync`, `sudo chown`, `sudo nginx`, and `sudo systemctl` commands
 - DNS records in Route 53 pointing `staging.<DOMAIN_NAME>` and `<DOMAIN_NAME>` to the EC2 instance or to the load balancer in front of it
 
 If your AWS SSL certificate is in ACM, TLS should terminate at an Application Load Balancer or CloudFront in front of EC2. In that setup, Nginx listens on plain HTTP `80` and the ALB/CloudFront handles HTTPS.
