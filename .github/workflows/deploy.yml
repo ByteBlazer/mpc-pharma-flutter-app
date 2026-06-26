@@ -1,0 +1,176 @@
+name: Build and deploy
+
+on:
+  push:
+    branches:
+      - staging
+      - production
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_CHANNEL: stable
+  EC2_USER: ubuntu
+  APP_ENV: ${{ github.ref_name == 'production' && 'production' || 'staging' }}
+  REMOTE_RELEASE_DIR: /tmp/mpc-pharma-web-${{ github.ref_name }}
+
+jobs:
+  deploy-web:
+    name: Deploy web app
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_DOMAIN: ${{ github.ref_name == 'production' && secrets.DOMAIN_NAME || format('staging.{0}', secrets.DOMAIN_NAME) }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build web bundle
+        run: flutter build web --release --base-href=/ --dart-define=APP_ENV=${{ env.APP_ENV }}
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ec2_key
+          chmod 600 ~/.ssh/ec2_key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload web bundle to EC2
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/ec2_key" \
+            build/web/ \
+            "${EC2_USER}@${{ secrets.EC2_HOST }}:${REMOTE_RELEASE_DIR}/"
+
+      - name: Publish web bundle through Nginx
+        run: |
+          ssh -i ~/.ssh/ec2_key "${EC2_USER}@${{ secrets.EC2_HOST }}" <<EOF
+          set -euo pipefail
+          sudo mkdir -p "/var/www/${DEPLOY_DOMAIN}"
+          sudo rsync -a --delete "${REMOTE_RELEASE_DIR}/" "/var/www/${DEPLOY_DOMAIN}/"
+          sudo chown -R www-data:www-data "/var/www/${DEPLOY_DOMAIN}"
+          sudo nginx -t
+          sudo systemctl reload nginx
+          EOF
+
+  package-android:
+    name: Package Android app
+    runs-on: ubuntu-latest
+    needs: deploy-web
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Decode production Android signing keystore
+        if: github.ref_name == 'production'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          {
+            echo "ANDROID_KEYSTORE_PATH=upload-keystore.jks"
+            echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Build staging debug APK
+        if: github.ref_name == 'staging'
+        run: flutter build apk --debug --dart-define=APP_ENV=staging
+
+      - name: Build production release APK
+        if: github.ref_name == 'production'
+        run: flutter build apk --release --dart-define=APP_ENV=production
+
+      - name: Build production app bundle
+        if: github.ref_name == 'production'
+        run: flutter build appbundle --release --dart-define=APP_ENV=production
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ github.ref_name }}
+          path: |
+            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+  package-ios:
+    name: Package iOS app
+    runs-on: macos-latest
+    needs: deploy-web
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build staging iOS app without code signing
+        if: github.ref_name == 'staging'
+        run: flutter build ios --debug --no-codesign --dart-define=APP_ENV=staging
+
+      - name: Build production iOS app without code signing
+        if: github.ref_name == 'production'
+        run: flutter build ios --release --no-codesign --dart-define=APP_ENV=production
+
+      - name: Archive unsigned iOS app artifact
+        run: |
+          cd build/ios/iphoneos
+          zip -r ../ios-${{ github.ref_name }}-unsigned.zip Runner.app
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ github.ref_name }}-unsigned
+          path: build/ios/ios-${{ github.ref_name }}-unsigned.zip
+          if-no-files-found: error
