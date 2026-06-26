@@ -27,7 +27,7 @@ jobs:
       BASE_DOMAIN: ${{ secrets.DOMAIN_NAME }}
       DEPLOY_DOMAIN: ${{ github.ref_name == 'main' && secrets.DOMAIN_NAME || format('staging.{0}', secrets.DOMAIN_NAME) }}
       EC2_HOST: ${{ secrets.EC2_HOST }}
-      EC2_USER: ${{ secrets.EC2_USER != '' && secrets.EC2_USER || 'ec2-user' }}
+      EC2_USER: ${{ secrets.EC2_USER != '' && secrets.EC2_USER || 'ubuntu' }}
 
     steps:
       - name: Check out repository
@@ -41,7 +41,7 @@ jobs:
           test -n "${BASE_DOMAIN}" || (echo "Missing required GitHub secret: DOMAIN_NAME" && exit 1)
           test -n "${EC2_HOST}" || (echo "Missing required GitHub secret: EC2_HOST" && exit 1)
           test -n "${EC2_SSH_PRIVATE_KEY}" || (echo "Missing required GitHub secret: EC2_SSH_PRIVATE_KEY" && exit 1)
-          test -n "${EC2_USER}" || (echo "EC2_USER resolved to empty. Set EC2_USER secret or use an Amazon Linux AMI with user ec2-user." && exit 1)
+          test -n "${EC2_USER}" || (echo "EC2_USER resolved to empty. Set EC2_USER secret or use an Ubuntu AMI with user ubuntu." && exit 1)
           echo "Required deployment secrets are present."
 
       - name: Print deployment context
@@ -140,17 +140,8 @@ jobs:
           set -euxo pipefail
           echo "Remote host: \$(hostname)"
           echo "Installing Nginx and rsync if needed"
-          if command -v apt-get >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx rsync
-          elif command -v dnf >/dev/null 2>&1; then
-            sudo dnf install -y nginx rsync
-          elif command -v yum >/dev/null 2>&1; then
-            sudo yum install -y nginx rsync
-          else
-            echo "No supported package manager found. Expected apt-get, dnf, or yum."
-            exit 1
-          fi
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx rsync
           echo "Creating web roots"
           sudo mkdir -p "/var/www/${BASE_DOMAIN}"
           sudo mkdir -p "/var/www/staging.${BASE_DOMAIN}"
@@ -176,6 +167,18 @@ jobs:
               root /var/www/DOMAIN_NAME_PLACEHOLDER;
               index index.html;
 
+              location /api/ {
+                  proxy_pass http://127.0.0.1:3001;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_read_timeout 300;
+              }
+
               location / {
                   try_files \$uri \$uri/ /index.html;
               }
@@ -187,6 +190,18 @@ jobs:
 
               root /var/www/staging.DOMAIN_NAME_PLACEHOLDER;
               index index.html;
+
+              location /api/ {
+                  proxy_pass http://127.0.0.1:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_read_timeout 300;
+              }
 
               location / {
                   try_files \$uri \$uri/ /index.html;
@@ -224,13 +239,7 @@ jobs:
           echo "Syncing release directory into Nginx web root"
           sudo rsync -a --delete "${REMOTE_RELEASE_DIR}/" "/var/www/${DEPLOY_DOMAIN}/"
           echo "Setting web root ownership"
-          if id www-data >/dev/null 2>&1; then
-            sudo chown -R www-data:www-data "/var/www/${DEPLOY_DOMAIN}"
-          elif id nginx >/dev/null 2>&1; then
-            sudo chown -R nginx:nginx "/var/www/${DEPLOY_DOMAIN}"
-          else
-            echo "No www-data or nginx user found; leaving web root ownership unchanged"
-          fi
+          sudo chown -R www-data:www-data "/var/www/${DEPLOY_DOMAIN}"
           echo "Validating Nginx configuration"
           sudo nginx -t
           echo "Reloading Nginx"

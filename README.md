@@ -176,7 +176,7 @@ flutter build web --release --base-href=/ --dart-define=APP_ENV=production
 2. Copy the generated files to EC2:
 
 ```bash
-rsync -avz --delete build/web/ ec2-user@YOUR_EC2_PUBLIC_IP:/tmp/mpc-pharma-web/
+rsync -avz --delete build/web/ ubuntu@YOUR_EC2_PUBLIC_IP:/tmp/mpc-pharma-web/
 ```
 
 3. On the EC2 instance, install and configure Nginx:
@@ -262,7 +262,7 @@ ANDROID_KEY_ALIAS
 
 `DOMAIN_NAME` is the base domain, for example `byteblazer.com`. The workflow derives the deployment hostnames from it.
 
-`EC2_USER` is optional. If it is not set, the workflow defaults to `ec2-user`. Use `ec2-user` for Amazon Linux AMIs, `ubuntu` for Ubuntu AMIs, and the correct SSH username for any other AMI.
+`EC2_USER` is optional. If it is not set, the workflow defaults to `ubuntu`.
 
 If the deploy fails with `Permission denied (publickey,...)`, check:
 
@@ -271,7 +271,7 @@ If the deploy fails with `Permission denied (publickey,...)`, check:
 - The EC2 security group allows SSH from GitHub Actions runners or from a network path that can reach the instance.
 - `EC2_HOST` points to the correct EC2 public IP or public DNS name.
 
-The workflow bootstraps a fresh EC2 instance on every web deploy. It installs `nginx` and `rsync` if needed, removes the default Nginx site, writes a managed Nginx config for `<DOMAIN_NAME>` and `staging.<DOMAIN_NAME>`, validates Nginx, and reloads/restarts it. It supports Ubuntu/Debian and Amazon Linux ownership conventions (`www-data` or `nginx`).
+The workflow bootstraps a fresh Ubuntu EC2 instance on every web deploy. It installs `nginx` and `rsync` if needed, removes the default Nginx site, writes a managed Nginx config for `<DOMAIN_NAME>` and `staging.<DOMAIN_NAME>`, validates Nginx, and reloads/restarts it.
 
 The workflow deploys the built web bundle to:
 
@@ -280,10 +280,19 @@ The workflow deploys the built web bundle to:
 /var/www/<DOMAIN_NAME>
 ```
 
+The same managed Nginx config also reserves API routes for the future NestJS API application:
+
+```text
+https://<DOMAIN_NAME>/api/...         -> http://127.0.0.1:3001/api/...
+https://staging.<DOMAIN_NAME>/api/... -> http://127.0.0.1:3000/api/...
+```
+
+The API repository does not need to write Nginx config. It should deploy and run the production API on `127.0.0.1:3001` and the staging API on `127.0.0.1:3000`.
+
 The EC2 instance should already have:
 
-- Amazon Linux, Ubuntu, or another image with `dnf`, `yum`, or `apt-get`
-- The SSH user allowed to run the needed `sudo dnf`/`sudo yum`/`sudo apt-get`, `sudo mkdir`, `sudo rm`, `sudo tee`, `sudo sed`, `sudo rsync`, `sudo chown`, `sudo nginx`, and `sudo systemctl` commands
+- Ubuntu or another `apt-get` based image
+- The SSH user allowed to run the needed `sudo apt-get`, `sudo mkdir`, `sudo rm`, `sudo tee`, `sudo sed`, `sudo rsync`, `sudo chown`, `sudo nginx`, and `sudo systemctl` commands
 - DNS records in Route 53 pointing `staging.<DOMAIN_NAME>` and `<DOMAIN_NAME>` to the EC2 instance or to the load balancer in front of it
 
 If your AWS SSL certificate is in ACM, TLS should terminate at an Application Load Balancer or CloudFront in front of EC2. In that setup, Nginx listens on plain HTTP `80` and the ALB/CloudFront handles HTTPS.
