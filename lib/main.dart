@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-const apiBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'REST API URL not configured yet',
-);
+import 'app_environment.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppEnvironment.load();
   runApp(const MpcPharmaApp());
 }
 
@@ -188,6 +187,7 @@ class _StatusCard extends StatelessWidget {
             const _StatusRow(label: 'UI', value: 'Hello World shell'),
             const _StatusRow(label: 'Targets', value: 'Android, iOS, Web'),
             const _StatusRow(label: 'Domain', value: 'mpcpharma.in'),
+            _StatusRow(label: 'Env', value: AppEnvironment.name),
             const Divider(height: 32),
             Text(
               'API base URL',
@@ -197,7 +197,7 @@ class _StatusCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             SelectableText(
-              apiBaseUrl,
+              AppEnvironment.apiBaseUrl,
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontFamily: 'monospace',
               ),
