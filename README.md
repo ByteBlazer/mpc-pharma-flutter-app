@@ -167,7 +167,7 @@ flutter build web --release --base-href=/ --dart-define=APP_ENV=production
 2. Copy the generated files to EC2:
 
 ```bash
-rsync -avz --delete build/web/ ubuntu@YOUR_EC2_PUBLIC_IP:/tmp/mpc-pharma-web/
+rsync -avz --delete build/web/ ec2-user@YOUR_EC2_PUBLIC_IP:/tmp/mpc-pharma-web/
 ```
 
 3. On the EC2 instance, install and configure Nginx:
@@ -253,7 +253,7 @@ ANDROID_KEY_ALIAS
 
 `DOMAIN_NAME` is the base domain, for example `byteblazer.com`. The workflow derives the deployment hostnames from it.
 
-`EC2_USER` is optional. If it is not set, the workflow defaults to `ubuntu`. Use `ec2-user` for Amazon Linux AMIs, `ubuntu` for Ubuntu AMIs, and the correct SSH username for any other AMI.
+`EC2_USER` is optional. If it is not set, the workflow defaults to `ec2-user`. Use `ec2-user` for Amazon Linux AMIs, `ubuntu` for Ubuntu AMIs, and the correct SSH username for any other AMI.
 
 If the deploy fails with `Permission denied (publickey,...)`, check:
 
@@ -423,7 +423,6 @@ Need the following as GitHub Actions secrets:
 
 - `EC2_HOST` - IPv4 address or hostname of the EC2 instance. If this changes, update the Route 53 records in the hosted zone for the domain.
 - `EC2_SSH_PRIVATE_KEY` - contents of the private key used to SSH into EC2.
-- `EC2_USER` - optional EC2 SSH username. Defaults to `ubuntu` if not set.
 - `DOMAIN_NAME` - base domain, for example `byteblazer.com`. If this changes, remove the old hosted zone records and add the required records for the new domain in Route 53.
 - `ANDROID_KEYSTORE_BASE64` - base64-encoded upload keystore file. The keystore file is kept in Google Drive under `ByteBlazer > Google & Android > Google Playstore`. You will need to convert to base64. See below for command.
 - `ANDROID_KEY_ALIAS` - upload key alias. Refer file kept in Google Drive under `Learning > GooglePlayStoreAppUpload-Notes.txt`.
