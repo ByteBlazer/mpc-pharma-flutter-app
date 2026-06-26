@@ -107,8 +107,17 @@ jobs:
           set -euxo pipefail
           echo "Remote host: \$(hostname)"
           echo "Installing Nginx and rsync if needed"
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx rsync
+          if command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx rsync
+          elif command -v dnf >/dev/null 2>&1; then
+            sudo dnf install -y nginx rsync
+          elif command -v yum >/dev/null 2>&1; then
+            sudo yum install -y nginx rsync
+          else
+            echo "No supported package manager found. Expected apt-get, dnf, or yum."
+            exit 1
+          fi
           echo "Creating web roots"
           sudo mkdir -p "/var/www/${BASE_DOMAIN}"
           sudo mkdir -p "/var/www/staging.${BASE_DOMAIN}"
