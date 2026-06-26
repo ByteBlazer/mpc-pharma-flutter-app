@@ -23,6 +23,8 @@ Use a Flutter SDK that satisfies the `pubspec.yaml` SDK constraint. Install plat
 - iOS: macOS with Xcode and CocoaPods. iOS packaging cannot be completed from Linux.
 - Web: Any machine with Flutter web support enabled.
 
+The GitHub Actions workflow pins Flutter to version `3.41.5` for predictable builds. Local development should use the same Flutter version when possible.
+
 Fetch dependencies after cloning or changing `pubspec.yaml`:
 
 ```bash
@@ -413,7 +415,7 @@ Need the following as GitHub Actions secrets:
 - `EC2_HOST` - IPv4 address or hostname of the EC2 instance. If this changes, update the Route 53 records in the hosted zone for the domain.
 - `EC2_SSH_PRIVATE_KEY` - contents of the private key used to SSH into EC2.
 - `DOMAIN_NAME` - base domain, for example `byteblazer.com`. If this changes, remove the old hosted zone records and add the required records for the new domain in Route 53.
-- `ANDROID_KEYSTORE_BASE64` - base64-encoded upload keystore file. The keystore file is kept in Google Drive under `ByteBlazer > Google & Android > Google Playstore`.
+- `ANDROID_KEYSTORE_BASE64` - base64-encoded upload keystore file. The keystore file is kept in Google Drive under `ByteBlazer > Google & Android > Google Playstore`. You will need to convert to base64. See below for command.
 - `ANDROID_KEY_ALIAS` - upload key alias. Refer file kept in Google Drive under `Learning > GooglePlayStoreAppUpload-Notes.txt`.
 - `ANDROID_KEYSTORE_PASSWORD` - shared password for both keystore and key. The password is kept in Google Drive under `Learning > GooglePlayStoreAppUpload-Notes.txt`.
 
@@ -423,8 +425,4 @@ To generate `ANDROID_KEYSTORE_BASE64`, run this from the folder containing the k
 base64 -w 0 local-keystore-byteblazer-play-console-account-used-for-signing-aab-file.keystore > keystore-base64-to-be-used-in-github-action-secret.txt
 ```
 
-Copy the full contents of `keystore-base64-to-be-used-in-github-action-secret.txt` into the `ANDROID_KEYSTORE_BASE64` GitHub secret. Then delete the temporary file:
-
-```bash
-rm keystore-base64-to-be-used-in-github-action-secret.txt
-```
+Copy the full contents of `keystore-base64-to-be-used-in-github-action-secret.txt` into the `ANDROID_KEYSTORE_BASE64` GitHub secret.
