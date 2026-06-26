@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - staging
-      - production
+      - main
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,7 @@ concurrency:
 
 env:
   FLUTTER_VERSION: '3.41.5'
-  APP_ENV: ${{ github.ref_name == 'production' && 'production' || 'staging' }}
+  APP_ENV: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
   REMOTE_RELEASE_DIR: /tmp/mpc-pharma-web-${{ github.ref_name }}
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BASE_DOMAIN: ${{ secrets.DOMAIN_NAME }}
-      DEPLOY_DOMAIN: ${{ github.ref_name == 'production' && secrets.DOMAIN_NAME || format('staging.{0}', secrets.DOMAIN_NAME) }}
+      DEPLOY_DOMAIN: ${{ github.ref_name == 'main' && secrets.DOMAIN_NAME || format('staging.{0}', secrets.DOMAIN_NAME) }}
       EC2_HOST: ${{ secrets.EC2_HOST }}
       EC2_USER: ${{ secrets.EC2_USER != '' && secrets.EC2_USER || 'ec2-user' }}
 
@@ -236,7 +236,7 @@ jobs:
           echo "Commit: ${{ github.sha }}"
           echo "Flutter version: ${FLUTTER_VERSION}"
           echo "App environment: ${APP_ENV}"
-          echo "Production signing expected: ${{ github.ref_name == 'production' }}"
+          echo "Production signing expected: ${{ github.ref_name == 'main' }}"
 
 
       - name: Set up Java
@@ -259,7 +259,7 @@ jobs:
           flutter pub get
 
       - name: Decode production Android signing keystore
-        if: github.ref_name == 'production'
+        if: github.ref_name == 'main'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -289,14 +289,14 @@ jobs:
           ls -lh build/app/outputs/flutter-apk/
 
       - name: Build production release APK
-        if: github.ref_name == 'production'
+        if: github.ref_name == 'main'
         run: |
           set -euxo pipefail
           flutter build apk --release --dart-define=APP_ENV=production
           ls -lh build/app/outputs/flutter-apk/
 
       - name: Build production app bundle
-        if: github.ref_name == 'production'
+        if: github.ref_name == 'main'
         run: |
           set -euxo pipefail
           flutter build appbundle --release --dart-define=APP_ENV=production
@@ -364,7 +364,7 @@ jobs:
           ls -lh build/ios/iphoneos/
 
       - name: Build production iOS app without code signing
-        if: github.ref_name == 'production'
+        if: github.ref_name == 'main'
         run: |
           set -euxo pipefail
           flutter build ios --release --no-codesign --dart-define=APP_ENV=production
