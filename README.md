@@ -262,7 +262,7 @@ If the deploy fails with `Permission denied (publickey,...)`, check:
 - The EC2 security group allows SSH from GitHub Actions runners or from a network path that can reach the instance.
 - `EC2_HOST` points to the correct EC2 public IP or public DNS name.
 
-The workflow bootstraps a fresh Ubuntu EC2 instance on every web deploy. It installs `nginx` and `rsync` if needed, removes the default Nginx site, writes a managed Nginx config for `<DOMAIN_NAME>` and `staging.<DOMAIN_NAME>`, validates Nginx, and reloads/restarts it.
+The workflow bootstraps a fresh EC2 instance on every web deploy. It installs `nginx` and `rsync` if needed, removes the default Nginx site, writes a managed Nginx config for `<DOMAIN_NAME>` and `staging.<DOMAIN_NAME>`, validates Nginx, and reloads/restarts it. It supports Ubuntu/Debian and Amazon Linux ownership conventions (`www-data` or `nginx`).
 
 The workflow deploys the built web bundle to:
 
