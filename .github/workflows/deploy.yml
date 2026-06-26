@@ -27,7 +27,7 @@ jobs:
       BASE_DOMAIN: ${{ secrets.DOMAIN_NAME }}
       DEPLOY_DOMAIN: ${{ github.ref_name == 'production' && secrets.DOMAIN_NAME || format('staging.{0}', secrets.DOMAIN_NAME) }}
       EC2_HOST: ${{ secrets.EC2_HOST }}
-      EC2_USER: ${{ secrets.EC2_USER != '' && secrets.EC2_USER || 'ubuntu' }}
+      EC2_USER: ${{ secrets.EC2_USER != '' && secrets.EC2_USER || 'ec2-user' }}
 
     steps:
       - name: Check out repository
@@ -41,7 +41,7 @@ jobs:
           test -n "${BASE_DOMAIN}" || (echo "Missing required GitHub secret: DOMAIN_NAME" && exit 1)
           test -n "${EC2_HOST}" || (echo "Missing required GitHub secret: EC2_HOST" && exit 1)
           test -n "${EC2_SSH_PRIVATE_KEY}" || (echo "Missing required GitHub secret: EC2_SSH_PRIVATE_KEY" && exit 1)
-          test -n "${EC2_USER}" || (echo "EC2_USER resolved to empty. Set EC2_USER secret or use an Ubuntu AMI with user ubuntu." && exit 1)
+          test -n "${EC2_USER}" || (echo "EC2_USER resolved to empty. Set EC2_USER secret or use an Amazon Linux AMI with user ec2-user." && exit 1)
           echo "Required deployment secrets are present."
 
       - name: Print deployment context
