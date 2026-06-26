@@ -16,7 +16,6 @@ concurrency:
 
 env:
   FLUTTER_VERSION: '3.41.5'
-  EC2_USER: ubuntu
   APP_ENV: ${{ github.ref_name == 'production' && 'production' || 'staging' }}
   REMOTE_RELEASE_DIR: /tmp/mpc-pharma-web-${{ github.ref_name }}
 
@@ -25,11 +24,25 @@ jobs:
     name: Deploy web app
     runs-on: ubuntu-latest
     env:
+      BASE_DOMAIN: ${{ secrets.DOMAIN_NAME }}
       DEPLOY_DOMAIN: ${{ github.ref_name == 'production' && secrets.DOMAIN_NAME || format('staging.{0}', secrets.DOMAIN_NAME) }}
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER != '' && secrets.EC2_USER || 'ubuntu' }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Validate deployment secrets
+        env:
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "${BASE_DOMAIN}" || (echo "Missing required GitHub secret: DOMAIN_NAME" && exit 1)
+          test -n "${EC2_HOST}" || (echo "Missing required GitHub secret: EC2_HOST" && exit 1)
+          test -n "${EC2_SSH_PRIVATE_KEY}" || (echo "Missing required GitHub secret: EC2_SSH_PRIVATE_KEY" && exit 1)
+          test -n "${EC2_USER}" || (echo "EC2_USER resolved to empty. Set EC2_USER secret or use an Ubuntu AMI with user ubuntu." && exit 1)
+          echo "Required deployment secrets are present."
 
       - name: Print deployment context
         run: |
@@ -38,10 +51,12 @@ jobs:
           echo "Commit: ${{ github.sha }}"
           echo "Flutter version: ${FLUTTER_VERSION}"
           echo "App environment: ${APP_ENV}"
+          echo "Base domain: ${BASE_DOMAIN}"
           echo "Deploy domain: ${DEPLOY_DOMAIN}"
+          echo "EC2 user: ${EC2_USER}"
           echo "Remote release directory: ${REMOTE_RELEASE_DIR}"
-          echo "EC2 host secret present: ${{ secrets.EC2_HOST != '' }}"
-          echo "EC2 SSH key secret present: ${{ secrets.EC2_SSH_PRIVATE_KEY != '' }}"
+          echo "EC2 host configured: true"
+          echo "EC2 SSH key configured: true"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -81,22 +96,22 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/ec2_key
           chmod 600 ~/.ssh/ec2_key
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${EC2_HOST}" >> ~/.ssh/known_hosts
           echo "SSH known_hosts configured"
 
       - name: Bootstrap EC2 web server
         run: |
           set -euxo pipefail
-          echo "Bootstrapping fresh EC2 instance for DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}"
-          ssh -i ~/.ssh/ec2_key "${EC2_USER}@${{ secrets.EC2_HOST }}" <<EOF
+          echo "Bootstrapping fresh EC2 instance for DOMAIN_NAME=${BASE_DOMAIN}"
+          ssh -i ~/.ssh/ec2_key "${EC2_USER}@${EC2_HOST}" <<EOF
           set -euxo pipefail
           echo "Remote host: \$(hostname)"
           echo "Installing Nginx and rsync if needed"
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx rsync
           echo "Creating web roots"
-          sudo mkdir -p "/var/www/${{ secrets.DOMAIN_NAME }}"
-          sudo mkdir -p "/var/www/staging.${{ secrets.DOMAIN_NAME }}"
+          sudo mkdir -p "/var/www/${BASE_DOMAIN}"
+          sudo mkdir -p "/var/www/staging.${BASE_DOMAIN}"
           echo "Removing default Nginx site if present"
           sudo rm -f /etc/nginx/sites-enabled/default
           sudo rm -f /etc/nginx/sites-available/default
@@ -136,7 +151,7 @@ jobs:
               }
           }
           NGINX
-          sudo sed -i "s/DOMAIN_NAME_PLACEHOLDER/${{ secrets.DOMAIN_NAME }}/g" /etc/nginx/conf.d/mpc-pharma-web.conf
+          sudo sed -i "s/DOMAIN_NAME_PLACEHOLDER/${BASE_DOMAIN}/g" /etc/nginx/conf.d/mpc-pharma-web.conf
           echo "Managed Nginx config:"
           sudo cat /etc/nginx/conf.d/mpc-pharma-web.conf
           echo "Validating and enabling Nginx"
@@ -148,18 +163,18 @@ jobs:
       - name: Upload web bundle to EC2
         run: |
           set -euxo pipefail
-          echo "Uploading build/web to ${EC2_USER}@${{ secrets.EC2_HOST }}:${REMOTE_RELEASE_DIR}/"
+          echo "Uploading build/web to ${EC2_USER}@${EC2_HOST}:${REMOTE_RELEASE_DIR}/"
           rsync -az --delete \
             -e "ssh -i ~/.ssh/ec2_key" \
             build/web/ \
-            "${EC2_USER}@${{ secrets.EC2_HOST }}:${REMOTE_RELEASE_DIR}/"
+            "${EC2_USER}@${EC2_HOST}:${REMOTE_RELEASE_DIR}/"
           echo "Upload completed"
 
       - name: Publish web bundle through Nginx
         run: |
           set -euxo pipefail
           echo "Publishing ${REMOTE_RELEASE_DIR} to /var/www/${DEPLOY_DOMAIN}"
-          ssh -i ~/.ssh/ec2_key "${EC2_USER}@${{ secrets.EC2_HOST }}" <<EOF
+          ssh -i ~/.ssh/ec2_key "${EC2_USER}@${EC2_HOST}" <<EOF
           set -euxo pipefail
           echo "Remote host: \$(hostname)"
           echo "Creating web root /var/www/${DEPLOY_DOMAIN}"
