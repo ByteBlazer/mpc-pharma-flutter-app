@@ -176,7 +176,7 @@ flutter build web --release --base-href=/ --dart-define=APP_ENV=production
 2. Copy the generated files to EC2:
 
 ```bash
-rsync -avz --delete build/web/ ubuntu@YOUR_EC2_PUBLIC_IP:/tmp/mpc-pharma-web/
+rsync -avz --delete build/web/ ubuntu@YOUR_EC2_PUBLIC_IP:/var/tmp/mpc-pharma-web/
 ```
 
 3. On the EC2 instance, install and configure Nginx:
@@ -185,7 +185,7 @@ rsync -avz --delete build/web/ ubuntu@YOUR_EC2_PUBLIC_IP:/tmp/mpc-pharma-web/
 sudo apt update
 sudo apt install -y nginx
 sudo mkdir -p /var/www/mpcpharma.in
-sudo rsync -av --delete /tmp/mpc-pharma-web/ /var/www/mpcpharma.in/
+sudo rsync -av --delete /var/tmp/mpc-pharma-web/ /var/www/mpcpharma.in/
 ```
 
 4. Create an Nginx site config:

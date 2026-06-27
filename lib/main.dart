@@ -81,8 +81,9 @@ class _HomeContent extends StatelessWidget {
 
         return Flex(
           direction: wide ? Axis.horizontal : Axis.vertical,
-          crossAxisAlignment:
-              wide ? CrossAxisAlignment.center : CrossAxisAlignment.stretch,
+          crossAxisAlignment: wide
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.stretch,
           children: [
             Flexible(
               flex: wide ? 3 : 0,
