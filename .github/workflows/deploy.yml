@@ -17,7 +17,7 @@ concurrency:
 env:
   FLUTTER_VERSION: '3.41.5'
   APP_ENV: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
-  REMOTE_RELEASE_DIR: /tmp/mpc-pharma-web-${{ github.ref_name }}
+  REMOTE_RELEASE_DIR: /var/tmp/mpc-pharma-web-${{ github.ref_name }}
 
 jobs:
   deploy-web:
