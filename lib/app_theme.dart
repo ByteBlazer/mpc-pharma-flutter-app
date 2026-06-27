@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 abstract final class AppTheme {
   // Change this one color to rebrand the app.
-  static const brandColor = Color(0xFF00897B);
+  static const brandColor = Color(0xFF3F5F8A);
 
   static ThemeData get theme {
     const colorScheme = ColorScheme.light(
