@@ -1,14 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:mpc_pharma/main.dart';
 
 void main() {
-  testWidgets('renders greeting from API', (tester) async {
-    await tester.pumpWidget(
-      MpcPharmaApp(fetchGreeting: () async => 'Hello from API'),
-    );
-    await tester.pumpAndSettle();
+  testWidgets('renders login screen', (tester) async {
+    SharedPreferences.setMockInitialValues({});
 
-    expect(find.text('Hello from API'), findsOneWidget);
+    await tester.pumpWidget(const MpcPharmaApp());
+    await tester.pump();
+
+    expect(find.text('Login'), findsOneWidget);
+    expect(find.text('Send OTP'), findsOneWidget);
   });
 }

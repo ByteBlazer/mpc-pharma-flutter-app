@@ -1,0 +1,69 @@
+import 'package:flutter/material.dart';
+
+abstract final class AppTheme {
+  // Change this one color to rebrand the app.
+  static const brandColor = Color(0xFF0F4C81);
+
+  static ThemeData get theme {
+    const colorScheme = ColorScheme.light(
+      primary: brandColor,
+      onPrimary: Colors.white,
+      secondary: brandColor,
+      onSecondary: Colors.white,
+      surface: Colors.white,
+      onSurface: Colors.black,
+      error: brandColor,
+      onError: Colors.white,
+    );
+
+    return ThemeData(
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: Colors.white,
+      useMaterial3: true,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: brandColor,
+        foregroundColor: Colors.white,
+        centerTitle: false,
+      ),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: brandColor, width: 1),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: brandColor,
+          foregroundColor: Colors.white,
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: brandColor,
+          side: const BorderSide(color: brandColor),
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: brandColor, width: 2),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: brandColor),
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
+  }
+}
