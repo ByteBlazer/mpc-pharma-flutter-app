@@ -45,8 +45,11 @@ Each file contains the same keys:
 
 ```env
 APP_ENV=local
-API_BASE_URL=http://localhost:8080
+API_BASE_URL=http://localhost:3000/api
+APP_CODE=
 ```
+
+`APP_CODE` is optional. For Android SMS Retriever OTP autofill, set it to the app-signature hash for the Flutter app package and make sure the backend includes that hash in the OTP SMS. Web and iOS can leave it empty.
 
 `env/staging.env` and `env/production.env` keep `API_BASE_URL=__API_BASE_URL__` in source control. GitHub Actions replaces only that placeholder at build time. `env/local.env` keeps the real local API URL and is not patched by CI.
 
