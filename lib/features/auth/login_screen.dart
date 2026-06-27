@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
 import '../../app_environment.dart';
+import 'user_profile_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -35,24 +36,40 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
   int _resendSeconds = 0;
   Timer? _resendTimer;
+  bool get _canSendOtp =>
+      !_isLoading && !_otpSent && _isValidPhone(_phoneController.text.trim());
+  bool get _canVerifyOtp =>
+      !_isLoading && _otpSent && _isValidOtp(_otpController.text.trim());
 
   @override
   void initState() {
     super.initState();
     _apiClient = widget._apiClient ?? ApiClient();
     _tokenStore = widget._tokenStore ?? AuthTokenStore();
+    _phoneController.addListener(_handlePhoneChange);
+    _otpController.addListener(_handleOtpChange);
     _loadExistingSession();
   }
 
   @override
   void dispose() {
     _resendTimer?.cancel();
+    _phoneController.removeListener(_handlePhoneChange);
+    _otpController.removeListener(_handleOtpChange);
     _phoneController.dispose();
     _otpController.dispose();
     if (widget._apiClient == null) {
       _apiClient.close();
     }
     super.dispose();
+  }
+
+  void _handlePhoneChange() {
+    if (mounted) setState(() {});
+  }
+
+  void _handleOtpChange() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadExistingSession() async {
@@ -164,10 +181,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('MPC Pharma')),
+      appBar: AppBar(
+        title: Text(_appTitle()),
+        actions: [
+          if (_isLoggedIn)
+            IconButton(
+              tooltip: 'User profile',
+              icon: const Icon(Icons.account_circle),
+              onPressed: _openUserProfile,
+            ),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -185,6 +210,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       isLoading: _isLoading,
                       errorMessage: _errorMessage,
                       resendSeconds: _resendSeconds,
+                      canSendOtp: _canSendOtp,
+                      canVerifyOtp: _canVerifyOtp,
                       onSendOtp: _sendOtp,
                       onVerifyOtp: _verifyOtp,
                       onChangePhone: () {
@@ -199,16 +226,24 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: Container(
-        color: colorScheme.primary,
-        padding: const EdgeInsets.all(12),
-        child: Text(
-          AppEnvironment.name.toUpperCase(),
-          textAlign: TextAlign.center,
-          style: TextStyle(color: colorScheme.onPrimary),
-        ),
+    );
+  }
+
+  void _openUserProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            UserProfileScreen(tokenStore: _tokenStore, onLogout: _logout),
       ),
     );
+  }
+
+  String _appTitle() {
+    return switch (AppEnvironment.name) {
+      AppEnvironment.local => 'MPC Pharma (Local)',
+      AppEnvironment.staging => 'MPC Pharma (Staging)',
+      _ => 'MPC Pharma',
+    };
   }
 }
 
@@ -220,6 +255,8 @@ class _LoginCard extends StatelessWidget {
     required this.isLoading,
     required this.errorMessage,
     required this.resendSeconds,
+    required this.canSendOtp,
+    required this.canVerifyOtp,
     required this.onSendOtp,
     required this.onVerifyOtp,
     required this.onChangePhone,
@@ -231,6 +268,8 @@ class _LoginCard extends StatelessWidget {
   final bool isLoading;
   final String? errorMessage;
   final int resendSeconds;
+  final bool canSendOtp;
+  final bool canVerifyOtp;
   final VoidCallback onSendOtp;
   final VoidCallback onVerifyOtp;
   final VoidCallback onChangePhone;
@@ -269,6 +308,7 @@ class _LoginCard extends StatelessWidget {
                 enabled: !isLoading && !otpSent,
                 autofillHints: const [AutofillHints.telephoneNumberNational],
                 keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.done,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(10),
@@ -280,21 +320,16 @@ class _LoginCard extends StatelessWidget {
                 onChanged: (_) {
                   if (errorMessage != null) onChangePhone();
                 },
+                onSubmitted: (_) {
+                  if (canSendOtp) onSendOtp();
+                },
               ),
               if (otpSent) ...[
                 const SizedBox(height: 18),
-                TextField(
+                _OtpCodeField(
                   controller: otpController,
                   enabled: !isLoading,
-                  autofillHints: const [AutofillHints.oneTimeCode],
-                  keyboardType: TextInputType.number,
-                  textInputAction: TextInputAction.done,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(6),
-                  ],
-                  decoration: const InputDecoration(labelText: 'OTP'),
-                  onSubmitted: (_) => isLoading ? null : onVerifyOtp(),
+                  onCompleted: onVerifyOtp,
                 ),
               ],
               if (errorMessage != null) ...[
@@ -310,12 +345,12 @@ class _LoginCard extends StatelessWidget {
                 const Center(child: CircularProgressIndicator())
               else if (otpSent)
                 ElevatedButton(
-                  onPressed: onVerifyOtp,
+                  onPressed: canVerifyOtp ? onVerifyOtp : null,
                   child: const Text('Verify and continue'),
                 )
               else
                 ElevatedButton(
-                  onPressed: onSendOtp,
+                  onPressed: canSendOtp ? onSendOtp : null,
                   child: const Text('Send OTP'),
                 ),
               if (otpSent) ...[
@@ -336,6 +371,139 @@ class _LoginCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _OtpCodeField extends StatefulWidget {
+  const _OtpCodeField({
+    required this.controller,
+    required this.enabled,
+    this.onCompleted,
+  });
+
+  final TextEditingController controller;
+  final bool enabled;
+  final VoidCallback? onCompleted;
+
+  @override
+  State<_OtpCodeField> createState() => _OtpCodeFieldState();
+}
+
+class _OtpCodeFieldState extends State<_OtpCodeField> {
+  static const _otpLength = 6;
+
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(_handleFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.enabled ? _focusNode.requestFocus : null,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            height: 64,
+            child: Opacity(
+              opacity: 0.01,
+              child: TextField(
+                controller: widget.controller,
+                focusNode: _focusNode,
+                enabled: widget.enabled,
+                autofocus: true,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                cursorColor: Colors.transparent,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.transparent),
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(_otpLength),
+                ],
+                onChanged: (value) {
+                  if (value.length == _otpLength) {
+                    TextInput.finishAutofillContext();
+                    widget.onCompleted?.call();
+                  }
+                },
+                onSubmitted: (_) => widget.onCompleted?.call(),
+              ),
+            ),
+          ),
+          IgnorePointer(
+            child: AnimatedBuilder(
+              animation: widget.controller,
+              builder: (context, _) {
+                final otp = widget.controller.text;
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(_otpLength, (index) {
+                    final digit = index < otp.length ? otp[index] : '';
+                    final isFocused =
+                        _focusNode.hasFocus && index == otp.length.clamp(0, 5);
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isFocused
+                                    ? colorScheme.primary
+                                    : Colors.black,
+                                width: isFocused ? 2 : 1,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                digit,
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
