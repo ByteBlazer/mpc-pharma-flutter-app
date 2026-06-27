@@ -4,27 +4,27 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../utils/download_file.dart';
-import 'user_form_screen.dart';
-import 'user_models.dart';
+import '../users/user_models.dart';
+import 'location_form_screen.dart';
 
-class UsersScreen extends StatefulWidget {
-  const UsersScreen({super.key, required this.apiClient});
+class LocationsScreen extends StatefulWidget {
+  const LocationsScreen({super.key, required this.apiClient});
 
   final ApiClient apiClient;
 
   @override
-  State<UsersScreen> createState() => _UsersScreenState();
+  State<LocationsScreen> createState() => _LocationsScreenState();
 }
 
-class _UsersScreenState extends State<UsersScreen> {
+class _LocationsScreenState extends State<LocationsScreen> {
   final _searchController = TextEditingController();
-  late Future<_UsersData> _dataFuture;
+  late Future<List<BaseLocation>> _locationsFuture;
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _dataFuture = _loadData();
+    _locationsFuture = widget.apiClient.getBaseLocations();
     _searchController.addListener(_handleSearchChange);
   }
 
@@ -39,69 +39,38 @@ class _UsersScreenState extends State<UsersScreen> {
     setState(() => _searchQuery = _searchController.text);
   }
 
-  Future<_UsersData> _loadData() async {
-    final results = await Future.wait([
-      widget.apiClient.getUsers(),
-      widget.apiClient.getUserRoles(),
-      widget.apiClient.getBaseLocations(),
-    ]);
-
-    return _UsersData(
-      users: results[0] as List<UserAccount>,
-      roles: results[1] as List<UserRoleOption>,
-      baseLocations: results[2] as List<BaseLocation>,
-    );
-  }
-
   void _refresh() {
     setState(() {
-      _dataFuture = _loadData();
+      _locationsFuture = widget.apiClient.getBaseLocations();
     });
   }
 
-  Future<void> _addUser(_UsersData data) async {
+  Future<void> _addLocation() async {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => UserFormScreen(
-          apiClient: widget.apiClient,
-          availableRoles: data.roles,
-          baseLocations: data.baseLocations,
-        ),
+        builder: (_) => LocationFormScreen(apiClient: widget.apiClient),
       ),
     );
     if (saved == true) _refresh();
   }
 
-  Future<void> _editUser(_UsersData data, UserAccount user) async {
-    try {
-      final latestUser = await widget.apiClient.getUser(userId: user.id);
-      if (!mounted) return;
-      final saved = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => UserFormScreen(
-            apiClient: widget.apiClient,
-            availableRoles: data.roles,
-            baseLocations: data.baseLocations,
-            user: latestUser,
-          ),
-        ),
-      );
-      if (saved == true) _refresh();
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to load user: $error')));
-    }
+  Future<void> _editLocation(BaseLocation location) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) =>
+            LocationFormScreen(apiClient: widget.apiClient, location: location),
+      ),
+    );
+    if (saved == true) _refresh();
   }
 
-  Future<void> _downloadUsers(List<UserAccount> users) async {
+  Future<void> _downloadLocations(List<BaseLocation> locations) async {
     try {
       final fileName =
-          'mpc-pharma-users-${DateTime.now().millisecondsSinceEpoch}.csv';
+          'mpc-pharma-locations-${DateTime.now().millisecondsSinceEpoch}.csv';
       await downloadFile(
         fileName: fileName,
-        bytes: utf8.encode(_usersToCsv(users)),
+        bytes: utf8.encode(_locationsToCsv(locations)),
         mimeType: 'text/csv;charset=utf-8',
       );
     } catch (error) {
@@ -112,32 +81,10 @@ class _UsersScreenState extends State<UsersScreen> {
     }
   }
 
-  String _usersToCsv(List<UserAccount> users) {
+  String _locationsToCsv(List<BaseLocation> locations) {
     final rows = <List<String>>[
-      [
-        'ID',
-        'Name',
-        'Mobile',
-        'Base Location ID',
-        'Base Location',
-        'Vehicle Number',
-        'Active',
-        'Roles',
-        'Created At',
-      ],
-      ...users.map(
-        (user) => [
-          user.id,
-          user.personName,
-          user.mobile,
-          user.baseLocationId,
-          user.baseLocationName,
-          user.vehicleNbr,
-          user.isActive ? 'Active' : 'Inactive',
-          user.roles.map((role) => role.tokenValue).join('; '),
-          user.createdAt?.toLocal().toString() ?? '',
-        ],
-      ),
+      ['ID', 'Name'],
+      ...locations.map((location) => [location.id, location.name]),
     ];
 
     return rows.map((row) => row.map(_csvCell).join(',')).join('\n');
@@ -151,10 +98,10 @@ class _UsersScreenState extends State<UsersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Users')),
+      appBar: AppBar(title: const Text('Locations')),
       body: SafeArea(
-        child: FutureBuilder<_UsersData>(
-          future: _dataFuture,
+        child: FutureBuilder<List<BaseLocation>>(
+          future: _locationsFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const Center(child: CircularProgressIndicator());
@@ -167,9 +114,9 @@ class _UsersScreenState extends State<UsersScreen> {
               );
             }
 
-            final data = snapshot.data ?? _UsersData.empty();
-            final filteredUsers = data.users
-                .where((user) => user.matchesSearch(_searchQuery))
+            final locations = snapshot.data ?? const <BaseLocation>[];
+            final filteredLocations = locations
+                .where((location) => location.matchesSearch(_searchQuery))
                 .toList();
 
             return Padding(
@@ -182,16 +129,17 @@ class _UsersScreenState extends State<UsersScreen> {
                     children: [
                       _SearchAndActions(
                         controller: _searchController,
-                        shownCount: filteredUsers.length,
-                        totalCount: data.users.length,
-                        onAddUser: () => _addUser(data),
-                        onDownloadUsers: () => _downloadUsers(data.users),
+                        shownCount: filteredLocations.length,
+                        totalCount: locations.length,
+                        onAddLocation: _addLocation,
+                        onDownloadLocations: () =>
+                            _downloadLocations(locations),
                       ),
                       const SizedBox(height: 12),
                       Expanded(
-                        child: _UsersSection(
-                          users: filteredUsers,
-                          onEditUser: (user) => _editUser(data, user),
+                        child: _LocationsSection(
+                          locations: filteredLocations,
+                          onEditLocation: _editLocation,
                         ),
                       ),
                     ],
@@ -211,15 +159,15 @@ class _SearchAndActions extends StatelessWidget {
     required this.controller,
     required this.shownCount,
     required this.totalCount,
-    required this.onAddUser,
-    required this.onDownloadUsers,
+    required this.onAddLocation,
+    required this.onDownloadLocations,
   });
 
   final TextEditingController controller;
   final int shownCount;
   final int totalCount;
-  final VoidCallback onAddUser;
-  final VoidCallback onDownloadUsers;
+  final VoidCallback onAddLocation;
+  final VoidCallback onDownloadLocations;
 
   @override
   Widget build(BuildContext context) {
@@ -229,22 +177,22 @@ class _SearchAndActions extends StatelessWidget {
         final search = TextField(
           controller: controller,
           decoration: const InputDecoration(
-            labelText: 'Search users',
+            labelText: 'Search locations',
             prefixIcon: Icon(Icons.search),
-            hintText: 'Name, mobile, location, vehicle, role...',
+            hintText: 'ID or location name...',
           ),
         );
-        final addUser = ElevatedButton.icon(
-          onPressed: onAddUser,
+        final addLocation = ElevatedButton.icon(
+          onPressed: onAddLocation,
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(0, 44),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
-          icon: const Icon(Icons.person_add_alt),
-          label: const Text('Add New User'),
+          icon: const Icon(Icons.add_location_alt_outlined),
+          label: const Text('Add New Location'),
         );
         final download = OutlinedButton.icon(
-          onPressed: onDownloadUsers,
+          onPressed: onDownloadLocations,
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(0, 44),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -257,7 +205,10 @@ class _SearchAndActions extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _UsersCountText(shownCount: shownCount, totalCount: totalCount),
+              _LocationsCountText(
+                shownCount: shownCount,
+                totalCount: totalCount,
+              ),
               const SizedBox(height: 8),
               search,
               const SizedBox(height: 12),
@@ -265,7 +216,7 @@ class _SearchAndActions extends StatelessWidget {
                 children: [
                   Expanded(child: download),
                   const SizedBox(width: 12),
-                  Expanded(child: addUser),
+                  Expanded(child: addLocation),
                 ],
               ),
             ],
@@ -275,7 +226,7 @@ class _SearchAndActions extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _UsersCountText(shownCount: shownCount, totalCount: totalCount),
+            _LocationsCountText(shownCount: shownCount, totalCount: totalCount),
             const SizedBox(height: 8),
             search,
             const SizedBox(height: 12),
@@ -284,7 +235,7 @@ class _SearchAndActions extends StatelessWidget {
               child: Wrap(
                 spacing: 12,
                 runSpacing: 12,
-                children: [download, addUser],
+                children: [download, addLocation],
               ),
             ),
           ],
@@ -294,8 +245,11 @@ class _SearchAndActions extends StatelessWidget {
   }
 }
 
-class _UsersCountText extends StatelessWidget {
-  const _UsersCountText({required this.shownCount, required this.totalCount});
+class _LocationsCountText extends StatelessWidget {
+  const _LocationsCountText({
+    required this.shownCount,
+    required this.totalCount,
+  });
 
   final int shownCount;
   final int totalCount;
@@ -303,7 +257,7 @@ class _UsersCountText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      '$shownCount of $totalCount users',
+      '$shownCount of $totalCount locations',
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
         color: Colors.black,
         fontWeight: FontWeight.w600,
@@ -312,17 +266,20 @@ class _UsersCountText extends StatelessWidget {
   }
 }
 
-class _UsersSection extends StatefulWidget {
-  const _UsersSection({required this.users, required this.onEditUser});
+class _LocationsSection extends StatefulWidget {
+  const _LocationsSection({
+    required this.locations,
+    required this.onEditLocation,
+  });
 
-  final List<UserAccount> users;
-  final ValueChanged<UserAccount> onEditUser;
+  final List<BaseLocation> locations;
+  final ValueChanged<BaseLocation> onEditLocation;
 
   @override
-  State<_UsersSection> createState() => _UsersSectionState();
+  State<_LocationsSection> createState() => _LocationsSectionState();
 }
 
-class _UsersSectionState extends State<_UsersSection> {
+class _LocationsSectionState extends State<_LocationsSection> {
   final _scrollController = ScrollController();
 
   @override
@@ -333,8 +290,8 @@ class _UsersSectionState extends State<_UsersSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.users.isEmpty) {
-      return const _EmptyState(message: 'No users match the search.');
+    if (widget.locations.isEmpty) {
+      return const _EmptyState(message: 'No locations match the search.');
     }
 
     return Scrollbar(
@@ -346,12 +303,12 @@ class _UsersSectionState extends State<_UsersSection> {
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.only(right: 20),
-        itemCount: widget.users.length,
+        itemCount: widget.locations.length,
         itemBuilder: (context, index) {
-          final user = widget.users[index];
-          return _UserListItem(
-            user: user,
-            onEdit: () => widget.onEditUser(user),
+          final location = widget.locations[index];
+          return _LocationListItem(
+            location: location,
+            onEdit: () => widget.onEditLocation(location),
           );
         },
       ),
@@ -359,10 +316,10 @@ class _UsersSectionState extends State<_UsersSection> {
   }
 }
 
-class _UserListItem extends StatelessWidget {
-  const _UserListItem({required this.user, required this.onEdit});
+class _LocationListItem extends StatelessWidget {
+  const _LocationListItem({required this.location, required this.onEdit});
 
-  final UserAccount user;
+  final BaseLocation location;
   final VoidCallback onEdit;
 
   @override
@@ -377,46 +334,21 @@ class _UserListItem extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      user.personName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  _StatusPill(isActive: user.isActive),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    tooltip: 'Edit user',
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_outlined),
-                  ),
-                ],
+              Expanded(
+                child: _SmallInfo(
+                  icon: Icons.location_on_outlined,
+                  text: location.name,
+                ),
               ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 12,
-                runSpacing: 6,
-                children: [
-                  _SmallInfo(icon: Icons.badge_outlined, text: user.id),
-                  _SmallInfo(icon: Icons.phone_outlined, text: user.mobile),
-                  _SmallInfo(
-                    icon: Icons.location_on_outlined,
-                    text: user.baseLocationName,
-                  ),
-                  if (user.vehicleNbr.isNotEmpty)
-                    _SmallInfo(
-                      icon: Icons.local_shipping_outlined,
-                      text: user.vehicleNbr,
-                    ),
-                ],
+              const SizedBox(width: 8),
+              _SmallInfo(icon: Icons.badge_outlined, text: location.id),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Edit location',
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
               ),
             ],
           ),
@@ -441,30 +373,6 @@ class _SmallInfo extends StatelessWidget {
         const SizedBox(width: 4),
         Text(text, style: const TextStyle(color: Colors.black)),
       ],
-    );
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.isActive});
-
-  final bool isActive;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: isActive ? colorScheme.primary : Colors.black,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(
-          isActive ? 'Active' : 'Inactive',
-          style: const TextStyle(color: Colors.white, fontSize: 12),
-        ),
-      ),
     );
   }
 }
@@ -508,7 +416,7 @@ class _ErrorState extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'Failed to load Users',
+                    'Failed to load Locations',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.black,
@@ -534,20 +442,4 @@ class _ErrorState extends StatelessWidget {
       ),
     );
   }
-}
-
-class _UsersData {
-  const _UsersData({
-    required this.users,
-    required this.roles,
-    required this.baseLocations,
-  });
-
-  factory _UsersData.empty() {
-    return const _UsersData(users: [], roles: [], baseLocations: []);
-  }
-
-  final List<UserAccount> users;
-  final List<UserRoleOption> roles;
-  final List<BaseLocation> baseLocations;
 }
