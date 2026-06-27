@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
 import '../../app_environment.dart';
+import '../home/home_screen.dart';
 import 'user_profile_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -193,17 +194,17 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
         ],
       ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: _isCheckingSession
-                  ? const Center(child: CircularProgressIndicator())
-                  : _isLoggedIn
-                  ? _SignedInCard(onLogout: _logout)
-                  : _LoginCard(
+      body: _isCheckingSession
+          ? const Center(child: CircularProgressIndicator())
+          : _isLoggedIn
+          ? HomeScreen(apiClient: _apiClient)
+          : SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: _LoginCard(
                       phoneController: _phoneController,
                       otpController: _otpController,
                       otpSent: _otpSent,
@@ -222,10 +223,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         });
                       },
                     ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -504,45 +505,6 @@ class _OtpCodeFieldState extends State<_OtpCodeField> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SignedInCard extends StatelessWidget {
-  const _SignedInCard({required this.onLogout});
-
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'You are signed in',
-              textAlign: TextAlign.center,
-              style: textTheme.headlineMedium?.copyWith(
-                color: Colors.black,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'The access token is saved locally and will be sent with authenticated API calls.',
-              textAlign: TextAlign.center,
-              style: textTheme.bodyLarge?.copyWith(color: Colors.black),
-            ),
-            const SizedBox(height: 24),
-            OutlinedButton(onPressed: onLogout, child: const Text('Logout')),
-          ],
-        ),
       ),
     );
   }
