@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import 'app_environment.dart';
 
@@ -8,8 +11,13 @@ Future<void> main() async {
   runApp(const MpcPharmaApp());
 }
 
+typedef GreetingFetcher = Future<String> Function();
+
 class MpcPharmaApp extends StatelessWidget {
-  const MpcPharmaApp({super.key});
+  const MpcPharmaApp({super.key, GreetingFetcher? fetchGreeting})
+    : _fetchGreeting = fetchGreeting ?? fetchGreetingFromApi;
+
+  final GreetingFetcher _fetchGreeting;
 
   @override
   Widget build(BuildContext context) {
@@ -17,264 +25,89 @@ class MpcPharmaApp extends StatelessWidget {
       title: 'MPC Pharma',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF176B87),
-          brightness: Brightness.light,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF176B87)),
         useMaterial3: true,
-        visualDensity: VisualDensity.standard,
       ),
-      home: const HomePage(),
+      home: GreetingPage(fetchGreeting: _fetchGreeting),
     );
   }
 }
 
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+class GreetingPage extends StatelessWidget {
+  const GreetingPage({super.key, required this.fetchGreeting});
+
+  final GreetingFetcher fetchGreeting;
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final compact = width < 720;
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FA),
-      appBar: AppBar(
-        title: const Text('MPC Pharma'),
-        centerTitle: false,
-        actions: compact
-            ? null
-            : const [
-                _HeaderAction(label: 'Android'),
-                _HeaderAction(label: 'iOS'),
-                _HeaderAction(label: 'Web'),
-                SizedBox(width: 16),
-              ],
-      ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: compact ? 20 : 48,
-              vertical: compact ? 32 : 56,
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1120),
-              child: const _HomeContent(),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+      body: Center(
+        child: FutureBuilder<String>(
+          future: fetchGreeting(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const CircularProgressIndicator();
+            }
 
-class _HomeContent extends StatelessWidget {
-  const _HomeContent();
+            if (snapshot.hasError) {
+              return Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Failed to load greeting: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                ),
+              );
+            }
 
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 720;
-        final gap = wide ? 40.0 : 28.0;
-
-        return Flex(
-          direction: wide ? Axis.horizontal : Axis.vertical,
-          crossAxisAlignment:
-              wide ? CrossAxisAlignment.center : CrossAxisAlignment.stretch,
-          children: [
-            Flexible(
-              flex: wide ? 3 : 0,
-              fit: wide ? FlexFit.tight : FlexFit.loose,
-              child: const _HeroCopy(),
-            ),
-            SizedBox(width: wide ? gap : 0, height: wide ? 0 : gap),
-            Flexible(
-              flex: wide ? 2 : 0,
-              fit: wide ? FlexFit.tight : FlexFit.loose,
-              child: const _StatusCard(),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _HeroCopy extends StatelessWidget {
-  const _HeroCopy();
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _Badge(label: 'Flutter starter'),
-        const SizedBox(height: 20),
-        Text(
-          'Hello World from MPC Pharma',
-          style: textTheme.displaySmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.8,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'A clean, web-first Flutter foundation that also packages for Android and iOS.',
-          style: textTheme.titleLarge?.copyWith(
-            color: Colors.black.withValues(alpha: 0.68),
-            height: 1.35,
-          ),
-        ),
-        const SizedBox(height: 28),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            FilledButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.public),
-              label: const Text('Web ready'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.phone_android),
-              label: const Text('Mobile ready'),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final compact = MediaQuery.sizeOf(context).width < 720;
-
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(compact ? 20 : 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.medical_services_outlined,
-              color: theme.colorScheme.primary,
-              size: compact ? 36 : 44,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Application status',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                snapshot.data ?? '',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
-            ),
-            const SizedBox(height: 16),
-            const _StatusRow(label: 'UI', value: 'Hello World shell'),
-            const _StatusRow(label: 'Targets', value: 'Android, iOS, Web'),
-            const _StatusRow(label: 'Domain', value: 'mpcpharma.in'),
-            _StatusRow(label: 'Env', value: AppEnvironment.name),
-            const Divider(height: 32),
-            Text(
-              'API base URL',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: Colors.black.withValues(alpha: 0.64),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SelectableText(
-              AppEnvironment.apiBaseUrl,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontFamily: 'monospace',
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _StatusRow extends StatelessWidget {
-  const _StatusRow({required this.label, required this.value});
+Future<String> fetchGreetingFromApi() async {
+  final uri = _apiUri('/greeting');
+  final response = await http.get(uri);
 
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 72,
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.black.withValues(alpha: 0.56)),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw Exception('GET $uri failed with status ${response.statusCode}');
   }
+
+  return _extractGreeting(response.body);
 }
 
-class _HeaderAction extends StatelessWidget {
-  const _HeaderAction({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: TextButton(onPressed: () {}, child: Text(label)),
-    );
-  }
+Uri _apiUri(String path) {
+  final base = AppEnvironment.apiBaseUrl;
+  final normalizedBase = base.endsWith('/')
+      ? base.substring(0, base.length - 1)
+      : base;
+  final normalizedPath = path.startsWith('/') ? path : '/$path';
+  return Uri.parse('$normalizedBase$normalizedPath');
 }
 
-class _Badge extends StatelessWidget {
-  const _Badge({required this.label});
+String _extractGreeting(String body) {
+  final trimmed = body.trim();
+  if (trimmed.isEmpty) return '';
 
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.primary;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        child: Text(
-          label,
-          style: TextStyle(color: color, fontWeight: FontWeight.w700),
-        ),
-      ),
-    );
+  try {
+    final decoded = jsonDecode(trimmed);
+    if (decoded is Map<String, dynamic>) {
+      final message = decoded['message'] ?? decoded['greeting'];
+      if (message != null) return message.toString();
+    }
+    if (decoded is String) return decoded;
+  } on FormatException {
+    // Plain text response.
   }
+
+  return trimmed;
 }
