@@ -81,16 +81,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         value: profile.baseLocationName,
                       ),
                       _InfoRow(
-                        label: 'Base location ID',
-                        value: profile.baseLocationId,
+                        label: 'Login Token Issued At',
+                        value: profile.issuedAt,
                       ),
                       _InfoRow(
-                        label: 'Heartbeat frequency',
-                        value:
-                            '${profile.locationHeartBeatFrequencyInSeconds} seconds',
+                        label: 'Login Token Expires At',
+                        value: profile.expiresAt,
                       ),
-                      _InfoRow(label: 'Issued at', value: profile.issuedAt),
-                      _InfoRow(label: 'Expires at', value: profile.expiresAt),
                       const SizedBox(height: 20),
                       Text(
                         'Roles',
@@ -231,8 +228,6 @@ class _JwtProfile {
     required this.username,
     required this.mobile,
     required this.roles,
-    required this.locationHeartBeatFrequencyInSeconds,
-    required this.baseLocationId,
     required this.baseLocationName,
     required this.issuedAt,
     required this.expiresAt,
@@ -257,10 +252,6 @@ class _JwtProfile {
       username: _stringValue(json['username']),
       mobile: _stringValue(json['mobile']),
       roles: _stringValue(json['roles']).split(',').toAppRoles(),
-      locationHeartBeatFrequencyInSeconds: _stringValue(
-        json['locationHeartBeatFrequencyInSeconds'],
-      ),
-      baseLocationId: _stringValue(json['baseLocationId']),
       baseLocationName: _stringValue(json['baseLocationName']),
       issuedAt: _formatEpochSeconds(json['iat']),
       expiresAt: _formatEpochSeconds(json['exp']),
@@ -271,8 +262,6 @@ class _JwtProfile {
   final String username;
   final String mobile;
   final List<AppRole> roles;
-  final String locationHeartBeatFrequencyInSeconds;
-  final String baseLocationId;
   final String baseLocationName;
   final String issuedAt;
   final String expiresAt;
@@ -283,6 +272,25 @@ class _JwtProfile {
     final seconds = int.tryParse(value?.toString() ?? '');
     if (seconds == null) return '';
     final dateTime = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
-    return dateTime.toLocal().toString();
+    final local = dateTime.toLocal();
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final month = months[local.month - 1];
+    final hourOfPeriod = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour < 12 ? 'AM' : 'PM';
+    return '$month ${local.day} $hourOfPeriod:$minute $period';
   }
 }

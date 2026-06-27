@@ -96,6 +96,20 @@ class BaseLocation {
 
   final String id;
   final String name;
+
+  bool matchesSearch(String query) {
+    final normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) return true;
+    return '$id $name'.toLowerCase().contains(normalizedQuery);
+  }
+}
+
+class BaseLocationSaveRequest {
+  const BaseLocationSaveRequest({required this.name});
+
+  final String name;
+
+  JsonMap toJson() => {'name': name};
 }
 
 class UserAccountSaveRequest {

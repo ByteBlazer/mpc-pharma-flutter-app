@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../api/auth_token_store.dart';
 import '../departments/departments_screen.dart';
+import '../locations/locations_screen.dart';
 import '../users/users_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -20,18 +24,7 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Features',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Choose a feature to continue.',
-                  style: TextStyle(color: Colors.black),
-                ),
+                const _HomeUserSummary(),
                 const SizedBox(height: 24),
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -66,6 +59,18 @@ class HomeScreen extends StatelessWidget {
                             );
                           },
                         ),
+                        _FeatureTile(
+                          icon: Icons.map_outlined,
+                          label: 'Locations',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    LocationsScreen(apiClient: apiClient),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     );
                   },
@@ -75,6 +80,98 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _HomeUserSummary extends StatelessWidget {
+  const _HomeUserSummary();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_HomeUser?>(
+      future: _HomeUser.load(),
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        if (user == null) return const SizedBox.shrink();
+
+        return Row(
+          children: [
+            Expanded(
+              child: _HomeUserSummaryItem(
+                icon: Icons.person_outline,
+                text: user.username,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _HomeUserSummaryItem(
+                icon: Icons.location_on_outlined,
+                text: user.baseLocationName,
+                alignment: MainAxisAlignment.end,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _HomeUserSummaryItem extends StatelessWidget {
+  const _HomeUserSummaryItem({
+    required this.icon,
+    required this.text,
+    this.alignment = MainAxisAlignment.start,
+  });
+
+  final IconData icon;
+  final String text;
+  final MainAxisAlignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: alignment,
+      children: [
+        Icon(icon, size: 18, color: Colors.black),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.black),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HomeUser {
+  const _HomeUser({required this.username, required this.baseLocationName});
+
+  final String username;
+  final String baseLocationName;
+
+  static Future<_HomeUser?> load() async {
+    final token = await AuthTokenStore().readToken();
+    if (token == null) return null;
+
+    final parts = token.split('.');
+    if (parts.length < 2) return null;
+
+    final payload = utf8.decode(
+      base64Url.decode(base64Url.normalize(parts[1])),
+    );
+    final json = jsonDecode(payload);
+    if (json is! Map<String, dynamic>) return null;
+
+    return _HomeUser(
+      username: json['username']?.toString() ?? '',
+      baseLocationName: json['baseLocationName']?.toString() ?? '',
     );
   }
 }

@@ -288,6 +288,31 @@ class ApiClient {
     return _decodeJsonList(response.body).map(BaseLocation.fromJson).toList();
   }
 
+  Future<void> createBaseLocation({
+    String? token,
+    required BaseLocationSaveRequest request,
+  }) async {
+    await _post(
+      'auth/base-locations',
+      token: token,
+      requiresAuth: true,
+      body: request.toJson(),
+    );
+  }
+
+  Future<void> updateBaseLocation({
+    String? token,
+    required String id,
+    required BaseLocationSaveRequest request,
+  }) async {
+    await _put(
+      'auth/base-locations/${Uri.encodeComponent(id)}',
+      token: token,
+      requiresAuth: true,
+      body: request.toJson(),
+    );
+  }
+
   Future<http.Response> _get(
     String endpoint, {
     String? token,
