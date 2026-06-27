@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../app_environment.dart';
 import 'auth_models.dart';
 import 'auth_token_store.dart';
+import '../features/users/user_models.dart' hide JsonMap;
 
 typedef JsonMap = Map<String, dynamic>;
 
@@ -227,6 +228,66 @@ class ApiClient {
     return _decodeJsonObject(response.body);
   }
 
+  Future<List<UserAccount>> getUsers({String? token}) async {
+    final response = await _get('auth/users', token: token, requiresAuth: true);
+    return _decodeJsonList(response.body).map(UserAccount.fromJson).toList();
+  }
+
+  Future<UserAccount> getUser({String? token, required String userId}) async {
+    final response = await _get(
+      'auth/users/${Uri.encodeComponent(userId)}',
+      token: token,
+      requiresAuth: true,
+    );
+    return UserAccount.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<void> createUser({
+    String? token,
+    required UserAccountSaveRequest request,
+  }) async {
+    await _post(
+      'auth/users',
+      token: token,
+      requiresAuth: true,
+      body: request.toJson(),
+    );
+  }
+
+  Future<void> updateUser({
+    String? token,
+    required String userId,
+    required UserAccountSaveRequest request,
+  }) async {
+    await _put(
+      'auth/users/${Uri.encodeComponent(userId)}',
+      token: token,
+      requiresAuth: true,
+      body: request.toJson(includeIsActive: true),
+    );
+  }
+
+  Future<List<UserRoleOption>> getUserRoles({String? token}) async {
+    final response = await _get(
+      'auth/user-roles',
+      token: token,
+      requiresAuth: true,
+    );
+    return _decodeJsonList(response.body)
+        .map(UserRoleOption.fromJson)
+        .where((option) => option.role != null)
+        .toList();
+  }
+
+  Future<List<BaseLocation>> getBaseLocations({String? token}) async {
+    final response = await _get(
+      'auth/base-locations',
+      token: token,
+      requiresAuth: true,
+    );
+    return _decodeJsonList(response.body).map(BaseLocation.fromJson).toList();
+  }
+
   Future<http.Response> _get(
     String endpoint, {
     String? token,
@@ -353,6 +414,15 @@ class ApiClient {
     final decoded = jsonDecode(body);
     if (decoded is JsonMap) return decoded;
     throw FormatException('Expected JSON object response', body);
+  }
+
+  static List<JsonMap> _decodeJsonList(String body) {
+    if (body.trim().isEmpty) return const [];
+    final decoded = jsonDecode(body);
+    if (decoded is List) {
+      return decoded.whereType<JsonMap>().toList();
+    }
+    throw FormatException('Expected JSON array response', body);
   }
 }
 
