@@ -9,9 +9,14 @@ import '../locations/locations_screen.dart';
 import '../users/users_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.apiClient});
+  const HomeScreen({
+    super.key,
+    required this.apiClient,
+    required this.onLoginAgain,
+  });
 
   final ApiClient apiClient;
+  final Future<void> Function() onLoginAgain;
 
   @override
   Widget build(BuildContext context) {
@@ -42,8 +47,10 @@ class HomeScreen extends StatelessWidget {
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    UsersScreen(apiClient: apiClient),
+                                builder: (_) => UsersScreen(
+                                  apiClient: apiClient,
+                                  onLoginAgain: onLoginAgain,
+                                ),
                               ),
                             );
                           },
@@ -65,8 +72,10 @@ class HomeScreen extends StatelessWidget {
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) =>
-                                    LocationsScreen(apiClient: apiClient),
+                                builder: (_) => LocationsScreen(
+                                  apiClient: apiClient,
+                                  onLoginAgain: onLoginAgain,
+                                ),
                               ),
                             );
                           },

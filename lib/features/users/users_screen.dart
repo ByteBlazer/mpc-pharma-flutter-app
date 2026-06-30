@@ -4,13 +4,20 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../utils/download_file.dart';
+import '../../widgets/app_snack_bar.dart';
+import '../../widgets/app_sort_controls.dart';
 import 'user_form_screen.dart';
 import 'user_models.dart';
 
 class UsersScreen extends StatefulWidget {
-  const UsersScreen({super.key, required this.apiClient});
+  const UsersScreen({
+    super.key,
+    required this.apiClient,
+    required this.onLoginAgain,
+  });
 
   final ApiClient apiClient;
+  final Future<void> Function() onLoginAgain;
 
   @override
   State<UsersScreen> createState() => _UsersScreenState();
@@ -20,6 +27,8 @@ class _UsersScreenState extends State<UsersScreen> {
   final _searchController = TextEditingController();
   late Future<_UsersData> _dataFuture;
   String _searchQuery = '';
+  AppSortField _sortField = AppSortField.id;
+  AppSortDirection _sortDirection = AppSortDirection.descending;
 
   @override
   void initState() {
@@ -37,6 +46,19 @@ class _UsersScreenState extends State<UsersScreen> {
 
   void _handleSearchChange() {
     setState(() => _searchQuery = _searchController.text);
+  }
+
+  void _changeSort(AppSortField field) {
+    setState(() {
+      if (_sortField == field) {
+        _sortDirection = _sortDirection == AppSortDirection.ascending
+            ? AppSortDirection.descending
+            : AppSortDirection.ascending;
+      } else {
+        _sortField = field;
+        _sortDirection = AppSortDirection.ascending;
+      }
+    });
   }
 
   Future<_UsersData> _loadData() async {
@@ -69,7 +91,10 @@ class _UsersScreenState extends State<UsersScreen> {
         ),
       ),
     );
-    if (saved == true) _refresh();
+    if (saved == true) {
+      _showSuccessMessage('User added successfully.');
+      _refresh();
+    }
   }
 
   Future<void> _editUser(_UsersData data, UserAccount user) async {
@@ -86,13 +111,23 @@ class _UsersScreenState extends State<UsersScreen> {
           ),
         ),
       );
-      if (saved == true) _refresh();
+      if (saved == true) {
+        _showSuccessMessage('User updated successfully.');
+        _refresh();
+      }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      showAppSnackBar(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to load user: $error')));
+        message: 'Failed to load user: $error',
+        type: AppSnackBarType.error,
+      );
     }
+  }
+
+  void _showSuccessMessage(String message) {
+    if (!mounted) return;
+    showAppSnackBar(context, message: message, type: AppSnackBarType.success);
   }
 
   Future<void> _downloadUsers(List<UserAccount> users) async {
@@ -106,9 +141,11 @@ class _UsersScreenState extends State<UsersScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      showAppSnackBar(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
     }
   }
 
@@ -148,6 +185,18 @@ class _UsersScreenState extends State<UsersScreen> {
     return '"$escaped"';
   }
 
+  int _compareUsers(UserAccount first, UserAccount second) {
+    final result = switch (_sortField) {
+      AppSortField.name => first.personName.toLowerCase().compareTo(
+        second.personName.toLowerCase(),
+      ),
+      AppSortField.id => _numericId(first.id).compareTo(_numericId(second.id)),
+    };
+    return _sortDirection == AppSortDirection.ascending ? result : -result;
+  }
+
+  int _numericId(String id) => int.tryParse(id) ?? 0;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -164,6 +213,7 @@ class _UsersScreenState extends State<UsersScreen> {
               return _ErrorState(
                 message: snapshot.error.toString(),
                 onRetry: _refresh,
+                onLoginAgain: widget.onLoginAgain,
               );
             }
 
@@ -171,6 +221,7 @@ class _UsersScreenState extends State<UsersScreen> {
             final filteredUsers = data.users
                 .where((user) => user.matchesSearch(_searchQuery))
                 .toList();
+            filteredUsers.sort(_compareUsers);
 
             return Padding(
               padding: const EdgeInsets.all(24),
@@ -184,6 +235,9 @@ class _UsersScreenState extends State<UsersScreen> {
                         controller: _searchController,
                         shownCount: filteredUsers.length,
                         totalCount: data.users.length,
+                        sortField: _sortField,
+                        sortDirection: _sortDirection,
+                        onSortChanged: _changeSort,
                         onAddUser: () => _addUser(data),
                         onDownloadUsers: () => _downloadUsers(data.users),
                       ),
@@ -211,6 +265,9 @@ class _SearchAndActions extends StatelessWidget {
     required this.controller,
     required this.shownCount,
     required this.totalCount,
+    required this.sortField,
+    required this.sortDirection,
+    required this.onSortChanged,
     required this.onAddUser,
     required this.onDownloadUsers,
   });
@@ -218,6 +275,9 @@ class _SearchAndActions extends StatelessWidget {
   final TextEditingController controller;
   final int shownCount;
   final int totalCount;
+  final AppSortField sortField;
+  final AppSortDirection sortDirection;
+  final ValueChanged<AppSortField> onSortChanged;
   final VoidCallback onAddUser;
   final VoidCallback onDownloadUsers;
 
@@ -268,6 +328,12 @@ class _SearchAndActions extends StatelessWidget {
                   Expanded(child: addUser),
                 ],
               ),
+              const SizedBox(height: 8),
+              AppSortControls(
+                field: sortField,
+                direction: sortDirection,
+                onChanged: onSortChanged,
+              ),
             ],
           );
         }
@@ -286,6 +352,12 @@ class _SearchAndActions extends StatelessWidget {
                 runSpacing: 12,
                 children: [download, addUser],
               ),
+            ),
+            const SizedBox(height: 8),
+            AppSortControls(
+              field: sortField,
+              direction: sortDirection,
+              onChanged: onSortChanged,
             ),
           ],
         );
@@ -488,10 +560,29 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
+  const _ErrorState({
+    required this.message,
+    required this.onRetry,
+    required this.onLoginAgain,
+  });
 
   final String message;
   final VoidCallback onRetry;
+  final Future<void> Function() onLoginAgain;
+
+  bool get _isAuthError {
+    final normalized = message.toLowerCase();
+    return normalized.contains('token') ||
+        normalized.contains('expired') ||
+        normalized.contains('unauthorized') ||
+        normalized.contains('401');
+  }
+
+  Future<void> _loginAgain(BuildContext context) async {
+    await onLoginAgain();
+    if (!context.mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -523,8 +614,10 @@ class _ErrorState extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: onRetry,
-                    child: const Text('Retry'),
+                    onPressed: _isAuthError
+                        ? () => _loginAgain(context)
+                        : onRetry,
+                    child: Text(_isAuthError ? 'Login Again' : 'Retry'),
                   ),
                 ],
               ),

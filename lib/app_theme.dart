@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 abstract final class AppTheme {
   // Change this one color to rebrand the app.
   static const brandColor = Color(0xFF3F5F8A);
+  static final _snackBarBackgroundColor = HSLColor.fromColor(
+    brandColor,
+  ).withSaturation(0.35).withLightness(0.92).toColor();
 
   static ThemeData get theme {
     const colorScheme = ColorScheme.light(
@@ -52,6 +55,16 @@ abstract final class AppTheme {
             borderRadius: BorderRadius.circular(14),
           ),
         ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: _snackBarBackgroundColor,
+        contentTextStyle: const TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.w600,
+        ),
+        actionTextColor: brandColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         focusedBorder: OutlineInputBorder(
