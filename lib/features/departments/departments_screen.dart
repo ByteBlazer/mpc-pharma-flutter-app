@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/app_snack_bar.dart';
+
 class DepartmentsScreen extends StatelessWidget {
   const DepartmentsScreen({super.key});
 
@@ -59,10 +61,10 @@ class DepartmentsScreen extends StatelessWidget {
   }
 
   void _showPlaceholder(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Department APIs and DB tables are not ready yet.'),
-      ),
+    showAppSnackBar(
+      context,
+      message: 'Department APIs and DB tables are not ready yet.',
+      type: AppSnackBarType.warning,
     );
   }
 }

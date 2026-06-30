@@ -197,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: _isCheckingSession
           ? const Center(child: CircularProgressIndicator())
           : _isLoggedIn
-          ? HomeScreen(apiClient: _apiClient)
+          ? HomeScreen(apiClient: _apiClient, onLoginAgain: _logout)
           : SafeArea(
               child: Center(
                 child: SingleChildScrollView(
