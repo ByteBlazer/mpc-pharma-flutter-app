@@ -191,6 +191,8 @@ class _LocationsScreenState extends State<LocationsScreen> {
                       Expanded(
                         child: _LocationsSection(
                           locations: filteredLocations,
+                          sortField: _sortField,
+                          sortDirection: _sortDirection,
                           onEditLocation: _editLocation,
                         ),
                       ),
@@ -339,10 +341,14 @@ class _LocationsCountText extends StatelessWidget {
 class _LocationsSection extends StatefulWidget {
   const _LocationsSection({
     required this.locations,
+    required this.sortField,
+    required this.sortDirection,
     required this.onEditLocation,
   });
 
   final List<BaseLocation> locations;
+  final AppSortField sortField;
+  final AppSortDirection sortDirection;
   final ValueChanged<BaseLocation> onEditLocation;
 
   @override
@@ -351,6 +357,24 @@ class _LocationsSection extends StatefulWidget {
 
 class _LocationsSectionState extends State<_LocationsSection> {
   final _scrollController = ScrollController();
+
+  @override
+  void didUpdateWidget(_LocationsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sortField != widget.sortField ||
+        oldWidget.sortDirection != widget.sortDirection) {
+      _scrollToTop();
+    }
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
 
   @override
   void dispose() {

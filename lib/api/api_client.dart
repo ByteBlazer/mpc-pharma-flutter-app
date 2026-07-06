@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../app_environment.dart';
 import 'auth_models.dart';
 import 'auth_token_store.dart';
+import '../features/departments/department_models.dart' hide JsonMap;
 import '../features/users/user_models.dart' hide JsonMap;
 
 typedef JsonMap = Map<String, dynamic>;
@@ -311,6 +312,57 @@ class ApiClient {
       requiresAuth: true,
       body: request.toJson(),
     );
+  }
+
+  Future<List<Department>> getDepartments({String? token}) async {
+    final response = await _get(
+      'auth/departments',
+      token: token,
+      requiresAuth: true,
+    );
+    return _decodeJsonList(response.body).map(Department.fromJson).toList();
+  }
+
+  Future<Department> createDepartment({
+    String? token,
+    required DepartmentSaveRequest request,
+  }) async {
+    final response = await _post(
+      'auth/departments',
+      token: token,
+      requiresAuth: true,
+      body: request.toJson(),
+    );
+    return Department.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<Department> updateDepartment({
+    String? token,
+    required String id,
+    required DepartmentSaveRequest request,
+  }) async {
+    final response = await _put(
+      'auth/departments/${Uri.encodeComponent(id)}',
+      token: token,
+      requiresAuth: true,
+      body: request.toJson(),
+    );
+    return Department.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<Department> setDepartmentLead({
+    String? token,
+    required String departmentId,
+    required String userId,
+    required bool isDepartmentLead,
+  }) async {
+    final response = await _put(
+      'auth/departments/${Uri.encodeComponent(departmentId)}/users/${Uri.encodeComponent(userId)}/lead',
+      token: token,
+      requiresAuth: true,
+      body: {'isDepartmentLead': isDepartmentLead},
+    );
+    return Department.fromJson(_decodeJsonObject(response.body));
   }
 
   Future<http.Response> _get(

@@ -61,7 +61,10 @@ class HomeScreen extends StatelessWidget {
                           onTap: () {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) => const DepartmentsScreen(),
+                                builder: (_) => DepartmentsScreen(
+                                  apiClient: apiClient,
+                                  onLoginAgain: onLoginAgain,
+                                ),
                               ),
                             );
                           },
