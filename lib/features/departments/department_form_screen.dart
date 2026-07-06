@@ -196,9 +196,7 @@ class _DepartmentFormScreenState extends State<DepartmentFormScreen> {
                               child: ElevatedButton(
                                 onPressed: _save,
                                 child: Text(
-                                  _isEditing
-                                      ? 'Save Department'
-                                      : 'Add Department',
+                                  _isEditing ? 'Save Dept' : 'Add Dept',
                                 ),
                               ),
                             ),
