@@ -6,6 +6,7 @@ import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
 import '../../auth/app_role.dart';
 import '../../utils/download_file.dart';
+import '../../widgets/app_list_controls_row.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_sort_controls.dart';
 import '../users/user_models.dart';
@@ -32,6 +33,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
   String _searchQuery = '';
   AppSortField _sortField = AppSortField.id;
   AppSortDirection _sortDirection = AppSortDirection.descending;
+  bool _showInactive = false;
 
   @override
   void initState() {
@@ -234,6 +236,11 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
   }
 
   int _compareDepartments(Department first, Department second) {
+    final activeCompare = second.isActive == first.isActive
+        ? 0
+        : (first.isActive ? -1 : 1);
+    if (activeCompare != 0) return activeCompare;
+
     final result = switch (_sortField) {
       AppSortField.name => first.name.toLowerCase().compareTo(
         second.name.toLowerCase(),
@@ -266,7 +273,12 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
             }
 
             final data = snapshot.data ?? _DepartmentsData.empty();
-            final filteredDepartments = data.departments
+            final visibleDepartments = _showInactive
+                ? data.departments
+                : data.departments
+                      .where((department) => department.isActive)
+                      .toList();
+            final filteredDepartments = visibleDepartments
                 .where((department) => department.matchesSearch(_searchQuery))
                 .toList();
             filteredDepartments.sort(_compareDepartments);
@@ -282,9 +294,13 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
                       _SearchAndActions(
                         controller: _searchController,
                         shownCount: filteredDepartments.length,
-                        totalCount: data.departments.length,
+                        totalCount: visibleDepartments.length,
                         sortField: _sortField,
                         sortDirection: _sortDirection,
+                        showInactive: _showInactive,
+                        onShowInactiveChanged: (value) {
+                          setState(() => _showInactive = value);
+                        },
                         onSortChanged: _changeSort,
                         canManage: data.hasWebAccess,
                         onAddDepartment: () => _addDepartment(data),
@@ -322,6 +338,8 @@ class _SearchAndActions extends StatelessWidget {
     required this.totalCount,
     required this.sortField,
     required this.sortDirection,
+    required this.showInactive,
+    required this.onShowInactiveChanged,
     required this.onSortChanged,
     required this.canManage,
     required this.onAddDepartment,
@@ -333,6 +351,8 @@ class _SearchAndActions extends StatelessWidget {
   final int totalCount;
   final AppSortField sortField;
   final AppSortDirection sortDirection;
+  final bool showInactive;
+  final ValueChanged<bool> onShowInactiveChanged;
   final ValueChanged<AppSortField> onSortChanged;
   final bool canManage;
   final VoidCallback onAddDepartment;
@@ -358,7 +378,7 @@ class _SearchAndActions extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
           icon: const Icon(Icons.add_business_outlined),
-          label: const Text('Add New Department'),
+          label: const Text('Add New Dept'),
         );
         final download = OutlinedButton.icon(
           onPressed: onDownloadDepartments,
@@ -367,7 +387,7 @@ class _SearchAndActions extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
           icon: const Icon(Icons.download_outlined),
-          label: const Text('Download as Excel'),
+          label: const Text('Download'),
         );
 
         if (narrow) {
@@ -389,10 +409,12 @@ class _SearchAndActions extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              AppSortControls(
-                field: sortField,
-                direction: sortDirection,
-                onChanged: onSortChanged,
+              AppListControlsRow(
+                sortField: sortField,
+                sortDirection: sortDirection,
+                showInactive: showInactive,
+                onShowInactiveChanged: onShowInactiveChanged,
+                onSortChanged: onSortChanged,
               ),
             ],
           );
@@ -417,10 +439,12 @@ class _SearchAndActions extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            AppSortControls(
-              field: sortField,
-              direction: sortDirection,
-              onChanged: onSortChanged,
+            AppListControlsRow(
+              sortField: sortField,
+              sortDirection: sortDirection,
+              showInactive: showInactive,
+              onShowInactiveChanged: onShowInactiveChanged,
+              onSortChanged: onSortChanged,
             ),
           ],
         );
@@ -468,7 +492,8 @@ class _DepartmentsSection extends StatefulWidget {
   final Future<void> Function({
     required Department department,
     required DepartmentUser user,
-  }) onToggleLead;
+  })
+  onToggleLead;
 
   @override
   State<_DepartmentsSection> createState() => _DepartmentsSectionState();
@@ -545,7 +570,8 @@ class _DepartmentListItem extends StatefulWidget {
   final Future<void> Function({
     required Department department,
     required DepartmentUser user,
-  }) onToggleLead;
+  })
+  onToggleLead;
 
   @override
   State<_DepartmentListItem> createState() => _DepartmentListItemState();
@@ -631,7 +657,10 @@ class _DepartmentListItemState extends State<_DepartmentListItem> {
                 userCount == 0
                     ? 'No users linked'
                     : '$userCount ${userCount == 1 ? 'user' : 'users'} · $leadCount ${leadCount == 1 ? 'lead' : 'leads'}',
-                style: TextStyle(color: summaryColor, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: summaryColor,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               if (userCount > 0) ...[
                 const SizedBox(height: 4),
@@ -713,8 +742,8 @@ class _DepartmentUserRow extends StatelessWidget {
                     color: textColor,
                   ),
                   _SmallInfo(
-                    icon: Icons.phone_outlined,
-                    text: user.mobile,
+                    icon: Icons.badge_outlined,
+                    text: user.id,
                     color: textColor,
                   ),
                   if (user.isDepartmentLead)

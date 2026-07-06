@@ -31,61 +31,53 @@ class HomeScreen extends StatelessWidget {
               children: [
                 const _HomeUserSummary(),
                 const SizedBox(height: 24),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final crossAxisCount = constraints.maxWidth >= 720 ? 3 : 2;
-                    return GridView.count(
-                      crossAxisCount: crossAxisCount,
-                      shrinkWrap: true,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        _FeatureTile(
-                          icon: Icons.people_alt_outlined,
-                          label: 'Users',
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => UsersScreen(
-                                  apiClient: apiClient,
-                                  onLoginAgain: onLoginAgain,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        _FeatureTile(
-                          icon: Icons.business_outlined,
-                          label: 'Departments',
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => DepartmentsScreen(
-                                  apiClient: apiClient,
-                                  onLoginAgain: onLoginAgain,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        _FeatureTile(
-                          icon: Icons.map_outlined,
-                          label: 'Locations',
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => LocationsScreen(
-                                  apiClient: apiClient,
-                                  onLoginAgain: onLoginAgain,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    );
-                  },
+                Wrap(
+                  spacing: 20,
+                  runSpacing: 20,
+                  children: [
+                    _FeatureTile(
+                      icon: Icons.people_alt_outlined,
+                      label: 'Users',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => UsersScreen(
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    _FeatureTile(
+                      icon: Icons.business_outlined,
+                      label: 'Departments',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => DepartmentsScreen(
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    _FeatureTile(
+                      icon: Icons.map_outlined,
+                      label: 'Locations',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => LocationsScreen(
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -202,23 +194,49 @@ class _FeatureTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
+    final isWide = MediaQuery.sizeOf(context).width > 500;
+    final tileWidth = isWide ? 88.0 : 68.0;
+    final iconBoxSize = isWide ? 72.0 : 52.0;
+    final iconSize = isWide ? 32.0 : 24.0;
+    final borderRadius = isWide ? 16.0 : 14.0;
+    final labelSpacing = isWide ? 8.0 : 6.0;
+    final labelFontSize = isWide ? 13.0 : 11.0;
+
+    return SizedBox(
+      width: tileWidth,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(borderRadius),
+          onTap: onTap,
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 48, color: colorScheme.primary),
-              const SizedBox(height: 16),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  border: Border.all(
+                    color: colorScheme.primary.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: SizedBox(
+                  width: iconBoxSize,
+                  height: iconBoxSize,
+                  child: Icon(icon, size: iconSize, color: colorScheme.primary),
+                ),
+              ),
+              SizedBox(height: labelSpacing),
               Text(
                 label,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.black,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
+                  fontSize: labelFontSize,
+                  height: 1.15,
                 ),
               ),
             ],

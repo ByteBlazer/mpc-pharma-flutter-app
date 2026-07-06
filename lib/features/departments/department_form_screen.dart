@@ -29,6 +29,17 @@ class _DepartmentFormScreenState extends State<DepartmentFormScreen> {
 
   bool get _isEditing => widget.department != null;
 
+  List<UserAccount> get _pickableUsers {
+    if (!_isEditing) {
+      return widget.availableUsers.where((user) => user.isActive).toList();
+    }
+
+    final taggedUserIds = widget.department!.users.map((user) => user.id).toSet();
+    return widget.availableUsers.where((user) {
+      return user.isActive || taggedUserIds.contains(user.id);
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -133,7 +144,7 @@ class _DepartmentFormScreenState extends State<DepartmentFormScreen> {
                       ),
                       const SizedBox(height: 16),
                       _UsersMultiSelectField(
-                        availableUsers: widget.availableUsers,
+                        availableUsers: _pickableUsers,
                         selectedUserIds: _selectedUserIds,
                         enabled: !_isSaving,
                         onChanged: (userIds) {
