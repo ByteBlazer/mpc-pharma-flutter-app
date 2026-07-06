@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../utils/download_file.dart';
+import '../../widgets/app_list_controls_row.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_sort_controls.dart';
 import 'user_form_screen.dart';
@@ -29,6 +30,7 @@ class _UsersScreenState extends State<UsersScreen> {
   String _searchQuery = '';
   AppSortField _sortField = AppSortField.id;
   AppSortDirection _sortDirection = AppSortDirection.descending;
+  bool _showInactive = false;
 
   @override
   void initState() {
@@ -186,6 +188,11 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   int _compareUsers(UserAccount first, UserAccount second) {
+    final activeCompare = second.isActive == first.isActive
+        ? 0
+        : (first.isActive ? -1 : 1);
+    if (activeCompare != 0) return activeCompare;
+
     final result = switch (_sortField) {
       AppSortField.name => first.personName.toLowerCase().compareTo(
         second.personName.toLowerCase(),
@@ -218,7 +225,10 @@ class _UsersScreenState extends State<UsersScreen> {
             }
 
             final data = snapshot.data ?? _UsersData.empty();
-            final filteredUsers = data.users
+            final visibleUsers = _showInactive
+                ? data.users
+                : data.users.where((user) => user.isActive).toList();
+            final filteredUsers = visibleUsers
                 .where((user) => user.matchesSearch(_searchQuery))
                 .toList();
             filteredUsers.sort(_compareUsers);
@@ -234,9 +244,13 @@ class _UsersScreenState extends State<UsersScreen> {
                       _SearchAndActions(
                         controller: _searchController,
                         shownCount: filteredUsers.length,
-                        totalCount: data.users.length,
+                        totalCount: visibleUsers.length,
                         sortField: _sortField,
                         sortDirection: _sortDirection,
+                        showInactive: _showInactive,
+                        onShowInactiveChanged: (value) {
+                          setState(() => _showInactive = value);
+                        },
                         onSortChanged: _changeSort,
                         onAddUser: () => _addUser(data),
                         onDownloadUsers: () => _downloadUsers(data.users),
@@ -269,6 +283,8 @@ class _SearchAndActions extends StatelessWidget {
     required this.totalCount,
     required this.sortField,
     required this.sortDirection,
+    required this.showInactive,
+    required this.onShowInactiveChanged,
     required this.onSortChanged,
     required this.onAddUser,
     required this.onDownloadUsers,
@@ -279,6 +295,8 @@ class _SearchAndActions extends StatelessWidget {
   final int totalCount;
   final AppSortField sortField;
   final AppSortDirection sortDirection;
+  final bool showInactive;
+  final ValueChanged<bool> onShowInactiveChanged;
   final ValueChanged<AppSortField> onSortChanged;
   final VoidCallback onAddUser;
   final VoidCallback onDownloadUsers;
@@ -312,7 +330,7 @@ class _SearchAndActions extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
           icon: const Icon(Icons.download_outlined),
-          label: const Text('Download as Excel'),
+          label: const Text('Download'),
         );
 
         if (narrow) {
@@ -331,10 +349,12 @@ class _SearchAndActions extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              AppSortControls(
-                field: sortField,
-                direction: sortDirection,
-                onChanged: onSortChanged,
+              AppListControlsRow(
+                sortField: sortField,
+                sortDirection: sortDirection,
+                showInactive: showInactive,
+                onShowInactiveChanged: onShowInactiveChanged,
+                onSortChanged: onSortChanged,
               ),
             ],
           );
@@ -356,10 +376,12 @@ class _SearchAndActions extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            AppSortControls(
-              field: sortField,
-              direction: sortDirection,
-              onChanged: onSortChanged,
+            AppListControlsRow(
+              sortField: sortField,
+              sortDirection: sortDirection,
+              showInactive: showInactive,
+              onShowInactiveChanged: onShowInactiveChanged,
+              onSortChanged: onSortChanged,
             ),
           ],
         );

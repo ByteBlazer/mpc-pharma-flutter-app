@@ -85,22 +85,30 @@ class UserRoleOption {
 }
 
 class BaseLocation {
-  const BaseLocation({required this.id, required this.name});
+  const BaseLocation({
+    required this.id,
+    required this.name,
+    required this.isActive,
+  });
 
   factory BaseLocation.fromJson(JsonMap json) {
     return BaseLocation(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
+      isActive: json['isActive'] != false,
     );
   }
 
   final String id;
   final String name;
+  final bool isActive;
 
   bool matchesSearch(String query) {
     final normalizedQuery = query.trim().toLowerCase();
     if (normalizedQuery.isEmpty) return true;
-    return '$id $name'.toLowerCase().contains(normalizedQuery);
+    return '$id $name ${isActive ? 'active' : 'inactive'}'
+        .toLowerCase()
+        .contains(normalizedQuery);
   }
 }
 
