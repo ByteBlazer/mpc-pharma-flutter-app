@@ -245,6 +245,8 @@ class _UsersScreenState extends State<UsersScreen> {
                       Expanded(
                         child: _UsersSection(
                           users: filteredUsers,
+                          sortField: _sortField,
+                          sortDirection: _sortDirection,
                           onEditUser: (user) => _editUser(data, user),
                         ),
                       ),
@@ -385,9 +387,16 @@ class _UsersCountText extends StatelessWidget {
 }
 
 class _UsersSection extends StatefulWidget {
-  const _UsersSection({required this.users, required this.onEditUser});
+  const _UsersSection({
+    required this.users,
+    required this.sortField,
+    required this.sortDirection,
+    required this.onEditUser,
+  });
 
   final List<UserAccount> users;
+  final AppSortField sortField;
+  final AppSortDirection sortDirection;
   final ValueChanged<UserAccount> onEditUser;
 
   @override
@@ -396,6 +405,24 @@ class _UsersSection extends StatefulWidget {
 
 class _UsersSectionState extends State<_UsersSection> {
   final _scrollController = ScrollController();
+
+  @override
+  void didUpdateWidget(_UsersSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sortField != widget.sortField ||
+        oldWidget.sortDirection != widget.sortDirection) {
+      _scrollToTop();
+    }
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
 
   @override
   void dispose() {
