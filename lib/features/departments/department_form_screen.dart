@@ -34,7 +34,9 @@ class _DepartmentFormScreenState extends State<DepartmentFormScreen> {
       return widget.availableUsers.where((user) => user.isActive).toList();
     }
 
-    final taggedUserIds = widget.department!.users.map((user) => user.id).toSet();
+    final taggedUserIds = widget.department!.users
+        .map((user) => user.id)
+        .toSet();
     return widget.availableUsers.where((user) {
       return user.isActive || taggedUserIds.contains(user.id);
     }).toList();
@@ -114,9 +116,7 @@ class _DepartmentFormScreenState extends State<DepartmentFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Department' : 'Add Department'),
-      ),
+      appBar: AppBar(title: Text(_isEditing ? 'Edit Dept' : 'Add Dept')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
