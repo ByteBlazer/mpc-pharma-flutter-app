@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../api/api_client.dart';
 import '../../auth/app_role.dart';
+import '../../widgets/app_multi_select_field.dart';
 import 'user_models.dart';
 
 class UserFormScreen extends StatefulWidget {
@@ -126,6 +127,21 @@ class _UserFormScreenState extends State<UserFormScreen> {
     return null;
   }
 
+  List<AppMultiSelectItem<AppRole>> get _roleSelectItems {
+    return widget.availableRoles
+        .where((option) => option.role != null)
+        .map((option) {
+          final role = option.role!;
+          return AppMultiSelectItem<AppRole>(
+            value: role,
+            label: role.label,
+            subtitle: option.description.isEmpty ? null : option.description,
+            searchText: '${role.label} ${role.tokenValue} ${option.description}',
+          );
+        })
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -200,10 +216,19 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _RolesMultiSelectField(
-                          availableRoles: widget.availableRoles,
-                          selectedRoles: _selectedRoles,
+                        AppMultiSelectField<AppRole>(
+                          fieldLabel: 'Roles',
+                          dialogTitle: 'Select roles',
+                          countLabel: 'roles',
+                          items: _roleSelectItems,
+                          selectedValues: _selectedRoles,
                           enabled: !_isSaving,
+                          emptySelectionText: 'Select roles',
+                          searchLabel: 'Search roles',
+                          searchHint: 'Role name or description...',
+                          selectionSummaryBuilder: (selected, _) {
+                            return selected.map((role) => role.label).join(', ');
+                          },
                           onChanged: (roles) {
                             setState(() {
                               _selectedRoles = roles;
@@ -269,113 +294,5 @@ class _UserFormScreenState extends State<UserFormScreen> {
         ),
       ),
     );
-  }
-}
-
-class _RolesMultiSelectField extends StatelessWidget {
-  const _RolesMultiSelectField({
-    required this.availableRoles,
-    required this.selectedRoles,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final List<UserRoleOption> availableRoles;
-  final Set<AppRole> selectedRoles;
-  final bool enabled;
-  final ValueChanged<Set<AppRole>> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final selectedLabel = selectedRoles.isEmpty
-        ? 'Select roles'
-        : selectedRoles.map((role) => role.label).join(', ');
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: enabled ? () => _openRolePicker(context) : null,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Roles',
-          enabled: enabled,
-          suffixIcon: const Icon(Icons.arrow_drop_down),
-        ),
-        child: Text(
-          selectedLabel,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: selectedRoles.isEmpty ? Colors.black54 : Colors.black,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openRolePicker(BuildContext context) async {
-    final nextSelection = await showDialog<Set<AppRole>>(
-      context: context,
-      builder: (context) {
-        var dialogSelection = {...selectedRoles};
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Select roles'),
-              content: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: availableRoles.map((option) {
-                      final role = option.role;
-                      if (role == null) return const SizedBox.shrink();
-                      return CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        value: dialogSelection.contains(role),
-                        title: Text(
-                          role.label,
-                          style: const TextStyle(color: Colors.black),
-                        ),
-                        subtitle: option.description.isEmpty
-                            ? null
-                            : Text(
-                                option.description,
-                                style: const TextStyle(color: Colors.black),
-                              ),
-                        onChanged: (selected) {
-                          setDialogState(() {
-                            if (selected == true) {
-                              dialogSelection.add(role);
-                            } else {
-                              dialogSelection.remove(role);
-                            }
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(dialogSelection),
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(0, 44),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                  ),
-                  child: const Text('Apply'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (nextSelection != null) onChanged(nextSelection);
   }
 }

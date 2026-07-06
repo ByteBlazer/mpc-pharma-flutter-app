@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../widgets/app_multi_select_field.dart';
 import '../users/user_models.dart';
 import 'department_models.dart';
 
@@ -113,6 +114,32 @@ class _DepartmentFormScreenState extends State<DepartmentFormScreen> {
     return null;
   }
 
+  List<AppMultiSelectItem<String>> get _userSelectItems {
+    return _pickableUsers
+        .map(
+          (user) => AppMultiSelectItem<String>(
+            value: user.id,
+            label: user.isActive
+                ? user.personName
+                : '${user.personName} (Inactive)',
+            subtitle: user.mobile,
+            searchText: [
+              user.id,
+              user.mobile,
+              user.personName,
+              user.baseLocationId,
+              user.baseLocationName,
+              user.vehicleNbr,
+              user.isActive ? 'active' : 'inactive',
+              ...user.roles.map((role) => role.tokenValue),
+              ...user.roles.map((role) => role.label),
+            ].join(' '),
+            dimmed: !user.isActive,
+          ),
+        )
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -143,10 +170,20 @@ class _DepartmentFormScreenState extends State<DepartmentFormScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      _UsersMultiSelectField(
-                        availableUsers: _pickableUsers,
-                        selectedUserIds: _selectedUserIds,
+                      AppMultiSelectField<String>(
+                        fieldLabel: 'Users',
+                        dialogTitle: 'Select users',
+                        countLabel: 'users',
+                        items: _userSelectItems,
+                        selectedValues: _selectedUserIds,
                         enabled: !_isSaving,
+                        emptySelectionText: 'Select users',
+                        searchLabel: 'Search users',
+                        searchHint: 'Name, mobile, location...',
+                        countSummary: const AppMultiSelectCountSummary(
+                          singular: 'user',
+                          plural: 'users',
+                        ),
                         onChanged: (userIds) {
                           setState(() {
                             _selectedUserIds = userIds;
@@ -210,214 +247,6 @@ class _DepartmentFormScreenState extends State<DepartmentFormScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _UsersMultiSelectField extends StatelessWidget {
-  const _UsersMultiSelectField({
-    required this.availableUsers,
-    required this.selectedUserIds,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final List<UserAccount> availableUsers;
-  final Set<String> selectedUserIds;
-  final bool enabled;
-  final ValueChanged<Set<String>> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final selectedLabel = selectedUserIds.isEmpty
-        ? 'Select users'
-        : '${selectedUserIds.length} ${selectedUserIds.length == 1 ? 'user' : 'users'} selected';
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: enabled ? () => _openUserPicker(context) : null,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Users',
-          enabled: enabled,
-          suffixIcon: const Icon(Icons.arrow_drop_down),
-        ),
-        child: Text(
-          selectedLabel,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: selectedUserIds.isEmpty ? Colors.black54 : Colors.black,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openUserPicker(BuildContext context) async {
-    final nextSelection = await showDialog<Set<String>>(
-      context: context,
-      builder: (context) => _UserPickerDialog(
-        availableUsers: availableUsers,
-        initialSelection: selectedUserIds,
-      ),
-    );
-
-    if (nextSelection != null) onChanged(nextSelection);
-  }
-}
-
-class _UserPickerDialog extends StatefulWidget {
-  const _UserPickerDialog({
-    required this.availableUsers,
-    required this.initialSelection,
-  });
-
-  final List<UserAccount> availableUsers;
-  final Set<String> initialSelection;
-
-  @override
-  State<_UserPickerDialog> createState() => _UserPickerDialogState();
-}
-
-class _UserPickerDialogState extends State<_UserPickerDialog> {
-  late Set<String> _selection;
-  final _searchController = TextEditingController();
-  String _searchQuery = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _selection = {...widget.initialSelection};
-    _searchController.addListener(_handleSearchChange);
-  }
-
-  @override
-  void dispose() {
-    _searchController.removeListener(_handleSearchChange);
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _handleSearchChange() {
-    setState(() => _searchQuery = _searchController.text);
-  }
-
-  List<UserAccount> get _filteredUsers {
-    return widget.availableUsers
-        .where((user) => user.matchesSearch(_searchQuery))
-        .toList();
-  }
-
-  String _userLabel(UserAccount user) {
-    if (user.isActive) return user.personName;
-    return '${user.personName} (Inactive)';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final filteredUsers = _filteredUsers;
-    final isFiltering = _searchQuery.trim().isNotEmpty;
-
-    return AlertDialog(
-      title: Text('Select users (${_selection.length} selected)'),
-      content: SizedBox(
-        width: 520,
-        height: 460,
-        child: widget.availableUsers.isEmpty
-            ? const Center(
-                child: Text(
-                  'No users available.',
-                  style: TextStyle(color: Colors.black),
-                ),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _searchController,
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Search users',
-                      prefixIcon: Icon(Icons.search),
-                      hintText: 'Name, mobile, location...',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    isFiltering
-                        ? '${filteredUsers.length} of ${widget.availableUsers.length} users shown'
-                        : '${widget.availableUsers.length} users',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: filteredUsers.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No users match the search.',
-                              style: TextStyle(color: Colors.black),
-                            ),
-                          )
-                        : Scrollbar(
-                            thumbVisibility: true,
-                            child: ListView.builder(
-                              itemCount: filteredUsers.length,
-                              itemBuilder: (context, index) {
-                                final user = filteredUsers[index];
-                                return CheckboxListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  value: _selection.contains(user.id),
-                                  title: Text(
-                                    _userLabel(user),
-                                    style: TextStyle(
-                                      color: user.isActive
-                                          ? Colors.black
-                                          : Colors.black54,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    user.mobile,
-                                    style: TextStyle(
-                                      color: user.isActive
-                                          ? Colors.black
-                                          : Colors.black54,
-                                    ),
-                                  ),
-                                  onChanged: (selected) {
-                                    setState(() {
-                                      if (selected == true) {
-                                        _selection.add(user.id);
-                                      } else {
-                                        _selection.remove(user.id);
-                                      }
-                                    });
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                  ),
-                ],
-              ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.of(context).pop(_selection),
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size(0, 44),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-          ),
-          child: const Text('Apply'),
-        ),
-      ],
     );
   }
 }
