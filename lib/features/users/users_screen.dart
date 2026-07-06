@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api/api_client.dart';
 import '../../utils/download_file.dart';
 import '../../widgets/app_list_controls_row.dart';
+import '../../widgets/app_search_field.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_sort_controls.dart';
 import 'user_form_screen.dart';
@@ -306,13 +307,10 @@ class _SearchAndActions extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final narrow = constraints.maxWidth < 720;
-        final search = TextField(
+        final search = AppSearchField(
           controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Search users',
-            prefixIcon: Icon(Icons.search),
-            hintText: 'Name, mobile, location, vehicle, role...',
-          ),
+          labelText: 'Search users',
+          hintText: 'Name, mobile, location, vehicle, role...',
         );
         final addUser = ElevatedButton.icon(
           onPressed: onAddUser,

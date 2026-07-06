@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../app_environment.dart';
 import 'auth_models.dart';
 import 'auth_token_store.dart';
+import '../features/customers/customer_models.dart' hide JsonMap;
 import '../features/departments/department_models.dart' hide JsonMap;
 import '../features/users/user_models.dart' hide JsonMap;
 
@@ -363,6 +364,37 @@ class ApiClient {
       body: {'isDepartmentLead': isDepartmentLead},
     );
     return Department.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<List<CustomerSummary>> getCustomersLightweight({String? token}) async {
+    final response = await _get(
+      'customers',
+      token: token,
+      requiresAuth: true,
+      queryParameters: {'lightweight': 'true'},
+    );
+    return _decodeJsonList(response.body).map(CustomerSummary.fromJson).toList();
+  }
+
+  Future<List<Customer>> getCustomersFull({String? token}) async {
+    final response = await _get(
+      'customers',
+      token: token,
+      requiresAuth: true,
+    );
+    return _decodeJsonList(response.body).map(Customer.fromJson).toList();
+  }
+
+  Future<Customer> getCustomer({
+    String? token,
+    required String id,
+  }) async {
+    final response = await _get(
+      'customers/${Uri.encodeComponent(id)}',
+      token: token,
+      requiresAuth: true,
+    );
+    return Customer.fromJson(_decodeJsonObject(response.body));
   }
 
   Future<http.Response> _get(
