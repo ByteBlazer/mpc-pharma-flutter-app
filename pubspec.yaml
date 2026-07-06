@@ -37,6 +37,7 @@ dependencies:
   flutter_dotenv: ^6.0.1
   http: ^1.6.0
   shared_preferences: ^2.5.5
+  google_maps_flutter: ^2.17.1
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +65,7 @@ flutter:
     - env/local.env
     - env/staging.env
     - env/production.env
+    - assets/images/customer_map_marker.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

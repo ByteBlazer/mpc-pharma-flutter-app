@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
+import '../customers/customers_screen.dart';
 import '../departments/departments_screen.dart';
 import '../locations/locations_screen.dart';
 import '../users/users_screen.dart';
@@ -56,6 +57,20 @@ class HomeScreen extends StatelessWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => DepartmentsScreen(
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    _FeatureTile(
+                      icon: Icons.storefront_outlined,
+                      label: 'Customers',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => CustomersScreen(
                               apiClient: apiClient,
                               onLoginAgain: onLoginAgain,
                             ),
