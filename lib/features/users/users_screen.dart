@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api/api_client.dart';
 import '../../utils/download_file.dart';
 import '../../widgets/app_list_controls_row.dart';
+import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_sort_controls.dart';
@@ -456,12 +457,8 @@ class _UsersSectionState extends State<_UsersSection> {
       return const _EmptyState(message: 'No users match the search.');
     }
 
-    return Scrollbar(
+    return AppScrollbar(
       controller: _scrollController,
-      thumbVisibility: true,
-      trackVisibility: true,
-      thickness: 8,
-      radius: const Radius.circular(999),
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.only(right: 20),

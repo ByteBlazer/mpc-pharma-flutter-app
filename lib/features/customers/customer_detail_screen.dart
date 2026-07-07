@@ -97,14 +97,6 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                             label: 'Longitude',
                             value: customer.geoLongitude,
                           ),
-                          _InfoRow(
-                            label: 'Created at',
-                            value: _formatDateTime(customer.createdAt),
-                          ),
-                          _InfoRow(
-                            label: 'Last updated at',
-                            value: _formatDateTime(customer.lastUpdatedAt),
-                          ),
                         ],
                       ),
                     ),
@@ -116,30 +108,6 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         ),
       ),
     );
-  }
-
-  static String _formatDateTime(DateTime? dateTime) {
-    if (dateTime == null) return '';
-    final local = dateTime.toLocal();
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final month = months[local.month - 1];
-    final hourOfPeriod = local.hour % 12 == 0 ? 12 : local.hour % 12;
-    final minute = local.minute.toString().padLeft(2, '0');
-    final period = local.hour < 12 ? 'AM' : 'PM';
-    return '$month ${local.day} $hourOfPeriod:$minute $period';
   }
 }
 

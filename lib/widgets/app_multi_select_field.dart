@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'app_scrollbar.dart';
+
 class AppMultiSelectItem<T> {
   const AppMultiSelectItem({
     required this.value,
@@ -268,12 +270,8 @@ class _AppMultiSelectDialogState<T> extends State<_AppMultiSelectDialog<T>> {
                               style: const TextStyle(color: Colors.black),
                             ),
                           )
-                        : Scrollbar(
+                        : AppScrollbar(
                             controller: _scrollController,
-                            thumbVisibility: true,
-                            trackVisibility: true,
-                            thickness: 8,
-                            radius: const Radius.circular(999),
                             child: ListView.builder(
                               controller: _scrollController,
                               padding: const EdgeInsets.only(right: 20),
