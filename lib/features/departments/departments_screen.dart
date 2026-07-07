@@ -7,6 +7,7 @@ import '../../api/auth_token_store.dart';
 import '../../auth/app_role.dart';
 import '../../utils/download_file.dart';
 import '../../widgets/app_list_controls_row.dart';
+import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_sort_controls.dart';
@@ -530,12 +531,8 @@ class _DepartmentsSectionState extends State<_DepartmentsSection> {
       return const _EmptyState(message: 'No departments match the search.');
     }
 
-    return Scrollbar(
+    return AppScrollbar(
       controller: _scrollController,
-      thumbVisibility: true,
-      trackVisibility: true,
-      thickness: 8,
-      radius: const Radius.circular(999),
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.only(right: 20),
