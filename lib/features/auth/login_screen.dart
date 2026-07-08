@@ -32,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isCheckingSession = true;
   bool _isLoggedIn = false;
+  int _sessionVersion = 0;
   bool _otpSent = false;
   bool _isLoading = false;
   String? _errorMessage;
@@ -145,6 +146,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _onSessionReplaced() {
+    setState(() => _sessionVersion++);
+  }
+
   Future<void> _logout() async {
     await _tokenStore.clearToken();
     if (!mounted) return;
@@ -197,7 +202,12 @@ class _LoginScreenState extends State<LoginScreen> {
       body: _isCheckingSession
           ? const Center(child: CircularProgressIndicator())
           : _isLoggedIn
-          ? HomeScreen(apiClient: _apiClient, onLoginAgain: _logout)
+          ? HomeScreen(
+              key: ValueKey(_sessionVersion),
+              apiClient: _apiClient,
+              onLoginAgain: _logout,
+              onSessionReplaced: _onSessionReplaced,
+            )
           : SafeArea(
               child: Center(
                 child: SingleChildScrollView(

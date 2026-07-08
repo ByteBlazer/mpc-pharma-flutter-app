@@ -55,6 +55,42 @@ class ApiClient {
     return otpResponse;
   }
 
+  Future<OtpVerificationResponse> impersonate({
+    String? token,
+    String? employeeId,
+    String? customerId,
+  }) async {
+    final trimmedEmployeeId = employeeId?.trim() ?? '';
+    final trimmedCustomerId = customerId?.trim() ?? '';
+    final hasEmployeeId = trimmedEmployeeId.isNotEmpty;
+    final hasCustomerId = trimmedCustomerId.isNotEmpty;
+    if (hasEmployeeId == hasCustomerId) {
+      throw ArgumentError(
+        'Provide exactly one of employeeId or customerId for impersonation.',
+      );
+    }
+
+    final body = <String, String>{
+      if (hasEmployeeId) 'employeeId': trimmedEmployeeId,
+      if (hasCustomerId) 'customerId': trimmedCustomerId,
+    };
+
+    final response = await _post(
+      'auth/impersonate',
+      token: token,
+      requiresAuth: true,
+      body: body,
+    );
+    final impersonationResponse = OtpVerificationResponse.fromJson(
+      _decodeJsonObject(response.body),
+    );
+    final accessToken = impersonationResponse.accessToken;
+    if (accessToken != null && accessToken.isNotEmpty) {
+      await _tokenStore.saveToken(accessToken);
+    }
+    return impersonationResponse;
+  }
+
   Future<void> sendLocation({
     String? token,
     required JsonMap locationData,
