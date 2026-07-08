@@ -6,6 +6,7 @@ class DepartmentUser {
     required this.personName,
     required this.mobile,
     required this.isDepartmentLead,
+    required this.isTicketTriager,
   });
 
   factory DepartmentUser.fromJson(JsonMap json) {
@@ -14,6 +15,7 @@ class DepartmentUser {
       personName: _stringValue(json['personName']),
       mobile: _stringValue(json['mobile']),
       isDepartmentLead: json['isDepartmentLead'] == true,
+      isTicketTriager: json['isTicketTriager'] == true,
     );
   }
 
@@ -21,6 +23,7 @@ class DepartmentUser {
   final String personName;
   final String mobile;
   final bool isDepartmentLead;
+  final bool isTicketTriager;
 
   static String _stringValue(Object? value) => value?.toString() ?? '';
 }

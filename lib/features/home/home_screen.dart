@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
+import '../../auth/jwt_payload.dart';
+import '../auth/impersonate_screen.dart';
 import '../customers/customers_screen.dart';
 import '../departments/departments_screen.dart';
 import '../locations/locations_screen.dart';
+import '../tickets/tickets_screen.dart';
 import '../users/users_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -14,10 +17,12 @@ class HomeScreen extends StatelessWidget {
     super.key,
     required this.apiClient,
     required this.onLoginAgain,
+    required this.onSessionReplaced,
   });
 
   final ApiClient apiClient;
   final Future<void> Function() onLoginAgain;
+  final VoidCallback onSessionReplaced;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +41,29 @@ class HomeScreen extends StatelessWidget {
                   spacing: 20,
                   runSpacing: 20,
                   children: [
+                    _ImpersonateFeatureTile(
+                      apiClient: apiClient,
+                      onLoginAgain: onLoginAgain,
+                      onSessionReplaced: onSessionReplaced,
+                    ),
+                    _EmployeeTicketsFeatureTile(
+                      apiClient: apiClient,
+                      onLoginAgain: onLoginAgain,
+                    ),
+                    _FeatureTile(
+                      icon: Icons.support_agent_outlined,
+                      label: 'Complaints',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ComplaintsScreen(
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                     _FeatureTile(
                       icon: Icons.people_alt_outlined,
                       label: 'Users',
@@ -191,6 +219,79 @@ class _HomeUser {
     return _HomeUser(
       username: json['username']?.toString() ?? '',
       baseLocationName: json['baseLocationName']?.toString() ?? '',
+    );
+  }
+}
+
+class _EmployeeTicketsFeatureTile extends StatelessWidget {
+  const _EmployeeTicketsFeatureTile({
+    required this.apiClient,
+    required this.onLoginAgain,
+  });
+
+  final ApiClient apiClient;
+  final Future<void> Function() onLoginAgain;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: JwtPayload.currentUserIsEmployee(),
+      builder: (context, snapshot) {
+        if (snapshot.data != true) return const SizedBox.shrink();
+
+        return _FeatureTile(
+          icon: Icons.confirmation_number_outlined,
+          label: 'Tickets',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TicketsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ImpersonateFeatureTile extends StatelessWidget {
+  const _ImpersonateFeatureTile({
+    required this.apiClient,
+    required this.onLoginAgain,
+    required this.onSessionReplaced,
+  });
+
+  final ApiClient apiClient;
+  final Future<void> Function() onLoginAgain;
+  final VoidCallback onSessionReplaced;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: JwtPayload.currentUserIsAppAdmin(),
+      builder: (context, snapshot) {
+        if (snapshot.data != true) return const SizedBox.shrink();
+
+        return _FeatureTile(
+          icon: Icons.manage_accounts_outlined,
+          label: 'Simulate Another User',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ImpersonateScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                  onSessionReplaced: onSessionReplaced,
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

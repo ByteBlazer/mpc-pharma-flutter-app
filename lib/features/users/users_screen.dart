@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../utils/download_file.dart';
+import '../../widgets/app_async_list_loader.dart';
 import '../../widgets/app_list_controls_row.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_search_field.dart';
@@ -28,7 +29,7 @@ class UsersScreen extends StatefulWidget {
 
 class _UsersScreenState extends State<UsersScreen> {
   final _searchController = TextEditingController();
-  late Future<_UsersData> _dataFuture;
+  final _loader = AppAsyncListLoader<_UsersData>();
   String _searchQuery = '';
   AppSortField _sortField = AppSortField.id;
   AppSortDirection _sortDirection = AppSortDirection.descending;
@@ -37,7 +38,7 @@ class _UsersScreenState extends State<UsersScreen> {
   @override
   void initState() {
     super.initState();
-    _dataFuture = _loadData();
+    _loader.initialize(_loadData);
     _searchController.addListener(_handleSearchChange);
   }
 
@@ -79,10 +80,8 @@ class _UsersScreenState extends State<UsersScreen> {
     );
   }
 
-  void _refresh() {
-    setState(() {
-      _dataFuture = _loadData();
-    });
+  Future<void> _refresh() {
+    return _loader.reload(load: _loadData, setState: setState);
   }
 
   Future<void> _addUser(_UsersData data) async {
@@ -95,10 +94,9 @@ class _UsersScreenState extends State<UsersScreen> {
         ),
       ),
     );
-    if (saved == true) {
-      _showSuccessMessage('User added successfully.');
-      _refresh();
-    }
+    if (!mounted || saved != true) return;
+    _showSuccessMessage('User added successfully.');
+    await _refresh();
   }
 
   Future<void> _editUser(_UsersData data, UserAccount user) async {
@@ -115,10 +113,9 @@ class _UsersScreenState extends State<UsersScreen> {
           ),
         ),
       );
-      if (saved == true) {
-        _showSuccessMessage('User updated successfully.');
-        _refresh();
-      }
+      if (!mounted || saved != true) return;
+      _showSuccessMessage('User updated successfully.');
+      await _refresh();
     } catch (error) {
       if (!mounted) return;
       showAppSnackBar(
@@ -212,7 +209,8 @@ class _UsersScreenState extends State<UsersScreen> {
       appBar: AppBar(title: const Text('Users')),
       body: SafeArea(
         child: FutureBuilder<_UsersData>(
-          future: _dataFuture,
+          key: ValueKey(_loader.refreshToken),
+          future: _loader.future,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const Center(child: CircularProgressIndicator());

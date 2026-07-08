@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 abstract final class AppTheme {
   // Change this one color to rebrand the app.
-  static const brandColor = Color(0xFF3F5F8A);
+  static const brandColor = Color(0xFF49979B);
   static final _snackBarBackgroundColor = HSLColor.fromColor(
     brandColor,
   ).withSaturation(0.35).withLightness(0.92).toColor();

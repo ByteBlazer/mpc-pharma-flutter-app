@@ -7,6 +7,7 @@ import 'auth_models.dart';
 import 'auth_token_store.dart';
 import '../features/customers/customer_models.dart' hide JsonMap;
 import '../features/departments/department_models.dart' hide JsonMap;
+import '../features/tickets/ticket_models.dart' hide JsonMap;
 import '../features/users/user_models.dart' hide JsonMap;
 
 typedef JsonMap = Map<String, dynamic>;
@@ -53,6 +54,42 @@ class ApiClient {
       await _tokenStore.saveToken(accessToken);
     }
     return otpResponse;
+  }
+
+  Future<OtpVerificationResponse> impersonate({
+    String? token,
+    String? employeeId,
+    String? customerId,
+  }) async {
+    final trimmedEmployeeId = employeeId?.trim() ?? '';
+    final trimmedCustomerId = customerId?.trim() ?? '';
+    final hasEmployeeId = trimmedEmployeeId.isNotEmpty;
+    final hasCustomerId = trimmedCustomerId.isNotEmpty;
+    if (hasEmployeeId == hasCustomerId) {
+      throw ArgumentError(
+        'Provide exactly one of employeeId or customerId for impersonation.',
+      );
+    }
+
+    final body = <String, String>{
+      if (hasEmployeeId) 'employeeId': trimmedEmployeeId,
+      if (hasCustomerId) 'customerId': trimmedCustomerId,
+    };
+
+    final response = await _post(
+      'auth/impersonate',
+      token: token,
+      requiresAuth: true,
+      body: body,
+    );
+    final impersonationResponse = OtpVerificationResponse.fromJson(
+      _decodeJsonObject(response.body),
+    );
+    final accessToken = impersonationResponse.accessToken;
+    if (accessToken != null && accessToken.isNotEmpty) {
+      await _tokenStore.saveToken(accessToken);
+    }
+    return impersonationResponse;
   }
 
   Future<void> sendLocation({
@@ -397,6 +434,333 @@ class ApiClient {
     return Customer.fromJson(_decodeJsonObject(response.body));
   }
 
+  Future<List<ComplaintCategory>> getComplaintCategories({String? token}) async {
+    final response = await _get(
+      'ticket/complaint-category',
+      token: token,
+      requiresAuth: true,
+    );
+    return _decodeJsonList(response.body)
+        .map(ComplaintCategory.fromJson)
+        .toList();
+  }
+
+  Future<ComplaintCategory> createComplaintCategory({
+    String? token,
+    required String name,
+    required String assignedDepartmentId,
+    bool isActive = true,
+  }) async {
+    final response = await _post(
+      'ticket/complaint-category',
+      token: token,
+      requiresAuth: true,
+      body: {
+        'name': name,
+        'assignedDepartmentId': assignedDepartmentId,
+        'isActive': isActive,
+      },
+    );
+    return ComplaintCategory.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<ComplaintCategory> updateComplaintCategory({
+    String? token,
+    required String categoryId,
+    required String name,
+    required String assignedDepartmentId,
+    required bool isActive,
+  }) async {
+    final response = await _put(
+      'ticket/complaint-category/${Uri.encodeComponent(categoryId)}',
+      token: token,
+      requiresAuth: true,
+      body: {
+        'name': name,
+        'assignedDepartmentId': assignedDepartmentId,
+        'isActive': isActive,
+      },
+    );
+    return ComplaintCategory.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<TicketAttachmentInitResponse> initiateTicketAttachmentUpload({
+    String? token,
+    required String fileName,
+    required String mimeType,
+    required int fileSize,
+  }) async {
+    final response = await _post(
+      'ticket/attachment',
+      token: token,
+      requiresAuth: true,
+      body: {
+        'fileName': fileName,
+        'mimeType': mimeType,
+        'fileSize': fileSize,
+      },
+    );
+    return TicketAttachmentInitResponse.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<void> markTicketAttachmentUploaded({
+    String? token,
+    required String attachmentId,
+  }) async {
+    await _put(
+      'ticket/attachment/uploaded/${Uri.encodeComponent(attachmentId)}',
+      token: token,
+      requiresAuth: true,
+    );
+  }
+
+  Future<TicketAttachmentDownload> getTicketAttachmentDownload({
+    String? token,
+    required String attachmentId,
+  }) async {
+    final response = await _get(
+      'ticket/attachment/${Uri.encodeComponent(attachmentId)}',
+      token: token,
+      requiresAuth: true,
+    );
+    return TicketAttachmentDownload.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<void> deleteUnlinkedTicketAttachment({
+    String? token,
+    required String attachmentId,
+  }) async {
+    await _delete(
+      'ticket/attachment/${Uri.encodeComponent(attachmentId)}',
+      token: token,
+      requiresAuth: true,
+    );
+  }
+
+  Future<void> uploadBytesToPresignedUrl({
+    required String uploadUrl,
+    required List<int> bytes,
+    required String mimeType,
+  }) async {
+    final response = await _httpClient.put(
+      Uri.parse(uploadUrl),
+      headers: {'Content-Type': mimeType},
+      body: bytes,
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Failed to upload attachment to storage.');
+    }
+  }
+
+  Future<List<TicketSummary>> getTickets({String? token}) async {
+    final response = await _get('ticket', token: token, requiresAuth: true);
+    return _decodeJsonList(response.body).map(TicketSummary.fromJson).toList();
+  }
+
+  Future<TicketDetail> getTicket({
+    String? token,
+    required String ticketId,
+    required bool isEmployeeView,
+  }) async {
+    final response = await _get(
+      'ticket/${Uri.encodeComponent(ticketId)}',
+      token: token,
+      requiresAuth: true,
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: isEmployeeView,
+    );
+  }
+
+  Future<TicketDetail> createTicket({
+    String? token,
+    required JsonMap body,
+    required bool isEmployeeView,
+  }) async {
+    final response = await _post(
+      'ticket',
+      token: token,
+      requiresAuth: true,
+      body: body,
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: isEmployeeView,
+    );
+  }
+
+  Future<TicketDetail> updateTicket({
+    String? token,
+    required String ticketId,
+    required JsonMap body,
+    required bool isEmployeeView,
+  }) async {
+    final response = await _put(
+      'ticket/${Uri.encodeComponent(ticketId)}',
+      token: token,
+      requiresAuth: true,
+      body: body,
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: isEmployeeView,
+    );
+  }
+
+  Future<void> linkTicketAttachments({
+    String? token,
+    required String ticketId,
+    required List<String> attachmentIds,
+  }) async {
+    await _post(
+      'ticket/${Uri.encodeComponent(ticketId)}/attachments',
+      token: token,
+      requiresAuth: true,
+      body: {'attachmentIds': attachmentIds},
+    );
+  }
+
+  Future<TicketDetail> startTicketWork({
+    String? token,
+    required String ticketId,
+  }) async {
+    final response = await _put(
+      'ticket/start/${Uri.encodeComponent(ticketId)}',
+      token: token,
+      requiresAuth: true,
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: true,
+    );
+  }
+
+  Future<TicketDetail> assignTicket({
+    String? token,
+    required String ticketId,
+    required String assignedDepartmentId,
+    required String assigneeAppUserId,
+  }) async {
+    final response = await _put(
+      'ticket/assign/${Uri.encodeComponent(ticketId)}',
+      token: token,
+      requiresAuth: true,
+      body: {
+        'assignedDepartmentId': assignedDepartmentId,
+        'assigneeAppUserId': assigneeAppUserId,
+      },
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: true,
+    );
+  }
+
+  Future<TicketDetail> resolveTicket({
+    String? token,
+    required String ticketId,
+    required String resolutionSummary,
+  }) async {
+    final response = await _put(
+      'ticket/resolve/${Uri.encodeComponent(ticketId)}',
+      token: token,
+      requiresAuth: true,
+      body: {'resolutionSummary': resolutionSummary},
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: true,
+    );
+  }
+
+  Future<TicketDetail> invalidateTicket({
+    String? token,
+    required String ticketId,
+    required String reason,
+  }) async {
+    final response = await _put(
+      'ticket/invalidate/${Uri.encodeComponent(ticketId)}',
+      token: token,
+      requiresAuth: true,
+      body: {'reason': reason},
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: true,
+    );
+  }
+
+  Future<TicketDetail> closeTicket({
+    String? token,
+    required String ticketId,
+  }) async {
+    final response = await _put(
+      'ticket/close/${Uri.encodeComponent(ticketId)}',
+      token: token,
+      requiresAuth: true,
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: true,
+    );
+  }
+
+  Future<TicketDetail> addTicketComment({
+    String? token,
+    required String ticketId,
+    required String comment,
+    List<String> attachmentIds = const [],
+  }) async {
+    final response = await _post(
+      'ticket/comment/${Uri.encodeComponent(ticketId)}',
+      token: token,
+      requiresAuth: true,
+      body: {
+        'comment': comment,
+        'attachmentIds': attachmentIds,
+      },
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: true,
+    );
+  }
+
+  Future<TicketDetail> updateTicketComment({
+    String? token,
+    required String commentId,
+    required String comment,
+    List<String> attachmentIds = const [],
+  }) async {
+    final response = await _put(
+      'ticket/comment/${Uri.encodeComponent(commentId)}',
+      token: token,
+      requiresAuth: true,
+      body: {
+        'comment': comment,
+        'attachmentIds': attachmentIds,
+      },
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: true,
+    );
+  }
+
+  Future<Department> setDepartmentTicketTriager({
+    String? token,
+    required String departmentId,
+    required String userId,
+  }) async {
+    final response = await _put(
+      'auth/departments/${Uri.encodeComponent(departmentId)}/users/${Uri.encodeComponent(userId)}/triager',
+      token: token,
+      requiresAuth: true,
+    );
+    return Department.fromJson(_decodeJsonObject(response.body));
+  }
+
   Future<http.Response> _get(
     String endpoint, {
     String? token,
@@ -446,6 +810,21 @@ class ApiClient {
     );
   }
 
+  Future<http.Response> _delete(
+    String endpoint, {
+    String? token,
+    bool requiresAuth = false,
+    Map<String, String>? queryParameters,
+  }) {
+    return _send(
+      method: 'DELETE',
+      endpoint: endpoint,
+      token: token,
+      requiresAuth: requiresAuth,
+      queryParameters: queryParameters,
+    );
+  }
+
   Future<http.Response> _send({
     required String method,
     required String endpoint,
@@ -471,6 +850,7 @@ class ApiClient {
         body: encodedBody,
       ),
       'PUT' => await _httpClient.put(uri, headers: headers, body: encodedBody),
+      'DELETE' => await _httpClient.delete(uri, headers: headers),
       _ => throw ArgumentError.value(method, 'method', 'Unsupported method'),
     };
 
