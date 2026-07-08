@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../utils/download_file.dart';
+import '../../widgets/app_async_list_loader.dart';
 import '../../widgets/app_list_controls_row.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_search_field.dart';
@@ -28,7 +29,7 @@ class LocationsScreen extends StatefulWidget {
 
 class _LocationsScreenState extends State<LocationsScreen> {
   final _searchController = TextEditingController();
-  late Future<List<BaseLocation>> _locationsFuture;
+  final _loader = AppAsyncListLoader<List<BaseLocation>>();
   String _searchQuery = '';
   AppSortField _sortField = AppSortField.id;
   AppSortDirection _sortDirection = AppSortDirection.descending;
@@ -37,7 +38,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
   @override
   void initState() {
     super.initState();
-    _locationsFuture = widget.apiClient.getBaseLocations();
+    _loader.initialize(() => widget.apiClient.getBaseLocations());
     _searchController.addListener(_handleSearchChange);
   }
 
@@ -65,10 +66,11 @@ class _LocationsScreenState extends State<LocationsScreen> {
     });
   }
 
-  void _refresh() {
-    setState(() {
-      _locationsFuture = widget.apiClient.getBaseLocations();
-    });
+  Future<void> _refresh() {
+    return _loader.reload(
+      load: () => widget.apiClient.getBaseLocations(),
+      setState: setState,
+    );
   }
 
   Future<void> _addLocation() async {
@@ -77,10 +79,9 @@ class _LocationsScreenState extends State<LocationsScreen> {
         builder: (_) => LocationFormScreen(apiClient: widget.apiClient),
       ),
     );
-    if (saved == true) {
-      _showSuccessMessage('Location added successfully.');
-      _refresh();
-    }
+    if (!mounted || saved != true) return;
+    _showSuccessMessage('Location added successfully.');
+    await _refresh();
   }
 
   Future<void> _editLocation(BaseLocation location) async {
@@ -90,10 +91,9 @@ class _LocationsScreenState extends State<LocationsScreen> {
             LocationFormScreen(apiClient: widget.apiClient, location: location),
       ),
     );
-    if (saved == true) {
-      _showSuccessMessage('Location updated successfully.');
-      _refresh();
-    }
+    if (!mounted || saved != true) return;
+    _showSuccessMessage('Location updated successfully.');
+    await _refresh();
   }
 
   void _showSuccessMessage(String message) {
@@ -152,7 +152,8 @@ class _LocationsScreenState extends State<LocationsScreen> {
       appBar: AppBar(title: const Text('Locations')),
       body: SafeArea(
         child: FutureBuilder<List<BaseLocation>>(
-          future: _locationsFuture,
+          key: ValueKey(_loader.refreshToken),
+          future: _loader.future,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const Center(child: CircularProgressIndicator());

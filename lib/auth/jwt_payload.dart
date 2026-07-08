@@ -58,6 +58,42 @@ abstract final class JwtPayload {
   static PrincipalType? principalTypeFromToken(String token) {
     final json = decode(token);
     if (json == null) return null;
-    return PrincipalType.fromTokenValue(json['principalType']?.toString());
+    return PrincipalType.fromTokenValue(json['principalType']?.toString()) ??
+        PrincipalType.employee;
+  }
+
+  static Future<PrincipalType?> currentPrincipalType({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final token = await (tokenStore ?? AuthTokenStore()).readToken();
+    if (token == null) return null;
+    return principalTypeFromToken(token);
+  }
+
+  static Future<bool> currentUserIsEmployee({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final principalType = await currentPrincipalType(tokenStore: tokenStore);
+    return principalType != PrincipalType.customer;
+  }
+
+  static Future<String?> currentUserId({AuthTokenStore? tokenStore}) async {
+    final token = await (tokenStore ?? AuthTokenStore()).readToken();
+    if (token == null) return null;
+    return decode(token)?['id']?.toString();
+  }
+
+  static List<AppRole> rolesFromToken(String token) {
+    final json = decode(token);
+    if (json == null) return const [];
+    return json['roles']?.toString().split(',').toAppRoles() ?? const [];
+  }
+
+  static Future<List<AppRole>> currentRoles({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final token = await (tokenStore ?? AuthTokenStore()).readToken();
+    if (token == null) return const [];
+    return rolesFromToken(token);
   }
 }

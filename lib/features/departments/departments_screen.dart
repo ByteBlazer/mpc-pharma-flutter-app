@@ -6,6 +6,7 @@ import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
 import '../../auth/app_role.dart';
 import '../../utils/download_file.dart';
+import '../../widgets/app_async_list_loader.dart';
 import '../../widgets/app_list_controls_row.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_search_field.dart';
@@ -31,7 +32,7 @@ class DepartmentsScreen extends StatefulWidget {
 
 class _DepartmentsScreenState extends State<DepartmentsScreen> {
   final _searchController = TextEditingController();
-  late Future<_DepartmentsData> _dataFuture;
+  final _loader = AppAsyncListLoader<_DepartmentsData>();
   String _searchQuery = '';
   AppSortField _sortField = AppSortField.id;
   AppSortDirection _sortDirection = AppSortDirection.descending;
@@ -40,7 +41,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
   @override
   void initState() {
     super.initState();
-    _dataFuture = _loadData();
+    _loader.initialize(_loadData);
     _searchController.addListener(_handleSearchChange);
   }
 
@@ -99,10 +100,8 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
     return roles.hasRole(AppRole.webAccess);
   }
 
-  void _refresh() {
-    setState(() {
-      _dataFuture = _loadData();
-    });
+  Future<void> _refresh() {
+    return _loader.reload(load: _loadData, setState: setState);
   }
 
   Future<void> _addDepartment(_DepartmentsData data) async {
@@ -116,10 +115,9 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
         ),
       ),
     );
-    if (saved == true) {
-      _showSuccessMessage('Department added successfully.');
-      _refresh();
-    }
+    if (!mounted || saved != true) return;
+    _showSuccessMessage('Department added successfully.');
+    await _refresh();
   }
 
   Future<void> _editDepartment(
@@ -137,10 +135,9 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
         ),
       ),
     );
-    if (saved == true) {
-      _showSuccessMessage('Department updated successfully.');
-      _refresh();
-    }
+    if (!mounted || saved != true) return;
+    _showSuccessMessage('Department updated successfully.');
+    await _refresh();
   }
 
   Future<void> _toggleLead({
@@ -159,7 +156,50 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
             ? '${user.personName} unmarked as lead.'
             : '${user.personName} marked as lead.',
       );
-      _refresh();
+      await _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
+    }
+  }
+
+  Future<void> _markTicketTriager({
+    required Department department,
+    required DepartmentUser user,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Mark as ticket triager'),
+        content: Text(
+          'Open unassigned tickets in ${department.name} will be assigned to ${user.personName}.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await widget.apiClient.setDepartmentTicketTriager(
+        departmentId: department.id,
+        userId: user.id,
+      );
+      if (!mounted) return;
+      _showSuccessMessage('${user.personName} marked as ticket triager.');
+      await _refresh();
     } catch (error) {
       if (!mounted) return;
       showAppSnackBar(
@@ -260,7 +300,8 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
       appBar: AppBar(title: const Text('Departments')),
       body: SafeArea(
         child: FutureBuilder<_DepartmentsData>(
-          future: _dataFuture,
+          key: ValueKey(_loader.refreshToken),
+          future: _loader.future,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const Center(child: CircularProgressIndicator());
@@ -319,6 +360,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
                           onEditDepartment: (department) =>
                               _editDepartment(data, department),
                           onToggleLead: _toggleLead,
+                          onMarkTriager: _markTicketTriager,
                         ),
                       ),
                     ],
@@ -481,6 +523,7 @@ class _DepartmentsSection extends StatefulWidget {
     required this.canManage,
     required this.onEditDepartment,
     required this.onToggleLead,
+    required this.onMarkTriager,
   });
 
   final List<Department> departments;
@@ -493,6 +536,11 @@ class _DepartmentsSection extends StatefulWidget {
     required DepartmentUser user,
   })
   onToggleLead;
+  final Future<void> Function({
+    required Department department,
+    required DepartmentUser user,
+  })
+  onMarkTriager;
 
   @override
   State<_DepartmentsSection> createState() => _DepartmentsSectionState();
@@ -544,6 +592,7 @@ class _DepartmentsSectionState extends State<_DepartmentsSection> {
             canManage: widget.canManage,
             onEdit: () => widget.onEditDepartment(department),
             onToggleLead: widget.onToggleLead,
+            onMarkTriager: widget.onMarkTriager,
           );
         },
       ),
@@ -557,6 +606,7 @@ class _DepartmentListItem extends StatefulWidget {
     required this.canManage,
     required this.onEdit,
     required this.onToggleLead,
+    required this.onMarkTriager,
   });
 
   final Department department;
@@ -567,6 +617,11 @@ class _DepartmentListItem extends StatefulWidget {
     required DepartmentUser user,
   })
   onToggleLead;
+  final Future<void> Function({
+    required Department department,
+    required DepartmentUser user,
+  })
+  onMarkTriager;
 
   @override
   State<_DepartmentListItem> createState() => _DepartmentListItemState();
@@ -583,6 +638,15 @@ class _DepartmentListItemState extends State<_DepartmentListItem> {
     setState(() => _togglingUserId = user.id);
     try {
       await widget.onToggleLead(department: widget.department, user: user);
+    } finally {
+      if (mounted) setState(() => _togglingUserId = null);
+    }
+  }
+
+  Future<void> _handleMarkTriager(DepartmentUser user) async {
+    setState(() => _togglingUserId = user.id);
+    try {
+      await widget.onMarkTriager(department: widget.department, user: user);
     } finally {
       if (mounted) setState(() => _togglingUserId = null);
     }
@@ -680,6 +744,7 @@ class _DepartmentListItemState extends State<_DepartmentListItem> {
                     canManage: widget.canManage,
                     isToggling: _togglingUserId == user.id,
                     onToggleLead: () => _handleToggleLead(user),
+                    onMarkTriager: () => _handleMarkTriager(user),
                   ),
                 ),
               ],
@@ -701,6 +766,7 @@ class _DepartmentUserRow extends StatelessWidget {
     required this.canManage,
     required this.isToggling,
     required this.onToggleLead,
+    required this.onMarkTriager,
   });
 
   final DepartmentUser user;
@@ -708,6 +774,7 @@ class _DepartmentUserRow extends StatelessWidget {
   final bool canManage;
   final bool isToggling;
   final VoidCallback onToggleLead;
+  final VoidCallback onMarkTriager;
 
   @override
   Widget build(BuildContext context) {
@@ -762,6 +829,30 @@ class _DepartmentUserRow extends StatelessWidget {
                         ),
                       ),
                     ),
+                  if (user.isTicketTriager)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: colorScheme.primary.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          'Ticket triager',
+                          style: TextStyle(
+                            color: textColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
               if (canManage) ...[
@@ -774,17 +865,36 @@ class _DepartmentUserRow extends StatelessWidget {
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : TextButton(
-                          onPressed: onToggleLead,
-                          style: TextButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                          child: Text(
-                            user.isDepartmentLead
-                                ? 'Unmark as lead'
-                                : 'Mark as lead',
-                          ),
+                      : Wrap(
+                          spacing: 4,
+                          runSpacing: 0,
+                          children: [
+                            TextButton(
+                              onPressed: onToggleLead,
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                              ),
+                              child: Text(
+                                user.isDepartmentLead
+                                    ? 'Unmark as lead'
+                                    : 'Mark as lead',
+                              ),
+                            ),
+                            if (!user.isTicketTriager)
+                              TextButton(
+                                onPressed: onMarkTriager,
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                ),
+                                child: const Text('Mark as ticket triager'),
+                              ),
+                          ],
                         ),
                 ),
               ],

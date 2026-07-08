@@ -9,6 +9,7 @@ import '../auth/impersonate_screen.dart';
 import '../customers/customers_screen.dart';
 import '../departments/departments_screen.dart';
 import '../locations/locations_screen.dart';
+import '../tickets/tickets_screen.dart';
 import '../users/users_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -44,6 +45,24 @@ class HomeScreen extends StatelessWidget {
                       apiClient: apiClient,
                       onLoginAgain: onLoginAgain,
                       onSessionReplaced: onSessionReplaced,
+                    ),
+                    _EmployeeTicketsFeatureTile(
+                      apiClient: apiClient,
+                      onLoginAgain: onLoginAgain,
+                    ),
+                    _FeatureTile(
+                      icon: Icons.support_agent_outlined,
+                      label: 'Complaints',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ComplaintsScreen(
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     _FeatureTile(
                       icon: Icons.people_alt_outlined,
@@ -200,6 +219,41 @@ class _HomeUser {
     return _HomeUser(
       username: json['username']?.toString() ?? '',
       baseLocationName: json['baseLocationName']?.toString() ?? '',
+    );
+  }
+}
+
+class _EmployeeTicketsFeatureTile extends StatelessWidget {
+  const _EmployeeTicketsFeatureTile({
+    required this.apiClient,
+    required this.onLoginAgain,
+  });
+
+  final ApiClient apiClient;
+  final Future<void> Function() onLoginAgain;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: JwtPayload.currentUserIsEmployee(),
+      builder: (context, snapshot) {
+        if (snapshot.data != true) return const SizedBox.shrink();
+
+        return _FeatureTile(
+          icon: Icons.confirmation_number_outlined,
+          label: 'Tickets',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TicketsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
