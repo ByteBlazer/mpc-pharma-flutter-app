@@ -54,110 +54,11 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         const _HomeUserSummary(),
                         const SizedBox(height: 24),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final screenWidth = MediaQuery.sizeOf(context).width;
-                            final tileWidth = _homeTileWidth(screenWidth);
-                            final columns =
-                                ((constraints.maxWidth + _homeTileSpacing) /
-                                        (tileWidth + _homeTileSpacing))
-                                    .floor()
-                                    .clamp(1, 8);
-                            final gridWidth = tileWidth * columns +
-                                _homeTileSpacing * (columns - 1);
-
-                            return Center(
-                              child: SizedBox(
-                                width: gridWidth,
-                                child: Wrap(
-                                  alignment: WrapAlignment.start,
-                                  spacing: _homeTileSpacing,
-                                  runSpacing: _homeTileSpacing,
-                                  children: [
-                            _ImpersonateFeatureTile(
-                              apiClient: apiClient,
-                              onLoginAgain: onLoginAgain,
-                              onSessionReplaced: onSessionReplaced,
-                            ),
-                            _EmployeeTicketsFeatureTile(
-                              apiClient: apiClient,
-                              onLoginAgain: onLoginAgain,
-                            ),
-                            _FeatureTile(
-                              icon: Icons.support_agent_outlined,
-                              label: 'Complaints',
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => ComplaintsScreen(
-                                      apiClient: apiClient,
-                                      onLoginAgain: onLoginAgain,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            _FeatureTile(
-                              icon: Icons.people_alt_outlined,
-                              label: 'Users',
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => UsersScreen(
-                                      apiClient: apiClient,
-                                      onLoginAgain: onLoginAgain,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            _FeatureTile(
-                              icon: Icons.business_outlined,
-                              label: 'Departments',
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => DepartmentsScreen(
-                                      apiClient: apiClient,
-                                      onLoginAgain: onLoginAgain,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            _FeatureTile(
-                              icon: Icons.storefront_outlined,
-                              label: 'Customers',
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => CustomersScreen(
-                                      apiClient: apiClient,
-                                      onLoginAgain: onLoginAgain,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            _FeatureTile(
-                              icon: Icons.map_outlined,
-                              label: 'Locations',
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => LocationsScreen(
-                                      apiClient: apiClient,
-                                      onLoginAgain: onLoginAgain,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
+                        _HomeFeatureGrid(
+                          isSimulationMode: isSimulationMode,
+                          apiClient: apiClient,
+                          onLoginAgain: onLoginAgain,
+                          onSessionReplaced: onSessionReplaced,
                         ),
                       ],
                     ),
@@ -276,60 +177,33 @@ class _HomeUser {
   }
 }
 
-class _EmployeeTicketsFeatureTile extends StatelessWidget {
-  const _EmployeeTicketsFeatureTile({
-    required this.apiClient,
-    required this.onLoginAgain,
-  });
-
-  final ApiClient apiClient;
-  final Future<void> Function() onLoginAgain;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: JwtPayload.currentUserIsEmployee(),
-      builder: (context, snapshot) {
-        if (snapshot.data != true) return const SizedBox.shrink();
-
-        return _FeatureTile(
-          icon: Icons.confirmation_number_outlined,
-          label: 'Tickets',
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => TicketsScreen(
-                  apiClient: apiClient,
-                  onLoginAgain: onLoginAgain,
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _ImpersonateFeatureTile extends StatelessWidget {
-  const _ImpersonateFeatureTile({
+class _HomeFeatureGrid extends StatelessWidget {
+  const _HomeFeatureGrid({
+    required this.isSimulationMode,
     required this.apiClient,
     required this.onLoginAgain,
     required this.onSessionReplaced,
   });
 
+  final bool isSimulationMode;
   final ApiClient apiClient;
   final Future<void> Function() onLoginAgain;
   final VoidCallback onSessionReplaced;
 
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: JwtPayload.canStartImpersonation(),
-      builder: (context, snapshot) {
-        if (snapshot.data != true) return const SizedBox.shrink();
+  Future<_HomeFeatureVisibility> _loadVisibility() async {
+    final showImpersonate = !isSimulationMode &&
+        await JwtPayload.canStartImpersonation();
+    final showTickets = await JwtPayload.currentUserIsEmployee();
+    return _HomeFeatureVisibility(
+      showImpersonate: showImpersonate,
+      showTickets: showTickets,
+    );
+  }
 
-        return _FeatureTile(
+  List<Widget> _buildTiles(BuildContext context, _HomeFeatureVisibility visibility) {
+    return [
+      if (visibility.showImpersonate)
+        _FeatureTile(
           icon: Icons.manage_accounts_outlined,
           label: 'Simulate Another User',
           onTap: () {
@@ -343,10 +217,165 @@ class _ImpersonateFeatureTile extends StatelessWidget {
               ),
             );
           },
+        ),
+      if (visibility.showTickets)
+        _FeatureTile(
+          icon: Icons.confirmation_number_outlined,
+          label: 'Tickets',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TicketsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      _FeatureTile(
+        icon: Icons.support_agent_outlined,
+        label: 'Complaints',
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ComplaintsScreen(
+                apiClient: apiClient,
+                onLoginAgain: onLoginAgain,
+              ),
+            ),
+          );
+        },
+      ),
+      _FeatureTile(
+        icon: Icons.people_alt_outlined,
+        label: 'Users',
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => UsersScreen(
+                apiClient: apiClient,
+                onLoginAgain: onLoginAgain,
+              ),
+            ),
+          );
+        },
+      ),
+      _FeatureTile(
+        icon: Icons.business_outlined,
+        label: 'Departments',
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => DepartmentsScreen(
+                apiClient: apiClient,
+                onLoginAgain: onLoginAgain,
+              ),
+            ),
+          );
+        },
+      ),
+      _FeatureTile(
+        icon: Icons.storefront_outlined,
+        label: 'Customers',
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => CustomersScreen(
+                apiClient: apiClient,
+                onLoginAgain: onLoginAgain,
+              ),
+            ),
+          );
+        },
+      ),
+      _FeatureTile(
+        icon: Icons.map_outlined,
+        label: 'Locations',
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => LocationsScreen(
+                apiClient: apiClient,
+                onLoginAgain: onLoginAgain,
+              ),
+            ),
+          );
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_HomeFeatureVisibility>(
+      future: _loadVisibility(),
+      builder: (context, snapshot) {
+        final visibility = snapshot.data;
+        if (visibility == null) return const SizedBox.shrink();
+
+        final tiles = _buildTiles(context, visibility);
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final screenWidth = MediaQuery.sizeOf(context).width;
+            final tileWidth = _homeTileWidth(screenWidth);
+            final columns =
+                ((constraints.maxWidth + _homeTileSpacing) /
+                        (tileWidth + _homeTileSpacing))
+                    .floor()
+                    .clamp(1, 8);
+            final gridWidth =
+                tileWidth * columns + _homeTileSpacing * (columns - 1);
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Center(
+                child: SizedBox(
+                  width: gridWidth,
+                  child: Column(
+                    children: [
+                      for (var rowStart = 0;
+                          rowStart < tiles.length;
+                          rowStart += columns) ...[
+                        if (rowStart > 0)
+                          const SizedBox(height: _homeTileSpacing),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (var column = 0; column < columns; column++) ...[
+                              if (column > 0)
+                                const SizedBox(width: _homeTileSpacing),
+                              SizedBox(
+                                width: tileWidth,
+                                child: rowStart + column < tiles.length
+                                    ? tiles[rowStart + column]
+                                    : const SizedBox.shrink(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         );
       },
     );
   }
+}
+
+class _HomeFeatureVisibility {
+  const _HomeFeatureVisibility({
+    required this.showImpersonate,
+    required this.showTickets,
+  });
+
+  final bool showImpersonate;
+  final bool showTickets;
 }
 
 class _FeatureTile extends StatelessWidget {
@@ -371,33 +400,51 @@ class _FeatureTile extends StatelessWidget {
     final borderRadius = isWide ? 16.0 : 14.0;
     final labelSpacing = isWide ? 8.0 : 6.0;
     final labelFontSize = isWide ? 13.0 : 11.0;
+    final labelLineHeight = labelFontSize * 1.15;
+    final labelAreaHeight = labelLineHeight * 2;
+
+    const borderWidth = 1.0;
+    const tileInset = 2.0;
+    final innerRadius =
+        borderRadius > borderWidth ? borderRadius - borderWidth : 0.0;
 
     return SizedBox(
       width: tileWidth,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(borderRadius),
-          onTap: onTap,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DecoratedBox(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(tileInset),
+              child: Container(
+                padding: const EdgeInsets.all(borderWidth),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  color: colorScheme.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(borderRadius),
-                  border: Border.all(
-                    color: colorScheme.primary.withValues(alpha: 0.3),
-                  ),
                 ),
-                child: SizedBox(
+                child: Container(
                   width: iconBoxSize,
                   height: iconBoxSize,
-                  child: Icon(icon, size: iconSize, color: colorScheme.primary),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(innerRadius),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: iconSize,
+                    color: colorScheme.primary,
+                  ),
                 ),
               ),
-              SizedBox(height: labelSpacing),
-              Text(
+            ),
+            SizedBox(height: labelSpacing),
+            SizedBox(
+              height: labelAreaHeight,
+              width: tileWidth,
+              child: Text(
                 label,
                 textAlign: TextAlign.center,
                 maxLines: 2,
@@ -409,8 +456,8 @@ class _FeatureTile extends StatelessWidget {
                   height: 1.15,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
