@@ -42,29 +42,36 @@ class HomeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 960),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const _HomeUserSummary(),
-                        const SizedBox(height: 24),
-                        _HomeFeatureGrid(
-                          isSimulationMode: isSimulationMode,
-                          apiClient: apiClient,
-                          onLoginAgain: onLoginAgain,
-                          onSessionReplaced: onSessionReplaced,
+            child: Stack(
+              children: [
+                const _HomeBackgroundDecor(),
+                SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 960),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const _HomeWelcomeCard(),
+                            const SizedBox(height: 28),
+                            const _HomeSectionHeader(title: 'Quick actions'),
+                            const SizedBox(height: 16),
+                            _HomeFeatureGrid(
+                              isSimulationMode: isSimulationMode,
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                              onSessionReplaced: onSessionReplaced,
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
           Padding(
@@ -85,8 +92,137 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _HomeUserSummary extends StatelessWidget {
-  const _HomeUserSummary();
+class _HomeBackgroundDecor extends StatelessWidget {
+  const _HomeBackgroundDecor();
+
+  List<Widget> _bottomCircles({
+    required double width,
+    required double height,
+    required Color primary,
+  }) {
+    final compact = width < 400;
+    final largeSize = height * (compact ? 0.22 : 0.24);
+    final mediumSize = height * (compact ? 0.16 : 0.175);
+    final smallSize = height * (compact ? 0.12 : 0.13);
+    final sideInset = width * 0.045;
+
+    final largeBottom = -largeSize * 0.20;
+    final largeLeft = -largeSize * 0.40;
+    final mediumBottom = height * 0.08;
+    final smallBottom = height * 0.30;
+    final smallLeft = width * 0.20;
+
+    return [
+      Positioned(
+        left: largeLeft,
+        bottom: largeBottom,
+        child: _HomeDecorCircle(
+          size: largeSize,
+          color: primary.withValues(alpha: 0.08),
+        ),
+      ),
+      Positioned(
+        left: width - sideInset - mediumSize,
+        bottom: mediumBottom,
+        child: _HomeDecorCircle(
+          size: mediumSize,
+          color: primary.withValues(alpha: 0.065),
+        ),
+      ),
+      Positioned(
+        left: smallLeft,
+        bottom: smallBottom,
+        child: _HomeDecorCircle(
+          size: smallSize,
+          color: primary.withValues(alpha: 0.05),
+        ),
+      ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final size = MediaQuery.sizeOf(context);
+
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    primary.withValues(alpha: 0.07),
+                    Colors.white,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          ..._bottomCircles(
+            width: size.width,
+            height: size.height,
+            primary: primary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeDecorCircle extends StatelessWidget {
+  const _HomeDecorCircle({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
+  }
+}
+
+class _HomeSectionHeader extends StatelessWidget {
+  const _HomeSectionHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 22,
+          decoration: BoxDecoration(
+            color: primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: Colors.black,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HomeWelcomeCard extends StatelessWidget {
+  const _HomeWelcomeCard();
 
   @override
   Widget build(BuildContext context) {
@@ -96,57 +232,113 @@ class _HomeUserSummary extends StatelessWidget {
         final user = snapshot.data;
         if (user == null) return const SizedBox.shrink();
 
-        return Row(
-          children: [
-            Expanded(
-              child: _HomeUserSummaryItem(
-                icon: Icons.person_outline,
-                text: user.username,
-              ),
+        final primary = Theme.of(context).colorScheme.primary;
+
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                primary.withValues(alpha: 0.10),
+                primary.withValues(alpha: 0.03),
+              ],
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _HomeUserSummaryItem(
-                icon: Icons.location_on_outlined,
-                text: user.baseLocationName,
-                alignment: MainAxisAlignment.end,
+            border: Border.all(color: primary.withValues(alpha: 0.16)),
+            boxShadow: [
+              BoxShadow(
+                color: primary.withValues(alpha: 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.11),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: primary.withValues(alpha: 0.20)),
+                  ),
+                  child: Icon(Icons.person_outline, color: primary, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome back',
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: primary,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user.username,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                      if (user.baseLocationName.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: primary.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: primary.withValues(alpha: 0.12),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.location_on_outlined,
+                                size: 15,
+                                color: primary,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  user.baseLocationName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Colors.black87,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
-    );
-  }
-}
-
-class _HomeUserSummaryItem extends StatelessWidget {
-  const _HomeUserSummaryItem({
-    required this.icon,
-    required this.text,
-    this.alignment = MainAxisAlignment.start,
-  });
-
-  final IconData icon;
-  final String text;
-  final MainAxisAlignment alignment;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: alignment,
-      children: [
-        Icon(icon, size: 18, color: Colors.black),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            text,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: Colors.black),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -431,6 +623,13 @@ class _FeatureTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(borderRadius),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
                 child: Container(
                   width: iconBoxSize,
