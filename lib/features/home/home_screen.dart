@@ -191,8 +191,8 @@ class _HomeFeatureGrid extends StatelessWidget {
   final VoidCallback onSessionReplaced;
 
   Future<_HomeFeatureVisibility> _loadVisibility() async {
-    final showImpersonate = !isSimulationMode &&
-        await JwtPayload.canStartImpersonation();
+    final showImpersonate =
+        !isSimulationMode && await JwtPayload.canStartImpersonation();
     final showTickets = await JwtPayload.currentUserIsEmployee();
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
@@ -200,12 +200,15 @@ class _HomeFeatureGrid extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildTiles(BuildContext context, _HomeFeatureVisibility visibility) {
+  List<Widget> _buildTiles(
+    BuildContext context,
+    _HomeFeatureVisibility visibility,
+  ) {
     return [
       if (visibility.showImpersonate)
         _FeatureTile(
           icon: Icons.manage_accounts_outlined,
-          label: 'Simulate Another User',
+          label: 'Simulate Other User',
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
@@ -253,10 +256,8 @@ class _HomeFeatureGrid extends StatelessWidget {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => UsersScreen(
-                apiClient: apiClient,
-                onLoginAgain: onLoginAgain,
-              ),
+              builder: (_) =>
+                  UsersScreen(apiClient: apiClient, onLoginAgain: onLoginAgain),
             ),
           );
         },
@@ -335,15 +336,21 @@ class _HomeFeatureGrid extends StatelessWidget {
                   width: gridWidth,
                   child: Column(
                     children: [
-                      for (var rowStart = 0;
-                          rowStart < tiles.length;
-                          rowStart += columns) ...[
+                      for (
+                        var rowStart = 0;
+                        rowStart < tiles.length;
+                        rowStart += columns
+                      ) ...[
                         if (rowStart > 0)
                           const SizedBox(height: _homeTileSpacing),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            for (var column = 0; column < columns; column++) ...[
+                            for (
+                              var column = 0;
+                              column < columns;
+                              column++
+                            ) ...[
                               if (column > 0)
                                 const SizedBox(width: _homeTileSpacing),
                               SizedBox(
@@ -405,8 +412,9 @@ class _FeatureTile extends StatelessWidget {
 
     const borderWidth = 1.0;
     const tileInset = 2.0;
-    final innerRadius =
-        borderRadius > borderWidth ? borderRadius - borderWidth : 0.0;
+    final innerRadius = borderRadius > borderWidth
+        ? borderRadius - borderWidth
+        : 0.0;
 
     return SizedBox(
       width: tileWidth,
@@ -432,11 +440,7 @@ class _FeatureTile extends StatelessWidget {
                     color: colorScheme.primary.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(innerRadius),
                   ),
-                  child: Icon(
-                    icon,
-                    size: iconSize,
-                    color: colorScheme.primary,
-                  ),
+                  child: Icon(icon, size: iconSize, color: colorScheme.primary),
                 ),
               ),
             ),
