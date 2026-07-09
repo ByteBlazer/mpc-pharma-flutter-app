@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
 import 'ticket_attachment_manager.dart';
 import 'ticket_models.dart';
@@ -86,7 +87,7 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(title: const Text('New complaint')),
       body: SafeArea(
         child: SingleChildScrollView(

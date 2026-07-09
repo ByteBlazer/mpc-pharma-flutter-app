@@ -22,7 +22,6 @@ class AppListControlsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.primary;
     final isWide = MediaQuery.sizeOf(context).width > 600;
 
     return SizedBox(
@@ -42,7 +41,6 @@ class AppListControlsRow extends StatelessWidget {
         TextButton(
           onPressed: () => onShowInactiveChanged(!showInactive),
           style: TextButton.styleFrom(
-            foregroundColor: color,
             visualDensity: VisualDensity.compact,
             padding: const EdgeInsets.symmetric(horizontal: 8),
           ),

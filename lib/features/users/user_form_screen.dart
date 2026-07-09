@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../api/api_client.dart';
 import '../../auth/app_role.dart';
 import '../../widgets/app_multi_select_field.dart';
+import '../../widgets/app_screen_scaffold.dart';
 import 'user_models.dart';
 
 class UserFormScreen extends StatefulWidget {
@@ -144,7 +145,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(title: Text(_isEditing ? 'Edit User' : 'Add User')),
       body: SafeArea(
         child: SingleChildScrollView(

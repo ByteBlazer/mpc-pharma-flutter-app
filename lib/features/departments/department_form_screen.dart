@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../widgets/app_multi_select_field.dart';
+import '../../widgets/app_screen_scaffold.dart';
 import '../users/user_models.dart';
 import 'department_models.dart';
 
@@ -142,7 +143,7 @@ class _DepartmentFormScreenState extends State<DepartmentFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(title: Text(_isEditing ? 'Edit Dept' : 'Add Dept')),
       body: SafeArea(
         child: SingleChildScrollView(
