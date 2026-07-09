@@ -13,6 +13,12 @@ import '../locations/locations_screen.dart';
 import '../tickets/tickets_screen.dart';
 import '../users/users_screen.dart';
 
+const _homeTileSpacing = 20.0;
+
+bool _isWideHomeLayout(double width) => width > 500;
+
+double _homeTileWidth(double width) => _isWideHomeLayout(width) ? 88.0 : 68.0;
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
@@ -48,10 +54,26 @@ class HomeScreen extends StatelessWidget {
                       children: [
                         const _HomeUserSummary(),
                         const SizedBox(height: 24),
-                        Wrap(
-                          spacing: 20,
-                          runSpacing: 20,
-                          children: [
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final screenWidth = MediaQuery.sizeOf(context).width;
+                            final tileWidth = _homeTileWidth(screenWidth);
+                            final columns =
+                                ((constraints.maxWidth + _homeTileSpacing) /
+                                        (tileWidth + _homeTileSpacing))
+                                    .floor()
+                                    .clamp(1, 8);
+                            final gridWidth = tileWidth * columns +
+                                _homeTileSpacing * (columns - 1);
+
+                            return Center(
+                              child: SizedBox(
+                                width: gridWidth,
+                                child: Wrap(
+                                  alignment: WrapAlignment.start,
+                                  spacing: _homeTileSpacing,
+                                  runSpacing: _homeTileSpacing,
+                                  children: [
                             _ImpersonateFeatureTile(
                               apiClient: apiClient,
                               onLoginAgain: onLoginAgain,
@@ -131,7 +153,11 @@ class HomeScreen extends StatelessWidget {
                                 );
                               },
                             ),
-                          ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -337,8 +363,9 @@ class _FeatureTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isWide = MediaQuery.sizeOf(context).width > 500;
-    final tileWidth = isWide ? 88.0 : 68.0;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isWide = _isWideHomeLayout(screenWidth);
+    final tileWidth = _homeTileWidth(screenWidth);
     final iconBoxSize = isWide ? 72.0 : 52.0;
     final iconSize = isWide ? 32.0 : 24.0;
     final borderRadius = isWide ? 16.0 : 14.0;

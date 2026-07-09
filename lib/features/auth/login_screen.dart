@@ -141,7 +141,10 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception('OTP verified, but no access token was returned.');
       }
       if (!mounted) return;
-      setState(() => _isLoggedIn = true);
+      setState(() {
+        _isLoggedIn = true;
+        _isSimulationMode = false;
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() => _errorMessage = error.toString());

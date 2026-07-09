@@ -51,6 +51,7 @@ class ApiClient {
     );
     final accessToken = otpResponse.accessToken;
     if (accessToken != null && accessToken.isNotEmpty) {
+      await _tokenStore.clearToken();
       await _tokenStore.saveToken(accessToken);
     }
     return otpResponse;
