@@ -29,8 +29,10 @@ class TicketDetailScreen extends StatefulWidget {
   State<TicketDetailScreen> createState() => _TicketDetailScreenState();
 }
 
-class _TicketDetailScreenState extends State<TicketDetailScreen> {
+class _TicketDetailScreenState extends State<TicketDetailScreen>
+    with SingleTickerProviderStateMixin {
   late Future<TicketDetail> _ticketFuture;
+  late TabController _discussionTabController;
   final _commentController = TextEditingController();
   late final TicketAttachmentManager _commentAttachmentManager;
   bool _isSubmittingComment = false;
@@ -38,12 +40,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _discussionTabController = TabController(length: 2, vsync: this);
     _commentAttachmentManager = TicketAttachmentManager(widget.apiClient);
     _ticketFuture = _loadTicket();
   }
 
   @override
   void dispose() {
+    _discussionTabController.dispose();
     _commentController.dispose();
     super.dispose();
   }
@@ -275,9 +279,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       ),
                       if (widget.isEmployeeView) ...[
                         const SizedBox(height: 24),
-                        _CommentsSection(comments: ticket.comments),
-                        const SizedBox(height: 24),
-                        _ActivitySection(activity: ticket.activity),
+                        _TicketDiscussionTabs(
+                          tabController: _discussionTabController,
+                          comments: ticket.comments,
+                          activity: ticket.activity,
+                        ),
                         const SizedBox(height: 24),
                         if (!ticket.isClosed)
                           TicketCommentField(
@@ -483,73 +489,202 @@ class _AttachmentsSection extends StatelessWidget {
   }
 }
 
-class _CommentsSection extends StatelessWidget {
-  const _CommentsSection({required this.comments});
+class _TicketDiscussionTabs extends StatelessWidget {
+  const _TicketDiscussionTabs({
+    required this.tabController,
+    required this.comments,
+    required this.activity,
+  });
+
+  final TabController tabController;
+  final List<TicketComment> comments;
+  final List<TicketActivity> activity;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: colorScheme.primary),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TabBar(
+            controller: tabController,
+            dividerHeight: 0,
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: BoxDecoration(
+              color: colorScheme.primary,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.black54,
+            labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
+            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+            splashFactory: NoSplash.splashFactory,
+            padding: const EdgeInsets.all(8),
+            tabs: [
+              Tab(text: 'Comments (${comments.length})'),
+              Tab(text: 'Activity (${activity.length})'),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: AnimatedBuilder(
+              animation: tabController,
+              builder: (context, _) {
+                return tabController.index == 0
+                    ? _CommentList(comments: comments)
+                    : _ActivityList(activity: activity);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommentList extends StatelessWidget {
+  const _CommentList({required this.comments});
+
   final List<TicketComment> comments;
 
   @override
   Widget build(BuildContext context) {
-    if (comments.isEmpty) return const SizedBox.shrink();
+    if (comments.isEmpty) {
+      return const Text(
+        'No comments yet.',
+        style: TextStyle(color: Colors.black54),
+      );
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Comments',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        ...comments.map(
-          (comment) => Card(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: comments.map((comment) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Card(
+            margin: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    comment.createdByName,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          comment.createdByName,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (comment.createdAt != null)
+                        Text(
+                          _formatTicketTimestamp(comment.createdAt!),
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 6),
-                  Text(comment.comment, style: const TextStyle(color: Colors.black)),
+                  Text(
+                    comment.comment,
+                    style: const TextStyle(color: Colors.black),
+                  ),
                 ],
               ),
             ),
           ),
-        ),
-      ],
+        );
+      }).toList(),
     );
   }
 }
 
-class _ActivitySection extends StatelessWidget {
-  const _ActivitySection({required this.activity});
+class _ActivityList extends StatelessWidget {
+  const _ActivityList({required this.activity});
+
   final List<TicketActivity> activity;
 
   @override
   Widget build(BuildContext context) {
-    if (activity.isEmpty) return const SizedBox.shrink();
+    if (activity.isEmpty) {
+      return const Text(
+        'No activity recorded yet.',
+        style: TextStyle(color: Colors.black54),
+      );
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Activity',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        ...activity.map(
-          (entry) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(entry.message, style: const TextStyle(color: Colors.black)),
-            subtitle: Text(
-              '${entry.createdByName} · ${entry.activityType}',
-              style: const TextStyle(color: Colors.black),
-            ),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: activity.map((entry) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      entry.message,
+                      style: const TextStyle(color: Colors.black),
+                    ),
+                  ),
+                  if (entry.createdAt != null)
+                    Text(
+                      _formatTicketTimestamp(entry.createdAt!),
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${entry.createdByName} · ${entry.activityType}',
+                style: const TextStyle(color: Colors.black54, fontSize: 12),
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+      }).toList(),
     );
   }
+}
+
+String _formatTicketTimestamp(DateTime dateTime) {
+  final local = dateTime.toLocal();
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  final month = months[local.month - 1];
+  final hourOfPeriod = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final period = local.hour < 12 ? 'AM' : 'PM';
+  return '$month ${local.day}, ${local.year} · $hourOfPeriod:$minute $period';
 }
