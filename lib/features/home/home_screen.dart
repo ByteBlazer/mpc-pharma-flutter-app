@@ -160,7 +160,11 @@ class _HomeWelcomeCard extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: primary.withValues(alpha: 0.20)),
                   ),
-                  child: Icon(Icons.person_outline, color: accentText, size: 26),
+                  child: Icon(
+                    Icons.person_outline,
+                    color: accentText,
+                    size: 26,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -169,11 +173,12 @@ class _HomeWelcomeCard extends StatelessWidget {
                     children: [
                       Text(
                         'Welcome back',
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: accentText,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                        ),
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: accentText,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                            ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -211,9 +216,7 @@ class _HomeWelcomeCard extends StatelessWidget {
                                 child: Text(
                                   user.baseLocationName,
                                   overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
+                                  style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(
                                         color: Colors.black87,
                                         fontWeight: FontWeight.w600,
