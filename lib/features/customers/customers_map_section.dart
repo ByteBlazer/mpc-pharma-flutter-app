@@ -320,11 +320,7 @@ class _CustomerMapCallout extends StatelessWidget {
 }
 
 class _MapMessage extends StatelessWidget {
-  const _MapMessage({
-    required this.message,
-    this.actionLabel,
-    this.onAction,
-  });
+  const _MapMessage({required this.message, this.actionLabel, this.onAction});
 
   final String message;
   final String? actionLabel;
