@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../widgets/app_multi_select_field.dart';
+import '../../widgets/app_searchable_select_field.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../customers/customer_models.dart';
 import '../departments/department_models.dart';
@@ -182,22 +184,29 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (_isCustomerTicket)
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedCustomerId,
-                          decoration: const InputDecoration(labelText: 'Customer'),
+                        AppSearchableSelectField<String>(
+                          fieldLabel: 'Customer',
+                          dialogTitle: 'Select customer',
+                          searchLabel: 'Search customers',
+                          searchHint: 'ID, firm name, city...',
+                          emptySelectionText: 'Select customer',
+                          selectedValue: _selectedCustomerId,
+                          enabled: !_isSubmitting,
                           items: data.customers
                               .map(
-                                (customer) => DropdownMenuItem(
+                                (customer) => AppMultiSelectItem<String>(
                                   value: customer.id,
-                                  child: Text(
-                                    '${customer.firmName} (${customer.id})',
-                                  ),
+                                  label: '${customer.firmName} (${customer.id})',
+                                  searchText:
+                                      '${customer.id} ${customer.firmName} ${customer.city}',
+                                  subtitle: customer.city.isEmpty
+                                      ? null
+                                      : customer.city,
                                 ),
                               )
                               .toList(),
-                          onChanged: _isSubmitting
-                              ? null
-                              : (value) => setState(() => _selectedCustomerId = value),
+                          onChanged: (value) =>
+                              setState(() => _selectedCustomerId = value),
                         ),
                       if (_isCustomerTicket) const SizedBox(height: 16),
                       if (_isCustomerTicket || categories.isNotEmpty)

@@ -36,8 +36,10 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
   String _searchQuery = '';
   _ImpersonateTarget _target = _ImpersonateTarget.employee;
   String? _impersonatingId;
+  String? _currentUserId;
   bool _isVerifyingAccess = true;
   bool _canImpersonate = false;
+  bool _isImpersonating = false;
 
   @override
   void initState() {
@@ -57,10 +59,16 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
   }
 
   Future<void> _verifyAccess() async {
-    final canImpersonate = await JwtPayload.currentUserIsAppAdmin();
+    final results = await Future.wait([
+      JwtPayload.canStartImpersonation(),
+      JwtPayload.currentIsImpersonation(),
+      JwtPayload.currentUserId(),
+    ]);
     if (!mounted) return;
     setState(() {
-      _canImpersonate = canImpersonate;
+      _canImpersonate = results[0] as bool;
+      _isImpersonating = results[1] as bool;
+      _currentUserId = results[2] as String?;
       _isVerifyingAccess = false;
     });
   }
@@ -91,6 +99,10 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
   }
 
   Future<void> _impersonateEmployee(UserAccount employee) async {
+    if (_isCurrentUser(employee.id)) {
+      _showSelfImpersonationError();
+      return;
+    }
     await _impersonate(
       title: employee.personName,
       subtitle: 'Employee ID ${employee.id}',
@@ -99,10 +111,25 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
   }
 
   Future<void> _impersonateCustomer(CustomerSummary customer) async {
+    if (_isCurrentUser(customer.id)) {
+      _showSelfImpersonationError();
+      return;
+    }
     await _impersonate(
       title: customer.firmName,
       subtitle: 'Customer ID ${customer.id}',
       customerId: customer.id,
+    );
+  }
+
+  bool _isCurrentUser(String id) =>
+      _currentUserId != null && _currentUserId == id;
+
+  void _showSelfImpersonationError() {
+    showAppSnackBar(
+      context,
+      message: 'You cannot simulate your own account.',
+      type: AppSnackBarType.error,
     );
   }
 
@@ -162,6 +189,8 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
       body: SafeArea(
         child: _isVerifyingAccess
             ? const Center(child: CircularProgressIndicator())
+            : _isImpersonating
+            ? const _AlreadyImpersonating()
             : !_canImpersonate
             ? const _AccessDenied()
             : Padding(
@@ -238,6 +267,7 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
                                   employees: employees,
                                   scrollController: _scrollController,
                                   impersonatingId: _impersonatingId,
+                                  currentUserId: _currentUserId,
                                   onImpersonate: _impersonateEmployee,
                                 );
                               }
@@ -252,6 +282,7 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
                                 customers: customers,
                                 scrollController: _scrollController,
                                 impersonatingId: _impersonatingId,
+                                currentUserId: _currentUserId,
                                 onImpersonate: _impersonateCustomer,
                               );
                             },
@@ -272,12 +303,14 @@ class _EmployeeList extends StatelessWidget {
     required this.employees,
     required this.scrollController,
     required this.impersonatingId,
+    required this.currentUserId,
     required this.onImpersonate,
   });
 
   final List<UserAccount> employees;
   final ScrollController scrollController;
   final String? impersonatingId;
+  final String? currentUserId;
   final ValueChanged<UserAccount> onImpersonate;
 
   @override
@@ -301,6 +334,7 @@ class _EmployeeList extends StatelessWidget {
         itemBuilder: (context, index) {
           final employee = employees[index];
           final isLoading = impersonatingId == employee.id;
+          final isSelf = currentUserId != null && currentUserId == employee.id;
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: DecoratedBox(
@@ -327,7 +361,7 @@ class _EmployeeList extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : FilledButton(
-                        onPressed: employee.isActive
+                        onPressed: employee.isActive && !isSelf
                             ? () => onImpersonate(employee)
                             : null,
                         style: FilledButton.styleFrom(
@@ -355,12 +389,14 @@ class _CustomerList extends StatelessWidget {
     required this.customers,
     required this.scrollController,
     required this.impersonatingId,
+    required this.currentUserId,
     required this.onImpersonate,
   });
 
   final List<CustomerSummary> customers;
   final ScrollController scrollController;
   final String? impersonatingId;
+  final String? currentUserId;
   final ValueChanged<CustomerSummary> onImpersonate;
 
   @override
@@ -384,6 +420,7 @@ class _CustomerList extends StatelessWidget {
         itemBuilder: (context, index) {
           final customer = customers[index];
           final isLoading = impersonatingId == customer.id;
+          final isSelf = currentUserId != null && currentUserId == customer.id;
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: DecoratedBox(
@@ -410,7 +447,7 @@ class _CustomerList extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : FilledButton(
-                        onPressed: () => onImpersonate(customer),
+                        onPressed: !isSelf ? () => onImpersonate(customer) : null,
                         style: FilledButton.styleFrom(
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.symmetric(
@@ -463,6 +500,42 @@ class _ErrorState extends StatelessWidget {
           const SizedBox(height: 16),
           OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
         ],
+      ),
+    );
+  }
+}
+
+class _AlreadyImpersonating extends StatelessWidget {
+  const _AlreadyImpersonating();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Exit simulation mode before simulating another user.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.black),
+                  ),
+                  const SizedBox(height: 20),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Back'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

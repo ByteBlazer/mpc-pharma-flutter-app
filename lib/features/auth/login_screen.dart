@@ -6,6 +6,9 @@ import 'package:flutter/services.dart';
 import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
 import '../../app_environment.dart';
+import '../../auth/jwt_payload.dart';
+import '../../widgets/app_snack_bar.dart';
+import '../../widgets/simulation_mode_banner.dart';
 import '../home/home_screen.dart';
 import 'user_profile_screen.dart';
 
@@ -32,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isCheckingSession = true;
   bool _isLoggedIn = false;
+  bool _isSimulationMode = false;
   int _sessionVersion = 0;
   bool _otpSent = false;
   bool _isLoading = false;
@@ -79,6 +83,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() {
       _isLoggedIn = token != null;
+      _isSimulationMode =
+          token != null && JwtPayload.isImpersonation(token);
       _isCheckingSession = false;
     });
   }
@@ -147,7 +153,27 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _onSessionReplaced() {
-    setState(() => _sessionVersion++);
+    setState(() {
+      _sessionVersion++;
+      _isSimulationMode = true;
+    });
+  }
+
+  Future<void> _exitSimulation() async {
+    final restored = await _tokenStore.exitImpersonation();
+    if (!mounted) return;
+    if (!restored) {
+      showAppSnackBar(
+        context,
+        message: 'Could not restore your original session.',
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
+    setState(() {
+      _sessionVersion++;
+      _isSimulationMode = false;
+    });
   }
 
   Future<void> _logout() async {
@@ -155,6 +181,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() {
       _isLoggedIn = false;
+      _isSimulationMode = false;
       _otpSent = false;
       _errorMessage = null;
       _phoneController.clear();
@@ -192,6 +219,11 @@ class _LoginScreenState extends State<LoginScreen> {
         title: Text(_appTitle()),
         actions: [
           if (_isLoggedIn)
+            SimulationModeAppBarAction(
+              isVisible: _isSimulationMode,
+              onExitSimulation: _exitSimulation,
+            ),
+          if (_isLoggedIn)
             IconButton(
               tooltip: 'User profile',
               icon: const Icon(Icons.account_circle),
@@ -207,6 +239,8 @@ class _LoginScreenState extends State<LoginScreen> {
               apiClient: _apiClient,
               onLoginAgain: _logout,
               onSessionReplaced: _onSessionReplaced,
+              onExitSimulation: _exitSimulation,
+              isSimulationMode: _isSimulationMode,
             )
           : SafeArea(
               child: Center(
@@ -243,8 +277,11 @@ class _LoginScreenState extends State<LoginScreen> {
   void _openUserProfile() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            UserProfileScreen(tokenStore: _tokenStore, onLogout: _logout),
+        builder: (_) => UserProfileScreen(
+          tokenStore: _tokenStore,
+          onLogout: _logout,
+          onExitSimulation: _exitSimulation,
+        ),
       ),
     );
   }

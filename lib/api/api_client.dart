@@ -87,7 +87,7 @@ class ApiClient {
     );
     final accessToken = impersonationResponse.accessToken;
     if (accessToken != null && accessToken.isNotEmpty) {
-      await _tokenStore.saveToken(accessToken);
+      await _tokenStore.beginImpersonation(accessToken);
     }
     return impersonationResponse;
   }
