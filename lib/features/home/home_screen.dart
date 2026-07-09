@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
 import '../../auth/jwt_payload.dart';
+import '../../widgets/simulation_mode_banner.dart';
 import '../auth/impersonate_screen.dart';
 import '../customers/customers_screen.dart';
 import '../departments/departments_screen.dart';
@@ -18,114 +19,140 @@ class HomeScreen extends StatelessWidget {
     required this.apiClient,
     required this.onLoginAgain,
     required this.onSessionReplaced,
+    required this.onExitSimulation,
+    required this.isSimulationMode,
   });
 
   final ApiClient apiClient;
   final Future<void> Function() onLoginAgain;
   final VoidCallback onSessionReplaced;
+  final Future<void> Function() onExitSimulation;
+  final bool isSimulationMode;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 960),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _HomeUserSummary(),
-                const SizedBox(height: 24),
-                Wrap(
-                  spacing: 20,
-                  runSpacing: 20,
-                  children: [
-                    _ImpersonateFeatureTile(
-                      apiClient: apiClient,
-                      onLoginAgain: onLoginAgain,
-                      onSessionReplaced: onSessionReplaced,
-                    ),
-                    _EmployeeTicketsFeatureTile(
-                      apiClient: apiClient,
-                      onLoginAgain: onLoginAgain,
-                    ),
-                    _FeatureTile(
-                      icon: Icons.support_agent_outlined,
-                      label: 'Complaints',
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ComplaintsScreen(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 960),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const _HomeUserSummary(),
+                        const SizedBox(height: 24),
+                        Wrap(
+                          spacing: 20,
+                          runSpacing: 20,
+                          children: [
+                            _ImpersonateFeatureTile(
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                              onSessionReplaced: onSessionReplaced,
+                            ),
+                            _EmployeeTicketsFeatureTile(
                               apiClient: apiClient,
                               onLoginAgain: onLoginAgain,
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                    _FeatureTile(
-                      icon: Icons.people_alt_outlined,
-                      label: 'Users',
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => UsersScreen(
-                              apiClient: apiClient,
-                              onLoginAgain: onLoginAgain,
+                            _FeatureTile(
+                              icon: Icons.support_agent_outlined,
+                              label: 'Complaints',
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => ComplaintsScreen(
+                                      apiClient: apiClient,
+                                      onLoginAgain: onLoginAgain,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                    _FeatureTile(
-                      icon: Icons.business_outlined,
-                      label: 'Departments',
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => DepartmentsScreen(
-                              apiClient: apiClient,
-                              onLoginAgain: onLoginAgain,
+                            _FeatureTile(
+                              icon: Icons.people_alt_outlined,
+                              label: 'Users',
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => UsersScreen(
+                                      apiClient: apiClient,
+                                      onLoginAgain: onLoginAgain,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                    _FeatureTile(
-                      icon: Icons.storefront_outlined,
-                      label: 'Customers',
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => CustomersScreen(
-                              apiClient: apiClient,
-                              onLoginAgain: onLoginAgain,
+                            _FeatureTile(
+                              icon: Icons.business_outlined,
+                              label: 'Departments',
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => DepartmentsScreen(
+                                      apiClient: apiClient,
+                                      onLoginAgain: onLoginAgain,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                    _FeatureTile(
-                      icon: Icons.map_outlined,
-                      label: 'Locations',
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => LocationsScreen(
-                              apiClient: apiClient,
-                              onLoginAgain: onLoginAgain,
+                            _FeatureTile(
+                              icon: Icons.storefront_outlined,
+                              label: 'Customers',
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => CustomersScreen(
+                                      apiClient: apiClient,
+                                      onLoginAgain: onLoginAgain,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          ),
-                        );
-                      },
+                            _FeatureTile(
+                              icon: Icons.map_outlined,
+                              label: 'Locations',
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => LocationsScreen(
+                                      apiClient: apiClient,
+                                      onLoginAgain: onLoginAgain,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 960),
+                child: SimulationModeBanner(
+                  isVisible: isSimulationMode,
+                  onExitSimulation: onExitSimulation,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -272,7 +299,7 @@ class _ImpersonateFeatureTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<bool>(
-      future: JwtPayload.currentUserIsAppAdmin(),
+      future: JwtPayload.canStartImpersonation(),
       builder: (context, snapshot) {
         if (snapshot.data != true) return const SizedBox.shrink();
 

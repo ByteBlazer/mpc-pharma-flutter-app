@@ -45,6 +45,27 @@ abstract final class JwtPayload {
     return isAppAdmin(token);
   }
 
+  static bool isImpersonation(String token) {
+    final json = decode(token);
+    if (json == null) return false;
+    return json['impersonation'] == true;
+  }
+
+  static Future<bool> currentIsImpersonation({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final token = await (tokenStore ?? AuthTokenStore()).readToken();
+    if (token == null) return false;
+    return isImpersonation(token);
+  }
+
+  static Future<bool> canStartImpersonation({
+    AuthTokenStore? tokenStore,
+  }) async {
+    if (await currentIsImpersonation(tokenStore: tokenStore)) return false;
+    return currentUserIsAppAdmin(tokenStore: tokenStore);
+  }
+
   static bool isAppAdmin(String token) {
     final json = decode(token);
     if (json == null) return false;
