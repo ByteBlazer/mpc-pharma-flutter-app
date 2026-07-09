@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../widgets/app_screen_scaffold.dart';
 import 'customer_models.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
@@ -36,7 +37,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(title: const Text('Customer')),
       body: SafeArea(
         child: FutureBuilder<Customer>(

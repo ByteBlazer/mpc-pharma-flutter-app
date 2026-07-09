@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../widgets/app_screen_scaffold.dart';
 import '../users/user_models.dart';
 
 class LocationFormScreen extends StatefulWidget {
@@ -73,7 +74,7 @@ class _LocationFormScreenState extends State<LocationFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Edit Location' : 'Add Location'),
       ),

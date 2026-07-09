@@ -6,6 +6,7 @@ import '../../api/auth_token_store.dart';
 import '../../auth/app_role.dart';
 
 import '../../auth/jwt_payload.dart';
+import '../../widgets/app_screen_scaffold.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({
@@ -39,7 +40,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(title: const Text('User Profile')),
       body: SafeArea(
         child: Center(

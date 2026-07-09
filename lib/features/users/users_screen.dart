@@ -6,10 +6,12 @@ import '../../api/api_client.dart';
 import '../../utils/download_file.dart';
 import '../../widgets/app_async_list_loader.dart';
 import '../../widgets/app_list_controls_row.dart';
+import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_sort_controls.dart';
+import '../../widgets/app_surface.dart';
 import 'user_form_screen.dart';
 import 'user_models.dart';
 
@@ -205,7 +207,7 @@ class _UsersScreenState extends State<UsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(title: const Text('Users')),
       body: SafeArea(
         child: FutureBuilder<_UsersData>(
@@ -481,14 +483,9 @@ class _UserListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border.all(color: colorScheme.primary),
-          borderRadius: BorderRadius.circular(18),
-        ),
+      child: AppSurface(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

@@ -7,6 +7,7 @@ import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
 import '../../app_environment.dart';
 import '../../auth/jwt_payload.dart';
+import '../../widgets/app_brand_page_background.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/simulation_mode_banner.dart';
 import '../home/home_screen.dart';
@@ -235,7 +236,9 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
       body: _isCheckingSession
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppGradientScaffoldBody(
+              child: Center(child: CircularProgressIndicator()),
+            )
           : _isLoggedIn
           ? HomeScreen(
               key: ValueKey(_sessionVersion),
@@ -245,13 +248,14 @@ class _LoginScreenState extends State<LoginScreen> {
               onExitSimulation: _exitSimulation,
               isSimulationMode: _isSimulationMode,
             )
-          : SafeArea(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 520),
-                    child: _LoginCard(
+          : AppGradientScaffoldBody(
+              child: SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: _LoginCard(
                       phoneController: _phoneController,
                       otpController: _otpController,
                       otpSent: _otpSent,
@@ -274,6 +278,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
+          ),
     );
   }
 

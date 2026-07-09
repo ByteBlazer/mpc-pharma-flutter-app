@@ -8,7 +8,9 @@ import '../../api/auth_token_store.dart';
 import '../../auth/app_role.dart';
 import '../../utils/download_file.dart';
 import '../../widgets/app_snack_bar.dart';
+import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
+import '../../widgets/app_surface.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/app_view_details_button.dart';
 import 'customer_detail_screen.dart';
@@ -172,7 +174,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(title: const Text('Customers')),
       body: SafeArea(
         child: FutureBuilder<_CustomersData>(
@@ -405,18 +407,13 @@ class _CustomerListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final city = customer.city.trim();
 
     return SizedBox(
       height: 120,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(color: colorScheme.primary),
-            borderRadius: BorderRadius.circular(18),
-          ),
+        child: AppSurface(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: Column(

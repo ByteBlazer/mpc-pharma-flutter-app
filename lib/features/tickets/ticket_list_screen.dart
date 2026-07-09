@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../widgets/app_async_list_loader.dart';
+import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
+import '../../widgets/app_surface.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/app_snack_bar.dart';
 import 'ticket_detail_screen.dart';
@@ -76,7 +78,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(
         title: Text(widget.title),
         actions: widget.appBarActions,
@@ -184,17 +186,12 @@ class _TicketSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(color: colorScheme.primary),
-            borderRadius: BorderRadius.circular(18),
-          ),
+        child: AppSurface(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(

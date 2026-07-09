@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../app_environment.dart';
 import '../../utils/google_maps_loader.dart';
 import '../../utils/map_marker_icon.dart';
+import '../../widgets/app_surface.dart';
 import '../../widgets/app_view_details_button.dart';
 import 'customer_models.dart';
 
@@ -181,7 +182,6 @@ class _CustomersMapSectionState extends State<CustomersMapSection> {
 
     final markers = _buildMarkers();
     final missingCount = widget.customers.length - _mappableCustomers.length;
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -226,7 +226,6 @@ class _CustomersMapSectionState extends State<CustomersMapSection> {
                     child: _CustomerMapCallout(
                       customer: _selectedCustomer!,
                       canViewDetails: widget.canViewDetails,
-                      borderColor: colorScheme.primary,
                       onClose: () => setState(() => _selectedCustomer = null),
                       onViewDetails: () =>
                           widget.onViewCustomer(_selectedCustomer!),
@@ -245,14 +244,12 @@ class _CustomerMapCallout extends StatelessWidget {
   const _CustomerMapCallout({
     required this.customer,
     required this.canViewDetails,
-    required this.borderColor,
     required this.onClose,
     required this.onViewDetails,
   });
 
   final CustomerSummary customer;
   final bool canViewDetails;
-  final Color borderColor;
   final VoidCallback onClose;
   final VoidCallback onViewDetails;
 
@@ -263,12 +260,9 @@ class _CustomerMapCallout extends StatelessWidget {
     return Material(
       elevation: 6,
       borderRadius: BorderRadius.circular(16),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: borderColor),
-          borderRadius: BorderRadius.circular(16),
-        ),
+      color: Colors.transparent,
+      child: AppSurface(
+        borderRadius: 16,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
           child: Column(

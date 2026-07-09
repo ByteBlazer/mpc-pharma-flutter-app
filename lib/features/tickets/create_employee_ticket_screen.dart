@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../widgets/app_multi_select_field.dart';
+import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_searchable_select_field.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../customers/customer_models.dart';
@@ -158,7 +159,7 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
   @override
   Widget build(BuildContext context) {
     final title = _isCustomerTicket ? 'Raise for customer' : 'Internal ticket';
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(title: Text(title)),
       body: SafeArea(
         child: FutureBuilder<_CreateTicketData>(

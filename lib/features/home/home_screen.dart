@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
+import '../../app_theme.dart';
 import '../../auth/jwt_payload.dart';
+import '../../widgets/app_brand_page_background.dart';
+import '../../widgets/app_surface.dart';
 import '../../widgets/simulation_mode_banner.dart';
 import '../auth/impersonate_screen.dart';
 import '../customers/customers_screen.dart';
@@ -37,15 +40,18 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                const _HomeBackgroundDecor(),
-                SingleChildScrollView(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const Positioned.fill(
+          child: AppBrandPageBackground(showDecorCircles: true),
+        ),
+        SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
                   child: Center(
                     child: ConstrainedBox(
@@ -71,120 +77,24 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 960),
-                child: SimulationModeBanner(
-                  isVisible: isSimulationMode,
-                  onExitSimulation: onExitSimulation,
-                ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeBackgroundDecor extends StatelessWidget {
-  const _HomeBackgroundDecor();
-
-  List<Widget> _bottomCircles({
-    required double width,
-    required double height,
-    required Color primary,
-  }) {
-    final compact = width < 400;
-    final largeSize = height * (compact ? 0.22 : 0.24);
-    final mediumSize = height * (compact ? 0.16 : 0.175);
-    final smallSize = height * (compact ? 0.12 : 0.13);
-    final sideInset = width * 0.045;
-
-    final largeBottom = -largeSize * 0.20;
-    final largeLeft = -largeSize * 0.40;
-    final mediumBottom = height * 0.08;
-    final smallBottom = height * 0.30;
-    final smallLeft = width * 0.20;
-
-    return [
-      Positioned(
-        left: largeLeft,
-        bottom: largeBottom,
-        child: _HomeDecorCircle(
-          size: largeSize,
-          color: primary.withValues(alpha: 0.08),
-        ),
-      ),
-      Positioned(
-        left: width - sideInset - mediumSize,
-        bottom: mediumBottom,
-        child: _HomeDecorCircle(
-          size: mediumSize,
-          color: primary.withValues(alpha: 0.065),
-        ),
-      ),
-      Positioned(
-        left: smallLeft,
-        bottom: smallBottom,
-        child: _HomeDecorCircle(
-          size: smallSize,
-          color: primary.withValues(alpha: 0.05),
-        ),
-      ),
-    ];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    final size = MediaQuery.sizeOf(context);
-
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    primary.withValues(alpha: 0.07),
-                    Colors.white,
-                  ],
+              if (isSimulationMode)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 960),
+                      child: SimulationModeBanner(
+                        isVisible: true,
+                        onExitSimulation: onExitSimulation,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+            ],
           ),
-          ..._bottomCircles(
-            width: size.width,
-            height: size.height,
-            primary: primary,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeDecorCircle extends StatelessWidget {
-  const _HomeDecorCircle({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        ),
+      ],
     );
   }
 }
@@ -233,27 +143,10 @@ class _HomeWelcomeCard extends StatelessWidget {
         if (user == null) return const SizedBox.shrink();
 
         final primary = Theme.of(context).colorScheme.primary;
+        final accentText = AppTheme.primaryAccentText(primary);
 
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                primary.withValues(alpha: 0.10),
-                primary.withValues(alpha: 0.03),
-              ],
-            ),
-            border: Border.all(color: primary.withValues(alpha: 0.16)),
-            boxShadow: [
-              BoxShadow(
-                color: primary.withValues(alpha: 0.05),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
+        return AppSurface(
+          borderRadius: 20,
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Row(
@@ -267,7 +160,7 @@ class _HomeWelcomeCard extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: primary.withValues(alpha: 0.20)),
                   ),
-                  child: Icon(Icons.person_outline, color: primary, size: 26),
+                  child: Icon(Icons.person_outline, color: accentText, size: 26),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -277,7 +170,7 @@ class _HomeWelcomeCard extends StatelessWidget {
                       Text(
                         'Welcome back',
                         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: primary,
+                          color: accentText,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.3,
                         ),
@@ -311,7 +204,7 @@ class _HomeWelcomeCard extends StatelessWidget {
                               Icon(
                                 Icons.location_on_outlined,
                                 size: 15,
-                                color: primary,
+                                color: accentText,
                               ),
                               const SizedBox(width: 4),
                               Flexible(
@@ -639,7 +532,11 @@ class _FeatureTile extends StatelessWidget {
                     color: colorScheme.primary.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(innerRadius),
                   ),
-                  child: Icon(icon, size: iconSize, color: colorScheme.primary),
+                  child: Icon(
+                    icon,
+                    size: iconSize,
+                    color: AppTheme.primaryGlyph(colorScheme.primary),
+                  ),
                 ),
               ),
             ),

@@ -8,6 +8,8 @@ import '../../auth/app_role.dart';
 import '../../utils/download_file.dart';
 import '../../widgets/app_async_list_loader.dart';
 import '../../widgets/app_list_controls_row.dart';
+import '../../widgets/app_screen_scaffold.dart';
+import '../../widgets/app_surface.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/app_snack_bar.dart';
@@ -296,7 +298,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(title: const Text('Departments')),
       body: SafeArea(
         child: FutureBuilder<_DepartmentsData>(
@@ -654,7 +656,6 @@ class _DepartmentListItemState extends State<_DepartmentListItem> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final department = widget.department;
     final userCount = department.users.length;
     final leadCount = _leadCount;
@@ -662,11 +663,7 @@ class _DepartmentListItemState extends State<_DepartmentListItem> {
 
     final content = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border.all(color: colorScheme.primary),
-          borderRadius: BorderRadius.circular(18),
-        ),
+      child: AppSurface(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

@@ -4,7 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../api/api_client.dart';
 import '../../auth/app_role.dart';
 import '../../auth/jwt_payload.dart';
+import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
+import '../../widgets/app_surface.dart';
 import 'ticket_attachment_manager.dart';
 import 'ticket_models.dart';
 import 'widgets/ticket_audio_recorder_button.dart';
@@ -218,7 +220,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScreenScaffold(
       appBar: AppBar(
         title: Text(widget.isEmployeeView ? 'Ticket' : 'Complaint'),
       ),
@@ -502,13 +504,11 @@ class _TicketDiscussionTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final primary = Theme.of(context).colorScheme.primary;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border.all(color: colorScheme.primary),
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return AppSurface(
+      borderRadius: 16,
+      clip: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -517,7 +517,7 @@ class _TicketDiscussionTabs extends StatelessWidget {
             dividerHeight: 0,
             indicatorSize: TabBarIndicatorSize.tab,
             indicator: BoxDecoration(
-              color: colorScheme.primary,
+              color: primary,
               borderRadius: BorderRadius.circular(8),
             ),
             labelColor: Colors.white,
