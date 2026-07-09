@@ -165,7 +165,9 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
         customerId: customerId,
       );
       if (response.accessToken == null || response.accessToken!.isEmpty) {
-        throw Exception('Impersonation succeeded, but no access token was returned.');
+        throw Exception(
+          'Impersonation succeeded, but no access token was returned.',
+        );
       }
       if (!mounted) return;
       widget.onSessionReplaced();
@@ -185,7 +187,7 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Simulate Another User')),
+      appBar: AppBar(title: const Text('Simulate Other User')),
       body: SafeArea(
         child: _isVerifyingAccess
             ? const Center(child: CircularProgressIndicator())
@@ -258,10 +260,14 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
                               }
 
                               final data =
-                                  snapshot.data ?? const _ImpersonateData.empty();
+                                  snapshot.data ??
+                                  const _ImpersonateData.empty();
                               if (_target == _ImpersonateTarget.employee) {
                                 final employees = data.employees
-                                    .where((user) => user.matchesSearch(_searchQuery))
+                                    .where(
+                                      (user) =>
+                                          user.matchesSearch(_searchQuery),
+                                    )
                                     .toList();
                                 return _EmployeeList(
                                   employees: employees,
@@ -447,7 +453,9 @@ class _CustomerList extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : FilledButton(
-                        onPressed: !isSelf ? () => onImpersonate(customer) : null,
+                        onPressed: !isSelf
+                            ? () => onImpersonate(customer)
+                            : null,
                         style: FilledButton.styleFrom(
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.symmetric(
@@ -469,10 +477,7 @@ class _CustomerList extends StatelessWidget {
 }
 
 class _ImpersonateData {
-  const _ImpersonateData({
-    required this.employees,
-    required this.customers,
-  });
+  const _ImpersonateData({required this.employees, required this.customers});
 
   const _ImpersonateData.empty() : employees = const [], customers = const [];
 
