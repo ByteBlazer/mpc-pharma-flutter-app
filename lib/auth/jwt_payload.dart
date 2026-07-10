@@ -73,7 +73,19 @@ abstract final class JwtPayload {
 
     final roles =
         json['roles']?.toString().split(',').toAppRoles() ?? const <AppRole>[];
-    return roles.hasRole(AppRole.appAdmin);
+    return roles.contains(AppRole.appAdmin);
+  }
+
+  static bool hasWebAccess(String token) {
+    return rolesFromToken(token).hasRole(AppRole.webAccess);
+  }
+
+  static Future<bool> currentUserHasWebAccess({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final token = await (tokenStore ?? AuthTokenStore()).readToken();
+    if (token == null) return false;
+    return hasWebAccess(token);
   }
 
   static PrincipalType? principalTypeFromToken(String token) {

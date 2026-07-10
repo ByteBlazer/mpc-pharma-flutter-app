@@ -390,10 +390,11 @@ class _EmployeeActions extends StatelessWidget {
         final roles = snapshot.data?.$2 ?? const [];
         final isAssignee = userId != null && userId == ticket.assigneeAppUserId;
         final isAdmin = roles.hasRole(AppRole.appAdmin);
-        final canWork = isAssignee &&
+        final canManageTicket = isAssignee || isAdmin;
+        final canWork = canManageTicket &&
             (ticket.status == TicketStatus.open ||
                 ticket.status == TicketStatus.assigned);
-        final canResolve = isAssignee &&
+        final canResolve = canManageTicket &&
             (ticket.status == TicketStatus.open ||
                 ticket.status == TicketStatus.assigned ||
                 ticket.status == TicketStatus.inProgress);
