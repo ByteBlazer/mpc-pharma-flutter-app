@@ -275,7 +275,6 @@ class _AppMultiSelectDialogState<T> extends State<_AppMultiSelectDialog<T>> {
                   if (widget.showSearch) ...[
                     TextField(
                       controller: _searchController,
-                      autofocus: true,
                       decoration: InputDecoration(
                         labelText: widget.searchLabel,
                         prefixIcon: const Icon(Icons.search),
