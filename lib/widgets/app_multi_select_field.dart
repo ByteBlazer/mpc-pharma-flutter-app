@@ -166,6 +166,7 @@ class _AppMultiSelectDialogState<T> extends State<_AppMultiSelectDialog<T>> {
   final _selectionCount = ValueNotifier<int>(0);
   Timer? _searchDebounce;
   String _searchQuery = '';
+  late final List<AppMultiSelectItem<T>> _orderedItems;
   late List<AppMultiSelectItem<T>> _filteredItems;
 
   @override
@@ -173,10 +174,45 @@ class _AppMultiSelectDialogState<T> extends State<_AppMultiSelectDialog<T>> {
     super.initState();
     _selection = {...widget.initialSelection};
     _selectionCount.value = _selection.length;
-    _filteredItems = List<AppMultiSelectItem<T>>.from(widget.items);
+    _orderedItems = _itemsWithInitialSelectionFirst(
+      widget.items,
+      widget.initialSelection,
+    );
+    _filteredItems = _filterItems(_orderedItems, _searchQuery);
     if (widget.showSearch) {
       _searchController.addListener(_handleSearchChange);
     }
+  }
+
+  /// On open, pin pre-selected values to the top. Order stays fixed for the
+  /// rest of this dialog session; reopening re-pins all current selections.
+  List<AppMultiSelectItem<T>> _itemsWithInitialSelectionFirst(
+    List<AppMultiSelectItem<T>> items,
+    Set<T> initialSelection,
+  ) {
+    if (initialSelection.isEmpty) return List<AppMultiSelectItem<T>>.from(items);
+
+    final selected = <AppMultiSelectItem<T>>[];
+    final unselected = <AppMultiSelectItem<T>>[];
+    for (final item in items) {
+      if (initialSelection.contains(item.value)) {
+        selected.add(item);
+      } else {
+        unselected.add(item);
+      }
+    }
+    return [...selected, ...unselected];
+  }
+
+  List<AppMultiSelectItem<T>> _filterItems(
+    List<AppMultiSelectItem<T>> items,
+    String query,
+  ) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) return List<AppMultiSelectItem<T>>.from(items);
+    return items
+        .where((item) => item.searchText.toLowerCase().contains(normalized))
+        .toList();
   }
 
   @override
@@ -195,13 +231,9 @@ class _AppMultiSelectDialogState<T> extends State<_AppMultiSelectDialog<T>> {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 200), () {
       if (!mounted) return;
-      final query = _searchController.text.trim().toLowerCase();
       setState(() {
         _searchQuery = _searchController.text;
-        _filteredItems = widget.items.where((item) {
-          if (query.isEmpty) return true;
-          return item.searchText.toLowerCase().contains(query);
-        }).toList();
+        _filteredItems = _filterItems(_orderedItems, _searchQuery);
       });
     });
   }
