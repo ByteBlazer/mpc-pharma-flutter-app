@@ -29,5 +29,8 @@ extension AppRoleListParsing on Iterable<String> {
 }
 
 extension AppRoleChecks on Iterable<AppRole> {
-  bool hasRole(AppRole role) => contains(role);
+  bool get hasAppAdmin => contains(AppRole.appAdmin);
+
+  /// [AppRole.appAdmin] is treated as a superuser for all role checks.
+  bool hasRole(AppRole role) => hasAppAdmin || contains(role);
 }

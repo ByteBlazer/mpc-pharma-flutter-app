@@ -4,8 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
-import '../../api/auth_token_store.dart';
-import '../../auth/app_role.dart';
+import '../../auth/jwt_payload.dart';
 import '../../utils/download_file.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_screen_scaffold.dart';
@@ -76,22 +75,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  Future<bool> _loadHasWebAccess() async {
-    final token = await AuthTokenStore().readToken();
-    if (token == null) return false;
-
-    final parts = token.split('.');
-    if (parts.length < 2) return false;
-
-    final payload = utf8.decode(
-      base64Url.decode(base64Url.normalize(parts[1])),
-    );
-    final json = jsonDecode(payload);
-    if (json is! Map<String, dynamic>) return false;
-
-    final roles = json['roles']?.toString().split(',').toAppRoles() ?? const [];
-    return roles.hasRole(AppRole.webAccess);
-  }
+  Future<bool> _loadHasWebAccess() => JwtPayload.currentUserHasWebAccess();
 
   void _refresh() {
     setState(() {
