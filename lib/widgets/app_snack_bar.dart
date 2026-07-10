@@ -70,7 +70,7 @@ class _AppSnackBarOverlayState extends State<_AppSnackBarOverlay>
   }
 
   Future<void> _showAndDismiss() async {
-    await Future<void>.delayed(const Duration(seconds: 1));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;
     await _controller.forward();
     await Future<void>.delayed(const Duration(milliseconds: 3200));
