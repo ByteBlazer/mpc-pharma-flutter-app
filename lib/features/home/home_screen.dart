@@ -282,9 +282,11 @@ class _HomeFeatureGrid extends StatelessWidget {
     final showImpersonate =
         !isSimulationMode && await JwtPayload.canStartImpersonation();
     final showTickets = await JwtPayload.currentUserIsEmployee();
+    final showComplaints = await JwtPayload.currentUserIsCustomer();
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
       showTickets: showTickets,
+      showComplaints: showComplaints,
     );
   }
 
@@ -324,20 +326,21 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
-      _FeatureTile(
-        icon: Icons.support_agent_outlined,
-        label: 'Complaints',
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => ComplaintsScreen(
-                apiClient: apiClient,
-                onLoginAgain: onLoginAgain,
+      if (visibility.showComplaints)
+        _FeatureTile(
+          icon: Icons.support_agent_outlined,
+          label: 'Complaints',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ComplaintsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
               ),
-            ),
-          );
-        },
-      ),
+            );
+          },
+        ),
       _FeatureTile(
         icon: Icons.people_alt_outlined,
         label: 'Users',
@@ -467,10 +470,12 @@ class _HomeFeatureVisibility {
   const _HomeFeatureVisibility({
     required this.showImpersonate,
     required this.showTickets,
+    required this.showComplaints,
   });
 
   final bool showImpersonate;
   final bool showTickets;
+  final bool showComplaints;
 }
 
 class _FeatureTile extends StatelessWidget {

@@ -107,7 +107,14 @@ abstract final class JwtPayload {
     AuthTokenStore? tokenStore,
   }) async {
     final principalType = await currentPrincipalType(tokenStore: tokenStore);
-    return principalType != PrincipalType.customer;
+    return principalType == PrincipalType.employee;
+  }
+
+  static Future<bool> currentUserIsCustomer({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final principalType = await currentPrincipalType(tokenStore: tokenStore);
+    return principalType == PrincipalType.customer;
   }
 
   static Future<String?> currentUserId({AuthTokenStore? tokenStore}) async {
