@@ -8,6 +8,7 @@ import '../../auth/jwt_payload.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_surface.dart';
+import '../departments/department_models.dart';
 import 'ticket_attachment_manager.dart';
 import 'ticket_models.dart';
 import 'widgets/ticket_description_field.dart';
@@ -409,6 +410,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                       if (widget.isEmployeeView) ...[
                         const SizedBox(height: 16),
                         _EmployeeActions(
+                          apiClient: widget.apiClient,
                           ticket: ticket,
                           onStart: _startWork,
                           onResolve: _resolveTicket,
@@ -602,6 +604,7 @@ class _TicketPromptDialogState extends State<_TicketPromptDialog> {
 
 class _EmployeeActions extends StatelessWidget {
   const _EmployeeActions({
+    required this.apiClient,
     required this.ticket,
     required this.onStart,
     required this.onResolve,
@@ -609,60 +612,94 @@ class _EmployeeActions extends StatelessWidget {
     required this.onClose,
   });
 
+  final ApiClient apiClient;
   final TicketDetail ticket;
   final VoidCallback onStart;
   final VoidCallback onResolve;
   final VoidCallback onInvalidate;
   final VoidCallback onClose;
 
+  Future<_EmployeeActionPermissions> _loadPermissions() async {
+    final userId = await JwtPayload.currentUserId();
+    final roles = await JwtPayload.currentRoles();
+    final isAssignee =
+        userId != null && userId == ticket.assigneeAppUserId;
+    final isAdmin = roles.hasRole(AppRole.appAdmin);
+
+    var isDepartmentLead = false;
+    var isTicketTriager = false;
+    if (userId != null && ticket.assignedDepartmentId.isNotEmpty) {
+      try {
+        final departments = await apiClient.getDepartments();
+        Department? assignedDepartment;
+        for (final department in departments) {
+          if (department.id == ticket.assignedDepartmentId) {
+            assignedDepartment = department;
+            break;
+          }
+        }
+        final membership = assignedDepartment?.users
+            .where((user) => user.id == userId)
+            .firstOrNull;
+        isDepartmentLead = membership?.isDepartmentLead == true;
+        isTicketTriager = membership?.isTicketTriager == true;
+      } catch (_) {
+        // Keep resolve/invalidate hidden if department lookup fails.
+      }
+    }
+
+    final canActOnWorkStatus =
+        ticket.status == TicketStatus.open ||
+        ticket.status == TicketStatus.assigned ||
+        ticket.status == TicketStatus.inProgress;
+    final canResolveOrInvalidate =
+        (isAssignee || isDepartmentLead || isTicketTriager) &&
+        canActOnWorkStatus;
+
+    return _EmployeeActionPermissions(
+      canStartWork: (isAssignee || isAdmin) &&
+          (ticket.status == TicketStatus.open ||
+              ticket.status == TicketStatus.assigned),
+      canResolveOrInvalidate: canResolveOrInvalidate,
+      canClose: isAdmin &&
+          (ticket.status == TicketStatus.resolved ||
+              ticket.status == TicketStatus.invalid),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<(String?, List<AppRole>)>(
-      future: () async {
-        final userId = await JwtPayload.currentUserId();
-        final roles = await JwtPayload.currentRoles();
-        return (userId, roles);
-      }(),
+    return FutureBuilder<_EmployeeActionPermissions>(
+      future: _loadPermissions(),
       builder: (context, snapshot) {
-        final userId = snapshot.data?.$1;
-        final roles = snapshot.data?.$2 ?? const [];
-        final isAssignee = userId != null && userId == ticket.assigneeAppUserId;
-        final isAdmin = roles.hasRole(AppRole.appAdmin);
-        final canManageTicket = isAssignee || isAdmin;
-        final canWork = canManageTicket &&
-            (ticket.status == TicketStatus.open ||
-                ticket.status == TicketStatus.assigned);
-        final canResolve = canManageTicket &&
-            (ticket.status == TicketStatus.open ||
-                ticket.status == TicketStatus.assigned ||
-                ticket.status == TicketStatus.inProgress);
-        final canClose = isAdmin &&
-            (ticket.status == TicketStatus.resolved ||
-                ticket.status == TicketStatus.invalid);
+        final permissions = snapshot.data;
+        if (permissions == null) {
+          return const SizedBox.shrink();
+        }
 
         return Wrap(
           spacing: 12,
           runSpacing: 12,
           children: [
-            if (canWork)
+            if (permissions.canStartWork)
               ElevatedButton.icon(
                 onPressed: onStart,
                 icon: const Icon(Icons.play_arrow_rounded, size: 20),
                 label: const Text('Start work'),
               ),
-            if (canResolve)
+            if (permissions.canResolveOrInvalidate)
               ElevatedButton.icon(
                 onPressed: onResolve,
                 icon: const Icon(Icons.check_circle_outline, size: 20),
                 label: const Text('Resolve'),
               ),
-            if (canResolve)
+            if (permissions.canResolveOrInvalidate)
               ElevatedButton.icon(
                 onPressed: onInvalidate,
                 icon: const Icon(Icons.block_flipped, size: 20),
                 label: const Text('Invalidate'),
               ),
-            if (canClose)
+            if (permissions.canClose)
               ElevatedButton.icon(
                 onPressed: onClose,
                 icon: const Icon(Icons.lock_outline, size: 20),
@@ -673,6 +710,18 @@ class _EmployeeActions extends StatelessWidget {
       },
     );
   }
+}
+
+class _EmployeeActionPermissions {
+  const _EmployeeActionPermissions({
+    required this.canStartWork,
+    required this.canResolveOrInvalidate,
+    required this.canClose,
+  });
+
+  final bool canStartWork;
+  final bool canResolveOrInvalidate;
+  final bool canClose;
 }
 
 class _InfoRow extends StatelessWidget {
@@ -878,25 +927,43 @@ class _TicketDiscussionTabs extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TabBar(
-            controller: tabController,
-            dividerHeight: 0,
-            indicatorSize: TabBarIndicatorSize.tab,
-            indicator: BoxDecoration(
-              color: primary,
-              borderRadius: BorderRadius.circular(8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TabBar(
+              controller: tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              dividerHeight: 0,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                color: primary,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.black54,
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+              labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+              overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+              splashFactory: NoSplash.splashFactory,
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              tabs: [
+                Tab(
+                  height: 36,
+                  text: 'Comments (${comments.length})',
+                ),
+                Tab(
+                  height: 36,
+                  text: 'Activity (${activity.length})',
+                ),
+              ],
             ),
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.black54,
-            labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
-            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-            splashFactory: NoSplash.splashFactory,
-            padding: const EdgeInsets.all(8),
-            tabs: [
-              Tab(text: 'Comments (${comments.length})'),
-              Tab(text: 'Activity (${activity.length})'),
-            ],
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
