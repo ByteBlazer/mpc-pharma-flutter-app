@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../app_theme.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
 import 'ticket_attachment_manager.dart';
@@ -87,7 +88,9 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppScreenScaffold(
+    return Theme(
+      data: AppTheme.withCompactButtons(Theme.of(context)),
+      child: AppScreenScaffold(
       appBar: AppBar(title: const Text('New complaint')),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -138,15 +141,18 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
                     enabled: !_isSubmitting,
                   ),
                   const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _isSubmitting ? null : _submit,
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Submit complaint'),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: ElevatedButton(
+                      onPressed: _isSubmitting ? null : _submit,
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Submit complaint'),
+                    ),
                   ),
                 ],
               ),
@@ -154,6 +160,7 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

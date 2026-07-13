@@ -9,22 +9,22 @@ class TicketStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+        color: primary.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: primary, width: 1.5),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         child: Text(
           status.label,
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
+          style: TextStyle(
+            color: primary,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            letterSpacing: 0.2,
           ),
         ),
       ),

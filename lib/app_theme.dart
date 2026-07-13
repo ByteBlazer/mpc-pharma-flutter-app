@@ -66,6 +66,58 @@ abstract final class AppTheme {
     );
   }
 
+  /// Compact, content-sized buttons (not full-width).
+  static ButtonStyle compactElevatedButton({
+    Color? backgroundColor,
+    Color? foregroundColor,
+  }) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: backgroundColor ?? brandColor,
+      foregroundColor: foregroundColor ?? Colors.white,
+      minimumSize: const Size(0, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  static ButtonStyle compactOutlinedButton({Color? foregroundColor}) {
+    final accent = foregroundColor ?? primaryAccentText(brandColor);
+    return OutlinedButton.styleFrom(
+      foregroundColor: accent,
+      side: BorderSide(color: accent),
+      minimumSize: const Size(0, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  static ButtonStyle compactFilledButton() {
+    return FilledButton.styleFrom(
+      minimumSize: const Size(0, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  /// Theme overlay so ticket screens use compact buttons by default.
+  static ThemeData withCompactButtons(ThemeData base) {
+    return base.copyWith(
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: compactElevatedButton(),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: compactOutlinedButton(),
+      ),
+      filledButtonTheme: FilledButtonThemeData(style: compactFilledButton()),
+    );
+  }
+
   static ThemeData get theme {
     final accentTextColor = primaryAccentText(brandColor);
 
@@ -133,6 +185,8 @@ abstract final class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
         floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
           if (states.contains(WidgetState.focused)) {
             return TextStyle(
@@ -150,7 +204,16 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: brandColor),
         ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: brandColor.withValues(alpha: 0.35)),
+        ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      dropdownMenuTheme: const DropdownMenuThemeData(
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(Colors.white),
+        ),
       ),
     );
   }

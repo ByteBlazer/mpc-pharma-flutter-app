@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../app_theme.dart';
 import '../../widgets/app_async_list_loader.dart';
 import '../../widgets/app_list_controls_row.dart';
 import '../../widgets/app_screen_scaffold.dart';
@@ -128,7 +129,9 @@ class _ComplaintCategoriesScreenState extends State<ComplaintCategoriesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppScreenScaffold(
+    return Theme(
+      data: AppTheme.withCompactButtons(Theme.of(context)),
+      child: AppScreenScaffold(
       appBar: AppBar(title: const Text('Complaint categories')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -229,6 +232,7 @@ class _ComplaintCategoriesScreenState extends State<ComplaintCategoriesScreen> {
           },
         ),
       ),
+    ),
     );
   }
 }
