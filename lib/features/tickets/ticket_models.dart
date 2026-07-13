@@ -1,3 +1,5 @@
+import '../../constants/system_user_ids.dart';
+
 typedef JsonMap = Map<String, dynamic>;
 
 enum TicketType {
@@ -267,6 +269,7 @@ class TicketSummary {
     required this.customerFirmName,
     required this.createdAt,
     required this.lastUpdatedAt,
+    this.raisedByCustomer,
   });
 
   factory TicketSummary.fromJson(JsonMap json) {
@@ -285,6 +288,7 @@ class TicketSummary {
       customerFirmName: _string(json['customerFirmName']),
       createdAt: DateTime.tryParse(_string(json['createdAt'])),
       lastUpdatedAt: DateTime.tryParse(_string(json['lastUpdatedAt'])),
+      raisedByCustomer: _optionalBool(json['raisedByCustomer']),
     );
   }
 
@@ -298,6 +302,11 @@ class TicketSummary {
   final String customerFirmName;
   final DateTime? createdAt;
   final DateTime? lastUpdatedAt;
+
+  /// Customer JWT only: true = self-raised, false = company-raised.
+  final bool? raisedByCustomer;
+
+  bool get isRaisedByCustomer => raisedByCustomer == true;
 
   bool matchesSearch(String query) {
     final normalized = query.trim().toLowerCase();
@@ -328,6 +337,7 @@ class TicketDetail {
     required this.raisedForCustomerId,
     required this.raisedForCustomerName,
     required this.createdBy,
+    required this.createdByName,
     required this.createdByCustomerId,
     required this.assignedDepartmentId,
     required this.assignedDepartmentName,
@@ -342,6 +352,7 @@ class TicketDetail {
     required this.lastUpdatedAt,
     required this.lastUpdatedBy,
     required this.isEmployeeView,
+    this.raisedByCustomer,
   });
 
   factory TicketDetail.fromJson(JsonMap json, {required bool isEmployeeView}) {
@@ -365,6 +376,7 @@ class TicketDetail {
       raisedForCustomerId: _string(json['raisedForCustomerId']),
       raisedForCustomerName: _string(json['raisedForCustomerName']),
       createdBy: _string(json['createdBy']),
+      createdByName: _string(json['createdByName']),
       createdByCustomerId: _string(json['createdByCustomerId']),
       assignedDepartmentId: _string(json['assignedDepartmentId']),
       assignedDepartmentName: _string(json['assignedDepartmentName']),
@@ -394,6 +406,7 @@ class TicketDetail {
       lastUpdatedAt: DateTime.tryParse(_string(json['lastUpdatedAt'])),
       lastUpdatedBy: _string(json['lastUpdatedBy']),
       isEmployeeView: isEmployeeView,
+      raisedByCustomer: _optionalBool(json['raisedByCustomer']),
     );
   }
 
@@ -408,6 +421,7 @@ class TicketDetail {
   final String raisedForCustomerId;
   final String raisedForCustomerName;
   final String createdBy;
+  final String createdByName;
   final String createdByCustomerId;
   final String assignedDepartmentId;
   final String assignedDepartmentName;
@@ -423,11 +437,45 @@ class TicketDetail {
   final String lastUpdatedBy;
   final bool isEmployeeView;
 
+  /// Customer JWT only: true = self-raised, false = company-raised.
+  final bool? raisedByCustomer;
+
+  bool get isRaisedByCustomer => raisedByCustomer == true;
+
   bool get isClosed => status == TicketStatus.closed;
   bool get isTerminal =>
       status == TicketStatus.resolved ||
       status == TicketStatus.invalid ||
       status == TicketStatus.closed;
+
+  /// Customer may add files only on self-raised complaints that are still open.
+  bool get canCustomerAddAttachments =>
+      isRaisedByCustomer &&
+      status != TicketStatus.resolved &&
+      status != TicketStatus.invalid &&
+      status != TicketStatus.closed;
+
+  /// Customer self-service complaint (`createdBy` is the system user).
+  bool get isCustomerSelfService =>
+      createdBy == SYSTEM_APP_USER_ID;
+
+  /// Description/subject may be edited only by the employee creator while
+  /// the ticket is still open / assigned / in progress. Never for
+  /// customer self-service tickets.
+  bool canEditDescription(String? currentEmployeeId) {
+    if (isCustomerSelfService) return false;
+    if (currentEmployeeId == null || currentEmployeeId.isEmpty) return false;
+    if (createdBy != currentEmployeeId) return false;
+    return status == TicketStatus.open ||
+        status == TicketStatus.assigned ||
+        status == TicketStatus.inProgress;
+  }
+
+  String get raisedByLabel {
+    if (isCustomerSelfService) return 'Customer';
+    if (createdByName.isNotEmpty) return createdByName;
+    return 'Employee';
+  }
 }
 
 class PendingTicketAttachment {
@@ -447,3 +495,13 @@ class PendingTicketAttachment {
 }
 
 String _string(Object? value) => value?.toString() ?? '';
+
+bool? _optionalBool(Object? value) {
+  if (value is bool) return value;
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'true') return true;
+    if (normalized == 'false') return false;
+  }
+  return null;
+}

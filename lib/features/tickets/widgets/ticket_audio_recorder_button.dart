@@ -17,11 +17,13 @@ class TicketAudioRecorderButton extends StatefulWidget {
     required this.attachmentManager,
     required this.onChanged,
     this.enabled = true,
+    this.compact = false,
   });
 
   final TicketAttachmentManager attachmentManager;
   final VoidCallback onChanged;
   final bool enabled;
+  final bool compact;
 
   @override
   State<TicketAudioRecorderButton> createState() =>
@@ -174,6 +176,55 @@ class _TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
   @override
   Widget build(BuildContext context) {
     final hasRecording = _localPath != null;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    final micButton = IconButton(
+      tooltip: _isRecording ? 'Stop recording' : 'Record voice message',
+      onPressed: !widget.enabled || _isUploading
+          ? null
+          : _isRecording
+          ? _stopRecording
+          : _startRecording,
+      icon: Icon(
+        _isRecording ? Icons.stop_circle_outlined : Icons.mic_none,
+        color: _isRecording ? Colors.red : primary,
+      ),
+    );
+
+    if (widget.compact) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          micButton,
+          if (_isRecording)
+            Text(
+              '$_elapsedSeconds s',
+              style: const TextStyle(color: Colors.black, fontSize: 12),
+            ),
+          if (hasRecording && !_isRecording) ...[
+            IconButton(
+              tooltip: 'Play recording',
+              onPressed: _isUploading ? null : _playRecording,
+              icon: const Icon(Icons.play_arrow),
+            ),
+            IconButton(
+              tooltip: 'Re-record',
+              onPressed: _isUploading ? null : _discardRecording,
+              icon: const Icon(Icons.refresh),
+            ),
+            if (_isUploading)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+          ],
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,17 +234,7 @@ class _TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            IconButton(
-              tooltip: _isRecording ? 'Stop recording' : 'Record voice message',
-              onPressed: !widget.enabled || _isUploading
-                  ? null
-                  : _isRecording
-                  ? _stopRecording
-                  : _startRecording,
-              icon: Icon(
-                _isRecording ? Icons.stop_circle_outlined : Icons.mic_none,
-              ),
-            ),
+            micButton,
             if (_isRecording)
               Text(
                 '${_elapsedSeconds}s / ${TicketAttachmentLimits.maxRecordingSeconds}s',

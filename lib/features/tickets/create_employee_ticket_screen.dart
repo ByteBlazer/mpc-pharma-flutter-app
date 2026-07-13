@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../app_theme.dart';
 import '../../widgets/app_multi_select_field.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_searchable_select_field.dart';
@@ -159,7 +160,9 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
   @override
   Widget build(BuildContext context) {
     final title = _isCustomerTicket ? 'Raise for customer' : 'Internal ticket';
-    return AppScreenScaffold(
+    return Theme(
+      data: AppTheme.withCompactButtons(Theme.of(context)),
+      child: AppScreenScaffold(
       appBar: AppBar(title: Text(title)),
       body: SafeArea(
         child: FutureBuilder<_CreateTicketData>(
@@ -310,15 +313,18 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                         enabled: !_isSubmitting,
                       ),
                       const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _isSubmitting ? null : () => _submit(data),
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Create ticket'),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : () => _submit(data),
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Text('Create ticket'),
+                        ),
                       ),
                     ],
                   ),
@@ -328,6 +334,7 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
           },
         ),
       ),
+    ),
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/api_client.dart';
+import '../../app_theme.dart';
 import '../../auth/app_role.dart';
 import '../../auth/jwt_payload.dart';
 import '../../widgets/app_screen_scaffold.dart';
@@ -9,7 +10,6 @@ import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_surface.dart';
 import 'ticket_attachment_manager.dart';
 import 'ticket_models.dart';
-import 'widgets/ticket_audio_recorder_button.dart';
 import 'widgets/ticket_description_field.dart';
 import 'widgets/ticket_status_chip.dart';
 
@@ -35,23 +35,86 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     with SingleTickerProviderStateMixin {
   late Future<TicketDetail> _ticketFuture;
   late TabController _discussionTabController;
+  final _pageScrollController = ScrollController();
+  final _commentsScrollController = ScrollController();
   final _commentController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _addCommentButtonKey = GlobalKey();
   late final TicketAttachmentManager _commentAttachmentManager;
+  late final TicketAttachmentManager _descriptionAttachmentManager;
   bool _isSubmittingComment = false;
+  bool _isEditingDescription = false;
+  bool _isSavingDescription = false;
+  bool _isComposingComment = false;
+  bool _isAddingCustomerAttachments = false;
+  bool _isLinkingCustomerAttachments = false;
+  String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
     _discussionTabController = TabController(length: 2, vsync: this);
+    _discussionTabController.addListener(_handleDiscussionTabChange);
     _commentAttachmentManager = TicketAttachmentManager(widget.apiClient);
+    _descriptionAttachmentManager = TicketAttachmentManager(widget.apiClient);
     _ticketFuture = _loadTicket();
+    JwtPayload.currentUserId().then((userId) {
+      if (!mounted) return;
+      setState(() => _currentUserId = userId);
+    });
   }
 
   @override
   void dispose() {
+    _discussionTabController.removeListener(_handleDiscussionTabChange);
     _discussionTabController.dispose();
+    _pageScrollController.dispose();
+    _commentsScrollController.dispose();
     _commentController.dispose();
+    _descriptionController.dispose();
     super.dispose();
+  }
+
+  void _handleDiscussionTabChange() {
+    if (_discussionTabController.indexIsChanging) return;
+    if (_discussionTabController.index == 0) {
+      _scrollCommentsToBottom();
+    }
+  }
+
+  void _scrollCommentsToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_commentsScrollController.hasClients) return;
+      _commentsScrollController.jumpTo(
+        _commentsScrollController.position.maxScrollExtent,
+      );
+    });
+  }
+
+  void _startComposingComment() {
+    setState(() => _isComposingComment = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final context = _addCommentButtonKey.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+          alignment: 0.1,
+        );
+      }
+    });
+  }
+
+  Future<void> _cancelComposingComment() async {
+    for (final attachment
+        in List<PendingTicketAttachment>.from(_commentAttachmentManager.attachments)) {
+      await _commentAttachmentManager.removeUnlinked(attachment.attachmentId);
+    }
+    _commentController.clear();
+    if (!mounted) return;
+    setState(() => _isComposingComment = false);
   }
 
   Future<TicketDetail> _loadTicket() {
@@ -62,7 +125,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   }
 
   void _refresh() {
-    setState(() => _ticketFuture = _loadTicket());
+    setState(() {
+      _ticketFuture = _loadTicket();
+    });
   }
 
   Future<void> _downloadAttachment(TicketAttachment attachment) async {
@@ -86,7 +151,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
   Future<void> _addComment() async {
     final comment = _commentController.text.trim();
-    if (comment.isEmpty) return;
+    if (comment.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: 'Please write a comment before posting.',
+        type: AppSnackBarType.warning,
+      );
+      return;
+    }
     setState(() => _isSubmittingComment = true);
     try {
       await widget.apiClient.addTicketComment(
@@ -96,6 +168,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       );
       _commentController.clear();
       _commentAttachmentManager.clear();
+      if (mounted) setState(() => _isComposingComment = false);
       _refresh();
     } catch (error) {
       if (!mounted) return;
@@ -167,18 +240,107 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     }
   }
 
-  Future<void> _addCustomerAttachments(TicketDetail ticket) async {
-    if (_commentAttachmentManager.attachmentIds.isEmpty) return;
-    try {
-      await widget.apiClient.linkTicketAttachments(
-        ticketId: ticket.id,
-        attachmentIds: _commentAttachmentManager.attachmentIds,
+  void _startEditingDescription(TicketDetail ticket) {
+    _descriptionController.text = ticket.description;
+    _descriptionAttachmentManager.clear();
+    setState(() => _isEditingDescription = true);
+  }
+
+  Future<void> _cancelEditingDescription() async {
+    for (final attachment in List<PendingTicketAttachment>.from(
+      _descriptionAttachmentManager.attachments,
+    )) {
+      await _descriptionAttachmentManager.removeUnlinked(attachment.attachmentId);
+    }
+    _descriptionController.clear();
+    if (!mounted) return;
+    setState(() => _isEditingDescription = false);
+  }
+
+  Future<void> _saveDescription(TicketDetail ticket) async {
+    final description = _descriptionController.text.trim();
+    if (description.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: 'Description cannot be empty.',
+        type: AppSnackBarType.error,
       );
-      _commentAttachmentManager.clear();
+      return;
+    }
+
+    setState(() => _isSavingDescription = true);
+    try {
+      final body = <String, Object?>{
+        'description': description,
+      };
+      if (_descriptionAttachmentManager.attachmentIds.isNotEmpty) {
+        body['attachmentIds'] = _descriptionAttachmentManager.attachmentIds;
+      }
+      await widget.apiClient.updateTicket(
+        ticketId: ticket.id,
+        body: body,
+        isEmployeeView: widget.isEmployeeView,
+      );
+      _descriptionController.clear();
+      _descriptionAttachmentManager.clear();
+      if (mounted) setState(() => _isEditingDescription = false);
       _refresh();
     } catch (error) {
       if (!mounted) return;
-      showAppSnackBar(context, message: error.toString(), type: AppSnackBarType.error);
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingDescription = false);
+    }
+  }
+
+  void _startAddingCustomerAttachments() {
+    _descriptionAttachmentManager.clear();
+    setState(() => _isAddingCustomerAttachments = true);
+  }
+
+  Future<void> _cancelAddingCustomerAttachments() async {
+    for (final attachment in List<PendingTicketAttachment>.from(
+      _descriptionAttachmentManager.attachments,
+    )) {
+      await _descriptionAttachmentManager.removeUnlinked(attachment.attachmentId);
+    }
+    if (!mounted) return;
+    setState(() => _isAddingCustomerAttachments = false);
+  }
+
+  Future<void> _linkCustomerAttachments(TicketDetail ticket) async {
+    final attachmentIds = _descriptionAttachmentManager.attachmentIds;
+    if (attachmentIds.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: 'Add at least one attachment.',
+        type: AppSnackBarType.warning,
+      );
+      return;
+    }
+
+    setState(() => _isLinkingCustomerAttachments = true);
+    try {
+      await widget.apiClient.linkTicketAttachments(
+        ticketId: ticket.id,
+        attachmentIds: attachmentIds,
+      );
+      _descriptionAttachmentManager.clear();
+      if (mounted) setState(() => _isAddingCustomerAttachments = false);
+      _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isLinkingCustomerAttachments = false);
     }
   }
 
@@ -186,41 +348,22 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     required String title,
     required String label,
     required bool required,
-  }) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
+  }) {
+    return showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          minLines: 3,
-          maxLines: null,
-          decoration: InputDecoration(labelText: label),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              if (required && value.isEmpty) return;
-              Navigator.of(context).pop(value);
-            },
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (context) => _TicketPromptDialog(
+        title: title,
+        label: label,
+        requiredField: required,
       ),
     );
-    controller.dispose();
-    return result;
   }
 
   @override
   Widget build(BuildContext context) {
-    return AppScreenScaffold(
+    return Theme(
+      data: AppTheme.withCompactButtons(Theme.of(context)),
+      child: AppScreenScaffold(
       appBar: AppBar(
         title: Text(widget.isEmployeeView ? 'Ticket' : 'Complaint'),
       ),
@@ -239,6 +382,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
               return const Center(child: Text('Ticket not found.'));
             }
             return SingleChildScrollView(
+              controller: _pageScrollController,
               padding: const EdgeInsets.all(24),
               child: Center(
                 child: ConstrainedBox(
@@ -247,6 +391,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: Text(
@@ -257,55 +402,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                               ),
                             ),
                           ),
+                          const SizedBox(width: 12),
                           TicketStatusChip(status: ticket.status),
                         ],
                       ),
-                      const SizedBox(height: 16),
                       if (widget.isEmployeeView) ...[
-                        _InfoRow('Priority', ticket.priority.label),
-                        _InfoRow('Type', ticket.ticketType.apiValue),
-                        _InfoRow('Department', ticket.assignedDepartmentName),
-                        _InfoRow('Assignee', ticket.assigneeName),
-                        _InfoRow('Customer', ticket.raisedForCustomerName),
-                        _InfoRow('Category', ticket.ticketComplaintCategoryName),
-                      ],
-                      _InfoRow('Description', ticket.description),
-                      if (ticket.resolutionSummary.isNotEmpty)
-                        _InfoRow('Resolution', ticket.resolutionSummary),
-                      if (ticket.invalidationReason.isNotEmpty)
-                        _InfoRow('Invalidation reason', ticket.invalidationReason),
-                      const SizedBox(height: 16),
-                      _AttachmentsSection(
-                        attachments: ticket.attachments,
-                        onOpen: _downloadAttachment,
-                      ),
-                      if (widget.isEmployeeView) ...[
-                        const SizedBox(height: 24),
-                        _TicketDiscussionTabs(
-                          tabController: _discussionTabController,
-                          comments: ticket.comments,
-                          activity: ticket.activity,
-                        ),
-                        const SizedBox(height: 24),
-                        if (!ticket.isClosed)
-                          TicketCommentField(
-                            controller: _commentController,
-                            attachmentManager: _commentAttachmentManager,
-                            onAttachmentsChanged: () => setState(() {}),
-                          ),
-                        if (!ticket.isClosed) ...[
-                          const SizedBox(height: 12),
-                          ElevatedButton(
-                            onPressed: _isSubmittingComment ? null : _addComment,
-                            child: _isSubmittingComment
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Text('Add comment'),
-                          ),
-                        ],
                         const SizedBox(height: 16),
                         _EmployeeActions(
                           ticket: ticket,
@@ -314,40 +415,123 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                           onInvalidate: _invalidateTicket,
                           onClose: _closeTicket,
                         ),
-                      ] else if (!ticket.isTerminal) ...[
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Add attachments',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      ],
+                      const SizedBox(height: 16),
+                      if (widget.isEmployeeView) ...[
+                        _InfoRow('Priority', ticket.priority.label),
+                        _InfoRow('Type', ticket.ticketType.apiValue),
+                        _InfoRow(
+                          'Raised by',
+                          ticket.isCustomerSelfService
+                              ? 'Customer'
+                              : ticket.raisedByLabel,
                         ),
-                        const SizedBox(height: 8),
-                        TicketAudioRecorderButton(
-                          attachmentManager: _commentAttachmentManager,
-                          onChanged: () => setState(() {}),
-                        ),
-                        const SizedBox(height: 12),
-                        TicketAttachmentPicker(
-                          attachmentManager: _commentAttachmentManager,
-                          onChanged: () => setState(() {}),
-                          enabled: true,
-                        ),
-                        if (_commentAttachmentManager.attachments.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          TicketAttachmentList(
-                            attachments: _commentAttachmentManager.attachments,
-                            attachmentManager: _commentAttachmentManager,
-                            onRemove: () => setState(() {}),
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: _commentAttachmentManager.attachmentIds.isEmpty
+                        _InfoRow('Department', ticket.assignedDepartmentName),
+                        _InfoRow('Assignee', ticket.assigneeName),
+                        _InfoRow('Customer', ticket.raisedForCustomerName),
+                        _InfoRow('Category', ticket.ticketComplaintCategoryName),
+                      ],
+                      if (widget.isEmployeeView &&
+                          _isEditingDescription &&
+                          ticket.canEditDescription(_currentUserId)) ...[
+                        TicketDescriptionField(
+                          controller: _descriptionController,
+                          attachmentManager: _descriptionAttachmentManager,
+                          onAttachmentsChanged: () => setState(() {}),
+                          labelText: '',
+                          enabled: !_isSavingDescription,
+                          isSubmitting: _isSavingDescription,
+                          autofocus: true,
+                          onCancel: _isSavingDescription
                               ? null
-                              : () => _addCustomerAttachments(ticket),
-                          child: const Text('Upload attachments'),
+                              : _cancelEditingDescription,
+                          onSubmit: _isSavingDescription
+                              ? null
+                              : () => _saveDescription(ticket),
+                        ),
+                      ] else ...[
+                        _InfoRow('Description', ticket.description),
+                        if (widget.isEmployeeView &&
+                            ticket.canEditDescription(_currentUserId))
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton(
+                              onPressed: () => _startEditingDescription(ticket),
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 0,
+                                ),
+                              ),
+                              child: const Text('Edit description'),
+                            ),
+                          ),
+                      ],
+                      if (ticket.resolutionSummary.isNotEmpty)
+                        _InfoRow('Resolution', ticket.resolutionSummary),
+                      if (ticket.invalidationReason.isNotEmpty)
+                        _InfoRow('Invalidation reason', ticket.invalidationReason),
+                      if (widget.isEmployeeView || ticket.isRaisedByCustomer) ...[
+                        const SizedBox(height: 16),
+                        _AttachmentsSection(
+                          attachments: ticket.attachments,
+                          onOpen: _downloadAttachment,
+                        ),
+                      ],
+                      if (!widget.isEmployeeView &&
+                          ticket.canCustomerAddAttachments) ...[
+                        const SizedBox(height: 16),
+                        if (!_isAddingCustomerAttachments)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: OutlinedButton.icon(
+                              onPressed: _startAddingCustomerAttachments,
+                              icon: const Icon(Icons.attach_file),
+                              label: const Text('Add attachments'),
+                            ),
+                          )
+                        else
+                          TicketComposerField(
+                            attachmentManager: _descriptionAttachmentManager,
+                            onAttachmentsChanged: () => setState(() {}),
+                            showTextField: false,
+                            enabled: !_isLinkingCustomerAttachments,
+                            isSubmitting: _isLinkingCustomerAttachments,
+                            onCancel: _isLinkingCustomerAttachments
+                                ? null
+                                : _cancelAddingCustomerAttachments,
+                            onSubmit: _isLinkingCustomerAttachments
+                                ? null
+                                : () => _linkCustomerAttachments(ticket),
+                            submitTooltip: 'Upload attachments',
+                            submitIcon: Icons.cloud_upload_outlined,
+                          ),
+                      ],
+                      if (widget.isEmployeeView) ...[
+                        const SizedBox(height: 24),
+                        _TicketDiscussionTabs(
+                          tabController: _discussionTabController,
+                          comments: ticket.comments,
+                          activity: ticket.activity,
+                          attachments: ticket.attachments,
+                          commentsScrollController: _commentsScrollController,
+                          canComposeComment: !ticket.isClosed,
+                          isComposingComment: _isComposingComment,
+                          addCommentButtonKey: _addCommentButtonKey,
+                          onStartComposing: _startComposingComment,
+                          onOpenAttachment: _downloadAttachment,
+                          commentComposer: _isComposingComment && !ticket.isClosed
+                              ? _CommentComposer(
+                                  controller: _commentController,
+                                  attachmentManager: _commentAttachmentManager,
+                                  isSubmitting: _isSubmittingComment,
+                                  onAttachmentsChanged: () => setState(() {}),
+                                  onCancel: _isSubmittingComment
+                                      ? null
+                                      : _cancelComposingComment,
+                                  onSubmit: _addComment,
+                                )
+                              : null,
                         ),
                       ],
                     ],
@@ -358,6 +542,60 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           },
         ),
       ),
+    ),
+    );
+  }
+}
+
+class _TicketPromptDialog extends StatefulWidget {
+  const _TicketPromptDialog({
+    required this.title,
+    required this.label,
+    required this.requiredField,
+  });
+
+  final String title;
+  final String label;
+  final bool requiredField;
+
+  @override
+  State<_TicketPromptDialog> createState() => _TicketPromptDialogState();
+}
+
+class _TicketPromptDialogState extends State<_TicketPromptDialog> {
+  late final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        minLines: 3,
+        maxLines: null,
+        decoration: InputDecoration(labelText: widget.label),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final value = _controller.text.trim();
+            if (widget.requiredField && value.isEmpty) return;
+            Navigator.of(context).pop(value);
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
@@ -407,13 +645,29 @@ class _EmployeeActions extends StatelessWidget {
           runSpacing: 12,
           children: [
             if (canWork)
-              OutlinedButton(onPressed: onStart, child: const Text('Start work')),
+              ElevatedButton.icon(
+                onPressed: onStart,
+                icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                label: const Text('Start work'),
+              ),
             if (canResolve)
-              OutlinedButton(onPressed: onResolve, child: const Text('Resolve')),
+              ElevatedButton.icon(
+                onPressed: onResolve,
+                icon: const Icon(Icons.check_circle_outline, size: 20),
+                label: const Text('Resolve'),
+              ),
             if (canResolve)
-              OutlinedButton(onPressed: onInvalidate, child: const Text('Invalidate')),
+              ElevatedButton.icon(
+                onPressed: onInvalidate,
+                icon: const Icon(Icons.block_flipped, size: 20),
+                label: const Text('Invalidate'),
+              ),
             if (canClose)
-              FilledButton(onPressed: onClose, child: const Text('Close ticket')),
+              ElevatedButton.icon(
+                onPressed: onClose,
+                icon: const Icon(Icons.lock_outline, size: 20),
+                label: const Text('Close ticket'),
+              ),
           ],
         );
       },
@@ -470,24 +724,119 @@ class _AttachmentsSection extends StatelessWidget {
           'Attachments',
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
         ),
-        const SizedBox(height: 8),
-        ...attachments.map(
-          (attachment) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(
-              attachment.isAudio ? Icons.mic : Icons.insert_drive_file_outlined,
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: attachments
+              .map(
+                (attachment) => _AttachmentGridTile(
+                  attachment: attachment,
+                  onOpen: () => onOpen(attachment),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _AttachmentGridTile extends StatelessWidget {
+  const _AttachmentGridTile({
+    required this.attachment,
+    required this.onOpen,
+    this.compact = false,
+  });
+
+  final TicketAttachment attachment;
+  final VoidCallback onOpen;
+  final bool compact;
+
+  IconData get _icon {
+    final mime = attachment.mimeType.toLowerCase();
+    if (mime.startsWith('audio/')) return Icons.mic;
+    if (mime.startsWith('image/')) return Icons.image_outlined;
+    if (mime == 'application/pdf') return Icons.picture_as_pdf_outlined;
+    if (mime.contains('sheet') || mime.contains('excel') || mime.contains('csv')) {
+      return Icons.table_chart_outlined;
+    }
+    if (mime.contains('word') || mime.contains('document')) {
+      return Icons.description_outlined;
+    }
+    return Icons.insert_drive_file_outlined;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final tileWidth = compact ? 64.0 : 88.0;
+    final iconSize = compact ? 20.0 : 28.0;
+    final fontSize = compact ? 9.0 : 11.0;
+    final radius = compact ? 10.0 : 12.0;
+    final padding = compact
+        ? const EdgeInsets.fromLTRB(6, 10, 6, 6)
+        : const EdgeInsets.fromLTRB(8, 10, 8, 8);
+    final gap = compact ? 4.0 : 8.0;
+
+    return Tooltip(
+      message: attachment.originalFileName,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(radius),
+          child: Ink(
+            width: tileWidth,
+            height: compact ? 64 : null,
+            padding: padding,
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: primary.withValues(alpha: 0.22)),
             ),
-            title: Text(
-              attachment.originalFileName,
-              style: const TextStyle(color: Colors.black),
-            ),
-            trailing: TextButton(
-              onPressed: () => onOpen(attachment),
-              child: const Text('Open'),
+            child: Column(
+              mainAxisSize: compact ? MainAxisSize.max : MainAxisSize.min,
+              children: [
+                Icon(
+                  _icon,
+                  size: iconSize,
+                  color: AppTheme.primaryAccentText(primary),
+                ),
+                SizedBox(height: gap),
+                if (compact)
+                  Expanded(
+                    child: Text(
+                      attachment.originalFileName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: fontSize,
+                        height: 1.15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  )
+                else
+                  Text(
+                    attachment.originalFileName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: fontSize,
+                      height: 1.2,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -497,11 +846,27 @@ class _TicketDiscussionTabs extends StatelessWidget {
     required this.tabController,
     required this.comments,
     required this.activity,
+    required this.attachments,
+    required this.commentsScrollController,
+    required this.canComposeComment,
+    required this.isComposingComment,
+    required this.addCommentButtonKey,
+    required this.onStartComposing,
+    required this.onOpenAttachment,
+    this.commentComposer,
   });
 
   final TabController tabController;
   final List<TicketComment> comments;
   final List<TicketActivity> activity;
+  final List<TicketAttachment> attachments;
+  final ScrollController commentsScrollController;
+  final bool canComposeComment;
+  final bool isComposingComment;
+  final GlobalKey addCommentButtonKey;
+  final VoidCallback onStartComposing;
+  final ValueChanged<TicketAttachment> onOpenAttachment;
+  final Widget? commentComposer;
 
   @override
   Widget build(BuildContext context) {
@@ -534,13 +899,41 @@ class _TicketDiscussionTabs extends StatelessWidget {
             ],
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: AnimatedBuilder(
               animation: tabController,
               builder: (context, _) {
-                return tabController.index == 0
-                    ? _CommentList(comments: comments)
-                    : _ActivityList(activity: activity);
+                final showingComments = tabController.index == 0;
+                if (!showingComments) {
+                  return _ActivityList(activity: activity);
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _CommentList(
+                      comments: comments,
+                      attachments: attachments,
+                      scrollController: commentsScrollController,
+                      onOpenAttachment: onOpenAttachment,
+                    ),
+                    if (canComposeComment) ...[
+                      const SizedBox(height: 12),
+                      if (!isComposingComment)
+                        Align(
+                          key: addCommentButtonKey,
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: onStartComposing,
+                            icon: const Icon(Icons.add_comment_outlined),
+                            label: const Text('Add New Comment'),
+                          ),
+                        )
+                      else
+                        commentComposer!,
+                    ],
+                  ],
+                );
               },
             ),
           ),
@@ -550,65 +943,171 @@ class _TicketDiscussionTabs extends StatelessWidget {
   }
 }
 
-class _CommentList extends StatelessWidget {
-  const _CommentList({required this.comments});
+class _CommentComposer extends StatelessWidget {
+  const _CommentComposer({
+    required this.controller,
+    required this.attachmentManager,
+    required this.isSubmitting,
+    required this.onAttachmentsChanged,
+    required this.onSubmit,
+    this.onCancel,
+  });
 
-  final List<TicketComment> comments;
+  final TextEditingController controller;
+  final TicketAttachmentManager attachmentManager;
+  final bool isSubmitting;
+  final VoidCallback onAttachmentsChanged;
+  final VoidCallback onSubmit;
+  final Future<void> Function()? onCancel;
 
   @override
   Widget build(BuildContext context) {
-    if (comments.isEmpty) {
-      return const Text(
-        'No comments yet.',
-        style: TextStyle(color: Colors.black54),
+    return TicketCommentField(
+      controller: controller,
+      attachmentManager: attachmentManager,
+      onAttachmentsChanged: onAttachmentsChanged,
+      enabled: !isSubmitting,
+      isSubmitting: isSubmitting,
+      onSubmit: onSubmit,
+      onCancel: onCancel,
+    );
+  }
+}
+
+class _CommentList extends StatefulWidget {
+  const _CommentList({
+    required this.comments,
+    required this.attachments,
+    required this.scrollController,
+    required this.onOpenAttachment,
+  });
+
+  final List<TicketComment> comments;
+  final List<TicketAttachment> attachments;
+  final ScrollController scrollController;
+  final ValueChanged<TicketAttachment> onOpenAttachment;
+
+  @override
+  State<_CommentList> createState() => _CommentListState();
+}
+
+class _CommentListState extends State<_CommentList> {
+  @override
+  void initState() {
+    super.initState();
+    _scrollToBottom();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CommentList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.comments.length != widget.comments.length ||
+        oldWidget.comments.map((c) => c.id).join() !=
+            widget.comments.map((c) => c.id).join()) {
+      _scrollToBottom();
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.scrollController.hasClients) return;
+      widget.scrollController.jumpTo(
+        widget.scrollController.position.maxScrollExtent,
+      );
+    });
+  }
+
+  List<TicketAttachment> _attachmentsFor(TicketComment comment) {
+    return widget.attachments
+        .where((attachment) => attachment.commentId == comment.id)
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.comments.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Text(
+          'No comments yet.',
+          style: TextStyle(color: Colors.black54),
+        ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: comments.map((comment) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Card(
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          comment.createdByName,
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w700,
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: widget.comments.length == 1 ? 220 : 400,
+      ),
+      child: ListView.builder(
+        controller: widget.scrollController,
+        shrinkWrap: true,
+        itemCount: widget.comments.length,
+        itemBuilder: (context, index) {
+          final comment = widget.comments[index];
+          final commentAttachments = _attachmentsFor(comment);
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: index == widget.comments.length - 1 ? 0 : 12,
+            ),
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            comment.createdByName,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
+                        if (comment.createdAt != null)
+                          Text(
+                            _formatTicketTimestamp(comment.createdAt!),
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      comment.comment,
+                      style: const TextStyle(color: Colors.black),
+                    ),
+                    if (commentAttachments.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: commentAttachments
+                            .map(
+                              (attachment) => _AttachmentGridTile(
+                                attachment: attachment,
+                                compact: true,
+                                onOpen: () =>
+                                    widget.onOpenAttachment(attachment),
+                              ),
+                            )
+                            .toList(),
                       ),
-                      if (comment.createdAt != null)
-                        Text(
-                          _formatTicketTimestamp(comment.createdAt!),
-                          style: const TextStyle(
-                            color: Colors.black54,
-                            fontSize: 12,
-                          ),
-                        ),
                     ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    comment.comment,
-                    style: const TextStyle(color: Colors.black),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        },
+      ),
     );
   }
 }

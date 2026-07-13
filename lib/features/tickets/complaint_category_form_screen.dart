@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../app_theme.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../departments/department_models.dart';
 import 'ticket_models.dart';
@@ -118,7 +119,9 @@ class _ComplaintCategoryFormScreenState
 
   @override
   Widget build(BuildContext context) {
-    return AppScreenScaffold(
+    return Theme(
+      data: AppTheme.withCompactButtons(Theme.of(context)),
+      child: AppScreenScaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Edit category' : 'Add category'),
       ),
@@ -215,21 +218,18 @@ class _ComplaintCategoryFormScreenState
                       if (_isSaving)
                         const Center(child: CircularProgressIndicator())
                       else
-                        Row(
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
                           children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: const Text('Cancel'),
-                              ),
+                            OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: const Text('Cancel'),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: _save,
-                                child: Text(
-                                  _isEditing ? 'Save category' : 'Add category',
-                                ),
+                            ElevatedButton(
+                              onPressed: _save,
+                              child: Text(
+                                _isEditing ? 'Save category' : 'Add category',
                               ),
                             ),
                           ],
@@ -242,6 +242,7 @@ class _ComplaintCategoryFormScreenState
           ),
         ),
       ),
+    ),
     );
   }
 }
