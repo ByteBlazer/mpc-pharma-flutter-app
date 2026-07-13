@@ -275,7 +275,8 @@ class TicketSummary {
   factory TicketSummary.fromJson(JsonMap json) {
     return TicketSummary(
       id: _string(json['id']),
-      status: TicketStatus.fromApi(_string(json['status'])) ?? TicketStatus.open,
+      status:
+          TicketStatus.fromApi(_string(json['status'])) ?? TicketStatus.open,
       priority:
           TicketPriority.fromApi(_string(json['priority'])) ??
           TicketPriority.medium,
@@ -365,7 +366,8 @@ class TicketDetail {
       ticketType:
           TicketType.fromApi(_string(json['ticketType'])) ??
           TicketType.raisedForCustomer,
-      status: TicketStatus.fromApi(_string(json['status'])) ?? TicketStatus.open,
+      status:
+          TicketStatus.fromApi(_string(json['status'])) ?? TicketStatus.open,
       priority:
           TicketPriority.fromApi(_string(json['priority'])) ??
           TicketPriority.medium,
@@ -456,8 +458,7 @@ class TicketDetail {
       status != TicketStatus.closed;
 
   /// Customer self-service complaint (`createdBy` is the system user).
-  bool get isCustomerSelfService =>
-      createdBy == SYSTEM_APP_USER_ID;
+  bool get isCustomerSelfService => createdBy == sytemAppUserId;
 
   /// Description/subject may be edited only by the employee creator while
   /// the ticket is still open / assigned / in progress. Never for
