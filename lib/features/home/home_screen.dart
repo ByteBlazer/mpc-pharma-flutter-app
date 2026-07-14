@@ -92,7 +92,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-              const _HomeBuildTimestamp(),
+              _HomeBuildTimestamp(apiClient: apiClient),
             ],
           ),
         ),
@@ -102,12 +102,14 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _HomeBuildTimestamp extends StatelessWidget {
-  const _HomeBuildTimestamp();
+  const _HomeBuildTimestamp({required this.apiClient});
+
+  final ApiClient apiClient;
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<String>(
-      future: loadBuildTimestamp(),
+      future: loadBuildTimestamp(apiClient: apiClient),
       builder: (context, snapshot) {
         final stamp = snapshot.data;
         if (stamp == null || stamp.isEmpty) {

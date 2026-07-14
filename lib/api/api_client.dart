@@ -57,6 +57,22 @@ class ApiClient {
     return otpResponse;
   }
 
+  /// Unauthenticated. Returns epoch seconds from `{ "buildTimestampEpoch": … }`.
+  Future<int> getBuildTimestampEpoch() async {
+    final response = await _get('build-timestamp', requiresAuth: false);
+    final value = _decodeJsonObject(response.body)['buildTimestampEpoch'];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      final parsed = int.tryParse(value.trim());
+      if (parsed != null) return parsed;
+    }
+    throw FormatException(
+      'Expected buildTimestampEpoch in response',
+      response.body,
+    );
+  }
+
   Future<OtpVerificationResponse> impersonate({
     String? token,
     String? employeeId,
