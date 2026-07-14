@@ -120,7 +120,7 @@ class _HomeBuildTimestamp extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.black45,
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
           ),
