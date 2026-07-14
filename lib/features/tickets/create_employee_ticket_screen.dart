@@ -4,7 +4,6 @@ import '../../api/api_client.dart';
 import '../../app_theme.dart';
 import '../../widgets/app_multi_select_field.dart';
 import '../../widgets/app_screen_scaffold.dart';
-import '../../widgets/app_searchable_select_field.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../customers/customer_models.dart';
 import '../departments/department_models.dart';
@@ -188,19 +187,24 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (_isCustomerTicket)
-                        AppSearchableSelectField<String>(
+                        AppMultiSelectField<String>(
                           fieldLabel: 'Customer',
                           dialogTitle: 'Select customer',
                           searchLabel: 'Search customers',
                           searchHint: 'ID, firm name, city...',
                           emptySelectionText: 'Select customer',
-                          selectedValue: _selectedCustomerId,
+                          countLabel: 'customers',
+                          singleSelect: true,
+                          selectedValues: {
+                            ?_selectedCustomerId,
+                          },
                           enabled: !_isSubmitting,
                           items: data.customers
                               .map(
                                 (customer) => AppMultiSelectItem<String>(
                                   value: customer.id,
-                                  label: '${customer.firmName} (${customer.id})',
+                                  label:
+                                      '${customer.firmName} (${customer.id})',
                                   searchText:
                                       '${customer.id} ${customer.firmName} ${customer.city}',
                                   subtitle: customer.city.isEmpty
@@ -209,8 +213,10 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                                 ),
                               )
                               .toList(),
-                          onChanged: (value) =>
-                              setState(() => _selectedCustomerId = value),
+                          onChanged: (values) => setState(
+                            () => _selectedCustomerId =
+                                values.isEmpty ? null : values.first,
+                          ),
                         ),
                       if (_isCustomerTicket) const SizedBox(height: 16),
                       if (_isCustomerTicket || categories.isNotEmpty)
