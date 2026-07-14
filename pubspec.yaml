@@ -67,6 +67,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - BUILD_TIMESTAMP
     - env/local.env
     - env/staging.env
     - env/production.env

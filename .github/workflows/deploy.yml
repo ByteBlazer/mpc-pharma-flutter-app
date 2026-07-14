@@ -91,6 +91,14 @@ jobs:
           echo "Patched ${ENV_FILE}:"
           cat "${ENV_FILE}"
 
+      - name: Stamp build timestamp
+        run: |
+          set -euxo pipefail
+          BUILD_STAMP="$(TZ=Asia/Kolkata date +'%d-%m-%Y %I:%M %p IST')"
+          printf '%s\n' "${BUILD_STAMP}" > BUILD_TIMESTAMP
+          echo "BUILD_TIMESTAMP set to:"
+          cat BUILD_TIMESTAMP
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -117,6 +125,8 @@ jobs:
         run: |
           set -euxo pipefail
           echo "Building web bundle for APP_ENV=${APP_ENV}"
+          echo "Build timestamp file:"
+          cat BUILD_TIMESTAMP
           flutter build web --release --base-href=/ --dart-define=APP_ENV=${APP_ENV}
           echo "Web build output:"
           du -sh build/web
@@ -317,6 +327,14 @@ jobs:
           cat "${ENV_FILE}"
 
 
+      - name: Stamp build timestamp
+        run: |
+          set -euxo pipefail
+          BUILD_STAMP="$(TZ=Asia/Kolkata date +'%d-%m-%Y %I:%M %p IST')"
+          printf '%s\n' "${BUILD_STAMP}" > BUILD_TIMESTAMP
+          echo "BUILD_TIMESTAMP set to:"
+          cat BUILD_TIMESTAMP
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -363,6 +381,8 @@ jobs:
         if: github.ref_name == 'staging'
         run: |
           set -euxo pipefail
+          echo "Build timestamp file:"
+          cat BUILD_TIMESTAMP
           flutter build apk --debug --dart-define=APP_ENV=staging
           ls -lh build/app/outputs/flutter-apk/
 
@@ -458,6 +478,14 @@ jobs:
           echo "Patched ${ENV_FILE}:"
           cat "${ENV_FILE}"
 
+      - name: Stamp build timestamp
+        run: |
+          set -euxo pipefail
+          BUILD_STAMP="$(TZ=Asia/Kolkata date +'%d-%m-%Y %I:%M %p IST')"
+          printf '%s\n' "${BUILD_STAMP}" > BUILD_TIMESTAMP
+          echo "BUILD_TIMESTAMP set to:"
+          cat BUILD_TIMESTAMP
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -474,6 +502,8 @@ jobs:
         if: github.ref_name == 'staging'
         run: |
           set -euxo pipefail
+          echo "Build timestamp file:"
+          cat BUILD_TIMESTAMP
           flutter build ios --debug --no-codesign --dart-define=APP_ENV=staging
           ls -lh build/ios/iphoneos/
 
