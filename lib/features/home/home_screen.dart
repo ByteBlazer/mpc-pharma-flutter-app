@@ -6,6 +6,7 @@ import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
 import '../../app_theme.dart';
 import '../../auth/jwt_payload.dart';
+import '../../utils/build_timestamp.dart';
 import '../../widgets/app_brand_page_background.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/simulation_mode_banner.dart';
@@ -91,10 +92,40 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+              const _HomeBuildTimestamp(),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _HomeBuildTimestamp extends StatelessWidget {
+  const _HomeBuildTimestamp();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: loadBuildTimestamp(),
+      builder: (context, snapshot) {
+        final stamp = snapshot.data;
+        if (stamp == null || stamp.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+          child: Text(
+            'Build $stamp',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.black45,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        );
+      },
     );
   }
 }
