@@ -5,6 +5,7 @@ class DepartmentUser {
     required this.id,
     required this.personName,
     required this.mobile,
+    required this.isActive,
     required this.isDepartmentLead,
     required this.isTicketTriager,
   });
@@ -14,6 +15,7 @@ class DepartmentUser {
       id: _stringValue(json['id']),
       personName: _stringValue(json['personName']),
       mobile: _stringValue(json['mobile']),
+      isActive: json['isActive'] == true,
       isDepartmentLead: json['isDepartmentLead'] == true,
       isTicketTriager: json['isTicketTriager'] == true,
     );
@@ -22,6 +24,7 @@ class DepartmentUser {
   final String id;
   final String personName;
   final String mobile;
+  final bool isActive;
   final bool isDepartmentLead;
   final bool isTicketTriager;
 
@@ -67,6 +70,25 @@ class Department {
   final String createdBy;
   final DateTime? lastUpdatedAt;
   final String lastUpdatedBy;
+
+  /// Active members for pickers. Pass [includeUserId] to keep a currently
+  /// assigned/tagged inactive user visible when editing existing data.
+  List<DepartmentUser> selectableUsers({String? includeUserId}) {
+    final keepId = includeUserId?.trim();
+    return users
+        .where(
+          (user) =>
+              user.isActive ||
+              (keepId != null && keepId.isNotEmpty && user.id == keepId),
+        )
+        .toList();
+  }
+
+  DepartmentUser? get activeTicketTriager {
+    return users
+        .where((user) => user.isTicketTriager && user.isActive)
+        .firstOrNull;
+  }
 
   bool matchesSearch(String query) {
     final normalizedQuery = query.trim().toLowerCase();
