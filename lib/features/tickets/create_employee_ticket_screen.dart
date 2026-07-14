@@ -72,13 +72,18 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
     );
   }
 
-  List<DepartmentUser> _departmentUsers(_CreateTicketData data) {
+  Department? _selectedDepartment(_CreateTicketData data) {
     final departmentId = _selectedDepartmentId;
-    if (departmentId == null) return const [];
+    if (departmentId == null) return null;
     return data.departments
-            .where((department) => department.id == departmentId)
-            .map((department) => department.users)
-            .firstOrNull ??
+        .where((department) => department.id == departmentId)
+        .firstOrNull;
+  }
+
+  List<DepartmentUser> _departmentUsers(_CreateTicketData data) {
+    return _selectedDepartment(data)?.selectableUsers(
+          includeUserId: _selectedAssigneeId,
+        ) ??
         const [];
   }
 
@@ -89,12 +94,10 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
         .firstOrNull;
     if (category == null) return;
     _selectedDepartmentId = category.assignedDepartmentId;
-    final triager = data.departments
-        .where((department) => department.id == category.assignedDepartmentId)
-        .expand((department) => department.users)
-        .where((user) => user.isTicketTriager)
+    final department = data.departments
+        .where((item) => item.id == category.assignedDepartmentId)
         .firstOrNull;
-    _selectedAssigneeId = triager?.id;
+    _selectedAssigneeId = department?.activeTicketTriager?.id;
   }
 
   Future<void> _submit(_CreateTicketData data) async {
@@ -258,24 +261,31 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                             ? null
                             : (value) => setState(() {
                                 _selectedDepartmentId = value;
-                                _selectedAssigneeId = null;
-                                final triager = data.departments
-                                    .where((department) => department.id == value)
-                                    .expand((department) => department.users)
-                                    .where((user) => user.isTicketTriager)
+                                final department = data.departments
+                                    .where((item) => item.id == value)
                                     .firstOrNull;
-                                _selectedAssigneeId = triager?.id;
+                                _selectedAssigneeId =
+                                    department?.activeTicketTriager?.id;
                               }),
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        initialValue: _selectedAssigneeId,
+                        key: ValueKey(
+                          'assignee-$_selectedDepartmentId-$_selectedAssigneeId',
+                        ),
+                        initialValue: users.any((user) => user.id == _selectedAssigneeId)
+                            ? _selectedAssigneeId
+                            : null,
                         decoration: const InputDecoration(labelText: 'Assignee'),
                         items: users
                             .map(
                               (user) => DropdownMenuItem(
                                 value: user.id,
-                                child: Text(user.personName),
+                                child: Text(
+                                  user.isActive
+                                      ? user.personName
+                                      : '${user.personName} (Inactive)',
+                                ),
                               ),
                             )
                             .toList(),
