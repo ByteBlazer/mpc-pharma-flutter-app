@@ -276,7 +276,11 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                         initialValue: users.any((user) => user.id == _selectedAssigneeId)
                             ? _selectedAssigneeId
                             : null,
-                        decoration: const InputDecoration(labelText: 'Assignee'),
+                        decoration: InputDecoration(
+                          labelText: _selectedDepartmentId == null
+                              ? 'Assignee (Select Dept First)'
+                              : 'Assignee',
+                        ),
                         items: users
                             .map(
                               (user) => DropdownMenuItem(
@@ -289,7 +293,7 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                               ),
                             )
                             .toList(),
-                        onChanged: _isSubmitting
+                        onChanged: _isSubmitting || _selectedDepartmentId == null
                             ? null
                             : (value) => setState(() => _selectedAssigneeId = value),
                       ),
