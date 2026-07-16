@@ -253,6 +253,8 @@ class TicketComposerField extends StatefulWidget {
 class _TicketComposerFieldState extends State<TicketComposerField> {
   final List<_ComposerUploadPlaceholder> _uploading = [];
   final Set<String> _removingIds = {};
+  final GlobalKey<TicketAudioRecorderButtonState> _audioRecorderKey =
+      GlobalKey<TicketAudioRecorderButtonState>();
 
   bool get _canEdit => widget.enabled && !widget.isSubmitting;
 
@@ -390,6 +392,14 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                       isBusy: isRemoving,
                       busyTooltip: 'Removing ${attachment.fileName}…',
                       enabled: _canEdit && !isBusy,
+                      onOpen: attachment.isAudio &&
+                              widget.showAudioRecorder &&
+                              _canEdit &&
+                              !isBusy &&
+                              !isRemoving
+                          ? () => _audioRecorderKey.currentState
+                              ?.openForVoiceClip(attachment)
+                          : null,
                       onRemove: isRemoving
                           ? null
                           : () => _removeAttachment(attachment),
@@ -416,6 +426,7 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                 ),
                 if (widget.showAudioRecorder)
                   TicketAudioRecorderButton(
+                    key: _audioRecorderKey,
                     attachmentManager: widget.attachmentManager,
                     onChanged: widget.onAttachmentsChanged,
                     enabled: _canEdit && !isBusy,
@@ -468,6 +479,7 @@ class _ComposerAttachmentTile extends StatelessWidget {
     this.isBusy = false,
     this.busyTooltip,
     this.enabled = false,
+    this.onOpen,
     this.onRemove,
   });
 
@@ -476,6 +488,7 @@ class _ComposerAttachmentTile extends StatelessWidget {
   final bool isBusy;
   final String? busyTooltip;
   final bool enabled;
+  final VoidCallback? onOpen;
   final Future<void> Function()? onRemove;
 
   IconData get _icon {
@@ -496,9 +509,14 @@ class _ComposerAttachmentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final accent = AppTheme.primaryAccentText(primary);
+    final canOpen = !isBusy && onOpen != null;
 
     return Tooltip(
-      message: isBusy ? (busyTooltip ?? fileName) : fileName,
+      message: isBusy
+          ? (busyTooltip ?? fileName)
+          : canOpen
+              ? 'Review voice message'
+              : fileName,
       child: SizedBox(
         width: 64,
         height: 64,
@@ -506,43 +524,50 @@ class _ComposerAttachmentTile extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.06),
+              child: Material(
+                color: primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: canOpen ? onOpen : null,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: primary.withValues(alpha: 0.22)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(6, 10, 6, 6),
-                  child: Column(
-                    children: [
-                      if (isBusy)
-                        SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: accent,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: primary.withValues(alpha: 0.22)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(6, 10, 6, 6),
+                      child: Column(
+                        children: [
+                          if (isBusy)
+                            SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: accent,
+                              ),
+                            )
+                          else
+                            Icon(_icon, size: 20, color: accent),
+                          const SizedBox(height: 4),
+                          Expanded(
+                            child: Text(
+                              fileName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 9,
+                                height: 1.15,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
-                        )
-                      else
-                        Icon(_icon, size: 20, color: accent),
-                      const SizedBox(height: 4),
-                      Expanded(
-                        child: Text(
-                          fileName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 9,
-                            height: 1.15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

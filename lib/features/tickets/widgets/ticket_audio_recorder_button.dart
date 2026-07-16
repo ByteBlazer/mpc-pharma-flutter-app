@@ -30,10 +30,10 @@ class TicketAudioRecorderButton extends StatefulWidget {
 
   @override
   State<TicketAudioRecorderButton> createState() =>
-      _TicketAudioRecorderButtonState();
+      TicketAudioRecorderButtonState();
 }
 
-class _TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
+class TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
   PendingTicketAttachment? _uploadedAttachment;
   String? _localPath;
   AudioEncoder? _activeEncoder;
@@ -57,6 +57,24 @@ class _TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
     _localPath = null;
     _activeEncoder = null;
     _voiceDuration = Duration.zero;
+  }
+
+  /// Same action as tapping the mic button.
+  Future<void> open() => _openModal();
+
+  /// Open review for a specific voice clip tile (ignores non-audio).
+  Future<void> openForVoiceClip(PendingTicketAttachment attachment) async {
+    if (!attachment.isAudio) return;
+    _syncWithAttachmentManager();
+    if (_uploadedAttachment?.attachmentId != attachment.attachmentId) {
+      setState(() {
+        _uploadedAttachment = attachment;
+        _localPath = null;
+        _activeEncoder = null;
+        _voiceDuration = Duration.zero;
+      });
+    }
+    await _openModal();
   }
 
   Future<void> _openModal() async {
@@ -155,7 +173,7 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
     AudioEncoder.opus,
     AudioEncoder.wav,
   ];
-  static const int _waveformBarCount = 18;
+  static const int _waveformBarCount = 36;
 
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
@@ -166,8 +184,8 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
 
   Timer? _timer;
   int _elapsedSeconds = 0;
-  /// Instant mic level (0..1) for the live waveform.
-  double _liveLevel = 0.08;
+  /// Instant mic level (0..1) for the live waveform. 0 = flat / silence.
+  double _liveLevel = 0;
   /// Rolling peak (dBFS) so quiet mics still fill the waveform.
   double _amplitudePeakDb = -45;
 
@@ -232,19 +250,22 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
   }
 
   void _resetWaveform() {
-    _liveLevel = 0.08;
+    _liveLevel = 0;
     _amplitudePeakDb = -45;
   }
 
   void _updateLiveLevel(double level) {
-    setState(() => _liveLevel = level.clamp(0.08, 1.0));
+    setState(() => _liveLevel = level.clamp(0.0, 1.0));
   }
 
   /// Map analyser dBFS (~-160..0) into a punchy 0..1 UI level.
+  /// Returns 0 below a speech threshold so dead silence stays flat.
   double _normalizeAmplitude(double db) {
     // Browser analyser speech is often around -70..-25, not near 0.
     const noiseFloorDb = -90.0;
     const loudDb = -20.0;
+    // Ignore ambient/hiss below this normalized activity.
+    const minActivity = 0.28;
 
     if (db > _amplitudePeakDb) {
       _amplitudePeakDb = db;
@@ -257,9 +278,12 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
     final span = math.max(peakCeiling - noiseFloorDb, 25.0);
     final linear = ((db - noiseFloorDb) / span).clamp(0.0, 1.0);
 
-    // Expand mid levels so normal speech is clearly visible.
-    final boosted = math.pow(linear, 0.45).toDouble();
-    return boosted.clamp(0.08, 1.0);
+    if (linear < minActivity) return 0;
+
+    // Remap so only levels above the threshold animate; keep punch above it.
+    final remapped =
+        ((linear - minActivity) / (1.0 - minActivity)).clamp(0.0, 1.0);
+    return math.pow(remapped, 0.45).toDouble().clamp(0.0, 1.0);
   }
 
   Future<AudioEncoder?> _selectEncoder() async {
@@ -1023,26 +1047,33 @@ class _LiveWavePainter extends CustomPainter {
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
 
-    final gap = 3.0;
+    final gap = 2.0;
     final totalGap = gap * (barCount - 1);
-    final barWidth = ((size.width - totalGap) / barCount).clamp(3.0, 10.0);
+    final barWidth = ((size.width - totalGap) / barCount).clamp(1.5, 3.5);
     final drawnWidth = (barWidth * barCount) + totalGap;
     final startX = (size.width - drawnWidth) / 2;
     final midY = size.height / 2;
     final maxBarHeight = size.height * 0.95;
     final center = (barCount - 1) / 2.0;
+    final isSilent = level <= 0.02;
 
     for (var i = 0; i < barCount; i++) {
-      // Center-weighted envelope so the middle reacts strongest.
-      final distance = (i - center).abs() / center;
-      final envelope = (1.0 - (distance * 0.55)).clamp(0.35, 1.0);
+      final double barHeight;
+      if (isSilent) {
+        // Flat baseline — no wobble during dead silence.
+        barHeight = 4.0;
+      } else {
+        // Center-weighted envelope so the middle reacts strongest.
+        final distance = (i - center).abs() / math.max(center, 1);
+        final envelope = (1.0 - (distance * 0.55)).clamp(0.35, 1.0);
 
-      // Instant mic level, with light phase motion so bars feel live (not a timeline).
-      final wobble = 0.55 +
-          (0.45 *
-              math.sin(phase * (1.6 + distance) + i * 0.55).abs());
-      final barLevel = (level * envelope * wobble).clamp(0.08, 1.0);
-      final barHeight = (maxBarHeight * barLevel).clamp(6.0, maxBarHeight);
+        // Instant mic level, with light phase motion so bars feel live.
+        final wobble = 0.55 +
+            (0.45 *
+                math.sin(phase * (1.6 + distance) + i * 0.55).abs());
+        final barLevel = (level * envelope * wobble).clamp(0.08, 1.0);
+        barHeight = (maxBarHeight * barLevel).clamp(4.0, maxBarHeight);
+      }
       final x = startX + (i * (barWidth + gap));
       final rect = RRect.fromRectAndRadius(
         Rect.fromCenter(
@@ -1050,7 +1081,7 @@ class _LiveWavePainter extends CustomPainter {
           width: barWidth,
           height: barHeight,
         ),
-        const Radius.circular(3),
+        const Radius.circular(1.5),
       );
       canvas.drawRRect(rect, paint);
     }
