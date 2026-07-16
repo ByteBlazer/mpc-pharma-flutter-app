@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
-import '../../auth/jwt_payload.dart';
-import 'complaint_categories_screen.dart';
 import 'create_complaint_screen.dart';
 import 'create_employee_ticket_screen.dart';
 import 'ticket_list_screen.dart';
@@ -55,38 +53,14 @@ class TicketsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: JwtPayload.currentUserIsAppAdmin(),
-      builder: (context, snapshot) {
-        final isAppAdmin = snapshot.data == true;
-        return TicketListScreen(
-          apiClient: apiClient,
-          onLoginAgain: onLoginAgain,
-          isEmployeeView: true,
-          title: 'Tickets',
-          createLabel: 'New ticket',
-          createSuccessMessage: 'Ticket created successfully.',
-          onCreate: () => _openCreateMenu(context),
-          appBarActions: isAppAdmin
-              ? [
-                  IconButton(
-                    tooltip: 'Complaint categories',
-                    icon: const Icon(Icons.category_outlined),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ComplaintCategoriesScreen(
-                            apiClient: apiClient,
-                            onLoginAgain: onLoginAgain,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ]
-              : null,
-        );
-      },
+    return TicketListScreen(
+      apiClient: apiClient,
+      onLoginAgain: onLoginAgain,
+      isEmployeeView: true,
+      title: 'Tickets',
+      createLabel: 'New ticket',
+      createSuccessMessage: 'Ticket created successfully.',
+      onCreate: () => _openCreateMenu(context),
     );
   }
 }

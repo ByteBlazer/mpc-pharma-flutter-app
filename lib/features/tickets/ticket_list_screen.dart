@@ -22,7 +22,6 @@ class TicketListScreen extends StatefulWidget {
     required this.onCreate,
     this.createLabel,
     this.createSuccessMessage,
-    this.appBarActions,
   });
 
   final ApiClient apiClient;
@@ -32,7 +31,6 @@ class TicketListScreen extends StatefulWidget {
   final Future<bool> Function() onCreate;
   final String? createLabel;
   final String? createSuccessMessage;
-  final List<Widget>? appBarActions;
 
   @override
   State<TicketListScreen> createState() => _TicketListScreenState();
@@ -82,10 +80,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
     return Theme(
       data: AppTheme.withCompactButtons(Theme.of(context)),
       child: AppScreenScaffold(
-        appBar: AppBar(
-          title: Text(widget.title),
-          actions: widget.appBarActions,
-        ),
+        appBar: AppBar(title: Text(widget.title)),
         floatingActionButton: widget.createLabel == null
             ? null
             : FloatingActionButton.extended(
@@ -311,6 +306,15 @@ class _TicketSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final isHighPriority = ticket.priority == TicketPriority.high;
+    final partyLabel = ticket.isCustomerTicket ? 'Customer' : 'Raised by';
+    final partyName = ticket.isCustomerTicket
+        ? ticket.customerFirmName.trim()
+        : ticket.createdByName.trim();
+    final assigneeName = ticket.assigneeName.trim();
+    final departmentName = ticket.assignedDepartmentName.trim();
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: InkWell(
@@ -323,6 +327,7 @@ class _TicketSummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Text(
@@ -333,32 +338,106 @@ class _TicketSummaryCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (isHighPriority) ...[
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: 'High priority',
+                        child: Icon(
+                          Icons.priority_high_rounded,
+                          size: 20,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 8),
                     TicketStatusChip(status: ticket.status),
                   ],
                 ),
-                const SizedBox(height: 8),
-                if (isEmployeeView)
-                  Text(
-                    '${ticket.priority.label} · ${ticket.ticketType.apiValue.replaceAll('_', ' ')}',
-                    style: const TextStyle(color: Colors.black),
-                  ),
-                if (isEmployeeView &&
-                    (ticket.assignedDepartmentName.isNotEmpty ||
-                        ticket.assigneeName.isNotEmpty))
-                  Text(
-                    '${ticket.assignedDepartmentName} · ${ticket.assigneeName}',
-                    style: const TextStyle(color: Colors.black),
-                  ),
-                if (isEmployeeView && ticket.customerFirmName.isNotEmpty)
-                  Text(
-                    ticket.customerFirmName,
-                    style: const TextStyle(color: Colors.black),
-                  ),
+                if (isEmployeeView) ...[
+                  if (partyName.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _TicketCardMetaRow(
+                      icon: ticket.isCustomerTicket
+                          ? Icons.storefront_outlined
+                          : Icons.person_outline,
+                      label: partyLabel,
+                      value: partyName,
+                      color: primary,
+                    ),
+                  ],
+                  if (assigneeName.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    _TicketCardMetaRow(
+                      icon: Icons.badge_outlined,
+                      label: 'Assignee',
+                      value: assigneeName,
+                      color: primary,
+                    ),
+                  ],
+                  if (departmentName.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    _TicketCardMetaRow(
+                      icon: Icons.apartment_outlined,
+                      label: 'Dept',
+                      value: departmentName,
+                      color: primary,
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TicketCardMetaRow extends StatelessWidget {
+  const _TicketCardMetaRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: color.withValues(alpha: 0.85)),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '$label · ',
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                TextSpan(
+                  text: value,
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

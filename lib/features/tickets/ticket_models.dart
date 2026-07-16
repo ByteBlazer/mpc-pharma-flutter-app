@@ -267,6 +267,7 @@ class TicketSummary {
     required this.assignedDepartmentName,
     required this.assigneeName,
     required this.customerFirmName,
+    required this.createdByName,
     required this.createdAt,
     required this.lastUpdatedAt,
     this.raisedByCustomer,
@@ -287,6 +288,7 @@ class TicketSummary {
       assignedDepartmentName: _string(json['assignedDepartmentName']),
       assigneeName: _string(json['assigneeName']),
       customerFirmName: _string(json['customerFirmName']),
+      createdByName: _string(json['createdByName']),
       createdAt: DateTime.tryParse(_string(json['createdAt'])),
       lastUpdatedAt: DateTime.tryParse(_string(json['lastUpdatedAt'])),
       raisedByCustomer: _optionalBool(json['raisedByCustomer']),
@@ -301,6 +303,7 @@ class TicketSummary {
   final String assignedDepartmentName;
   final String assigneeName;
   final String customerFirmName;
+  final String createdByName;
   final DateTime? createdAt;
   final DateTime? lastUpdatedAt;
 
@@ -308,6 +311,8 @@ class TicketSummary {
   final bool? raisedByCustomer;
 
   bool get isRaisedByCustomer => raisedByCustomer == true;
+
+  bool get isCustomerTicket => ticketType == TicketType.raisedForCustomer;
 
   bool matchesSearch(String query) {
     final normalized = query.trim().toLowerCase();
@@ -321,6 +326,7 @@ class TicketSummary {
       assignedDepartmentName,
       assigneeName,
       customerFirmName,
+      createdByName,
     ].join(' ').toLowerCase().contains(normalized);
   }
 }

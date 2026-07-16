@@ -80,5 +80,11 @@ class Customer {
   final DateTime? createdAt;
   final DateTime? lastUpdatedAt;
 
+  double? get latitude => double.tryParse(geoLatitude.trim());
+
+  double? get longitude => double.tryParse(geoLongitude.trim());
+
+  bool get hasCoordinates => latitude != null && longitude != null;
+
   static String _stringValue(Object? value) => value?.toString() ?? '';
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -8,6 +10,7 @@ import '../../auth/jwt_payload.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_surface.dart';
+import '../../widgets/unsaved_changes_dialog.dart';
 import '../departments/department_models.dart';
 import 'ticket_attachment_manager.dart';
 import 'ticket_models.dart';
@@ -53,6 +56,45 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   bool _isAddingCustomerAttachments = false;
   bool _isLinkingCustomerAttachments = false;
   String? _currentUserId;
+
+  bool get _hasUnsavedChanges {
+    if (_isEditingSubject) return true;
+    if (_isEditingDescription) return true;
+    if (_isComposingComment) {
+      if (_commentController.text.trim().isNotEmpty) return true;
+      if (_commentAttachmentManager.attachments.isNotEmpty) return true;
+    }
+    if (_isAddingCustomerAttachments &&
+        _descriptionAttachmentManager.attachments.isNotEmpty) {
+      return true;
+    }
+    return false;
+  }
+
+  String get _unsavedChangesMessage {
+    if (_isEditingSubject || _isEditingDescription) {
+      return 'You have unsaved edits on this ticket. If you leave now, those changes will be lost.';
+    }
+    if (_isComposingComment) {
+      return 'Your comment draft has not been posted. If you leave now, it will be lost.';
+    }
+    if (_isAddingCustomerAttachments) {
+      return 'You have attachments that have not been uploaded yet. If you leave now, they will be lost.';
+    }
+    return 'You have unsaved changes. If you leave now, they will be lost.';
+  }
+
+  Future<void> _handlePopRequested() async {
+    if (!_hasUnsavedChanges) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+    final leave = await confirmDiscardUnsavedChanges(
+      context,
+      message: _unsavedChangesMessage,
+    );
+    if (leave && mounted) Navigator.of(context).pop();
+  }
 
   @override
   void initState() {
@@ -425,13 +467,19 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.withCompactButtons(Theme.of(context)),
-      child: AppScreenScaffold(
-      appBar: AppBar(
-        title: Text(widget.isEmployeeView ? 'Ticket' : 'Complaint'),
-      ),
-      body: SafeArea(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        unawaited(_handlePopRequested());
+      },
+      child: Theme(
+        data: AppTheme.withCompactButtons(Theme.of(context)),
+        child: AppScreenScaffold(
+          appBar: AppBar(
+            title: Text(widget.isEmployeeView ? 'Ticket' : 'Complaint'),
+          ),
+          body: SafeArea(
         child: FutureBuilder<TicketDetail>(
           future: _ticketFuture,
           builder: (context, snapshot) {
@@ -690,7 +738,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
           },
         ),
       ),
-    ),
+        ),
+      ),
     );
   }
 }

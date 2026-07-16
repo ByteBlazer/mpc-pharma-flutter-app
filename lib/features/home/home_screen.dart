@@ -14,6 +14,7 @@ import '../auth/impersonate_screen.dart';
 import '../customers/customers_screen.dart';
 import '../departments/departments_screen.dart';
 import '../locations/locations_screen.dart';
+import '../settings/settings_screen.dart';
 import '../tickets/tickets_screen.dart';
 import '../users/users_screen.dart';
 
@@ -64,8 +65,6 @@ class HomeScreen extends StatelessWidget {
                           children: [
                             const _HomeWelcomeCard(),
                             const SizedBox(height: 28),
-                            const _HomeSectionHeader(title: 'Quick actions'),
-                            const SizedBox(height: 16),
                             _HomeFeatureGrid(
                               isSimulationMode: isSimulationMode,
                               apiClient: apiClient,
@@ -128,38 +127,6 @@ class _HomeBuildTimestamp extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _HomeSectionHeader extends StatelessWidget {
-  const _HomeSectionHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 22,
-          decoration: BoxDecoration(
-            color: primary,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: Colors.black,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -316,10 +283,12 @@ class _HomeFeatureGrid extends StatelessWidget {
         !isSimulationMode && await JwtPayload.canStartImpersonation();
     final showTickets = await JwtPayload.currentUserIsEmployee();
     final showComplaints = await JwtPayload.currentUserIsCustomer();
+    final showSettings = await JwtPayload.currentUserIsAppAdmin();
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
       showTickets: showTickets,
       showComplaints: showComplaints,
+      showSettings: showSettings,
     );
   }
 
@@ -428,6 +397,21 @@ class _HomeFeatureGrid extends StatelessWidget {
           );
         },
       ),
+      if (visibility.showSettings)
+        _FeatureTile(
+          icon: Icons.settings_outlined,
+          label: 'Settings',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => SettingsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
     ];
   }
 
@@ -504,11 +488,13 @@ class _HomeFeatureVisibility {
     required this.showImpersonate,
     required this.showTickets,
     required this.showComplaints,
+    required this.showSettings,
   });
 
   final bool showImpersonate;
   final bool showTickets;
   final bool showComplaints;
+  final bool showSettings;
 }
 
 class _FeatureTile extends StatelessWidget {
