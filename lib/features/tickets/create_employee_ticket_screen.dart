@@ -124,6 +124,11 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
       _showError('Enter a description.');
       return;
     }
+    final subject = _subjectController.text.trim();
+    if (!_isCustomerTicket && subject.isEmpty) {
+      _showError('Enter a subject.');
+      return;
+    }
 
     final body = <String, dynamic>{
       'ticketType': widget.ticketType.apiValue,
@@ -133,12 +138,9 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
       'priority': _priority.apiValue,
       'attachmentIds': _attachmentManager.attachmentIds,
     };
-    final subject = _subjectController.text.trim();
     if (subject.isNotEmpty) body['subject'] = subject;
     if (_isCustomerTicket) {
       body['customerId'] = _selectedCustomerId;
-      body['ticketComplaintCategoryId'] = _selectedCategoryId;
-    } else if (_selectedCategoryId != null && _selectedCategoryId!.isNotEmpty) {
       body['ticketComplaintCategoryId'] = _selectedCategoryId;
     }
 
@@ -222,13 +224,11 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                           ),
                         ),
                       if (_isCustomerTicket) const SizedBox(height: 16),
-                      if (_isCustomerTicket || categories.isNotEmpty)
+                      if (_isCustomerTicket) ...[
                         DropdownButtonFormField<String>(
                           initialValue: _selectedCategoryId,
-                          decoration: InputDecoration(
-                            labelText: _isCustomerTicket
-                                ? 'Category'
-                                : 'Category (optional)',
+                          decoration: const InputDecoration(
+                            labelText: 'Category',
                           ),
                           items: categories
                               .map(
@@ -245,7 +245,8 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                                   _applyCategoryDefaults(data, value);
                                 }),
                         ),
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
+                      ],
                       DropdownButtonFormField<String>(
                         initialValue: _selectedDepartmentId,
                         decoration: const InputDecoration(labelText: 'Department'),
@@ -301,8 +302,10 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                       TextField(
                         controller: _subjectController,
                         enabled: !_isSubmitting,
-                        decoration: const InputDecoration(
-                          labelText: 'Subject (optional)',
+                        decoration: InputDecoration(
+                          labelText: _isCustomerTicket
+                              ? 'Subject (optional)'
+                              : 'Subject',
                         ),
                       ),
                       const SizedBox(height: 16),
