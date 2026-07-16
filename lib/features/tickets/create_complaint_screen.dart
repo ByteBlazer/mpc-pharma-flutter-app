@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../app_theme.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
+import '../../widgets/unsaved_changes_dialog.dart';
 import 'ticket_attachment_manager.dart';
 import 'ticket_models.dart';
 import 'widgets/ticket_description_field.dart';
@@ -28,6 +31,30 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
   late Future<List<ComplaintCategory>> _categoriesFuture;
   String? _selectedCategoryId;
   bool _isSubmitting = false;
+  bool _allowExitWithoutPrompt = false;
+
+  bool get _hasUnsavedChanges {
+    if (_allowExitWithoutPrompt) return false;
+    if (_descriptionController.text.trim().isNotEmpty) return true;
+    if (_attachmentManager.attachments.isNotEmpty) return true;
+    if (_selectedCategoryId != null && _selectedCategoryId!.isNotEmpty) {
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _handlePopRequested() async {
+    if (!_hasUnsavedChanges) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+    final leave = await confirmDiscardUnsavedChanges(
+      context,
+      message:
+          'This complaint has not been submitted yet. If you leave now, your draft will be lost.',
+    );
+    if (leave && mounted) Navigator.of(context).pop();
+  }
 
   @override
   void initState() {
@@ -73,6 +100,7 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
         isEmployeeView: false,
       );
       if (!mounted) return;
+      _allowExitWithoutPrompt = true;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
@@ -88,79 +116,95 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.withCompactButtons(Theme.of(context)),
-      child: AppScreenScaffold(
-      appBar: AppBar(title: const Text('New complaint')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  FutureBuilder<List<ComplaintCategory>>(
-                    future: _categoriesFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState != ConnectionState.done) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError) {
-                        return Text(
-                          snapshot.error.toString(),
-                          style: const TextStyle(color: Colors.black),
-                        );
-                      }
-                      final categories = (snapshot.data ?? const [])
-                          .where((category) => category.isActive)
-                          .toList();
-                      return DropdownButtonFormField<String>(
-                        initialValue: _selectedCategoryId,
-                        decoration: const InputDecoration(labelText: 'Category'),
-                        items: categories
-                            .map(
-                              (category) => DropdownMenuItem(
-                                value: category.id,
-                                child: Text(category.name),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _isSubmitting
-                            ? null
-                            : (value) => setState(() => _selectedCategoryId = value),
-                      );
-                    },
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        unawaited(_handlePopRequested());
+      },
+      child: Theme(
+        data: AppTheme.withCompactButtons(Theme.of(context)),
+        child: AppScreenScaffold(
+          appBar: AppBar(title: const Text('New complaint')),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FutureBuilder<List<ComplaintCategory>>(
+                        future: _categoriesFuture,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState !=
+                              ConnectionState.done) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          if (snapshot.hasError) {
+                            return Text(
+                              snapshot.error.toString(),
+                              style: const TextStyle(color: Colors.black),
+                            );
+                          }
+                          final categories = (snapshot.data ?? const [])
+                              .where((category) => category.isActive)
+                              .toList();
+                          return DropdownButtonFormField<String>(
+                            initialValue: _selectedCategoryId,
+                            decoration: const InputDecoration(
+                              labelText: 'Category',
+                            ),
+                            items: categories
+                                .map(
+                                  (category) => DropdownMenuItem(
+                                    value: category.id,
+                                    child: Text(category.name),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: _isSubmitting
+                                ? null
+                                : (value) => setState(
+                                    () => _selectedCategoryId = value,
+                                  ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      TicketDescriptionField(
+                        controller: _descriptionController,
+                        attachmentManager: _attachmentManager,
+                        onAttachmentsChanged: () => setState(() {}),
+                        enabled: !_isSubmitting,
+                      ),
+                      const SizedBox(height: 24),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : _submit,
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Submit complaint'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  TicketDescriptionField(
-                    controller: _descriptionController,
-                    attachmentManager: _attachmentManager,
-                    onAttachmentsChanged: () => setState(() {}),
-                    enabled: !_isSubmitting,
-                  ),
-                  const SizedBox(height: 24),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submit,
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Submit complaint'),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
     );
   }
 }

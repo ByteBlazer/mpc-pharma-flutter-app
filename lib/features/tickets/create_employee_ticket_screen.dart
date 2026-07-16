@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
@@ -5,6 +7,7 @@ import '../../app_theme.dart';
 import '../../widgets/app_multi_select_field.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
+import '../../widgets/unsaved_changes_dialog.dart';
 import '../customers/customer_models.dart';
 import '../departments/department_models.dart';
 import 'ticket_attachment_manager.dart';
@@ -40,8 +43,43 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
   String? _selectedAssigneeId;
   TicketPriority _priority = TicketPriority.medium;
   bool _isSubmitting = false;
+  bool _allowExitWithoutPrompt = false;
 
   bool get _isCustomerTicket => widget.ticketType == TicketType.raisedForCustomer;
+
+  bool get _hasUnsavedChanges {
+    if (_allowExitWithoutPrompt) return false;
+    if (_subjectController.text.trim().isNotEmpty) return true;
+    if (_descriptionController.text.trim().isNotEmpty) return true;
+    if (_attachmentManager.attachments.isNotEmpty) return true;
+    if (_selectedCustomerId != null && _selectedCustomerId!.isNotEmpty) {
+      return true;
+    }
+    if (_selectedCategoryId != null && _selectedCategoryId!.isNotEmpty) {
+      return true;
+    }
+    if (_selectedDepartmentId != null && _selectedDepartmentId!.isNotEmpty) {
+      return true;
+    }
+    if (_selectedAssigneeId != null && _selectedAssigneeId!.isNotEmpty) {
+      return true;
+    }
+    if (_priority != TicketPriority.medium) return true;
+    return false;
+  }
+
+  Future<void> _handlePopRequested() async {
+    if (!_hasUnsavedChanges) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+    final leave = await confirmDiscardUnsavedChanges(
+      context,
+      message:
+          'This ticket has not been created yet. If you leave now, your draft will be lost.',
+    );
+    if (leave && mounted) Navigator.of(context).pop();
+  }
 
   @override
   void initState() {
@@ -148,6 +186,7 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
     try {
       await widget.apiClient.createTicket(body: body, isEmployeeView: true);
       if (!mounted) return;
+      _allowExitWithoutPrompt = true;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
@@ -164,11 +203,17 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
   @override
   Widget build(BuildContext context) {
     final title = _isCustomerTicket ? 'Raise for customer' : 'Internal ticket';
-    return Theme(
-      data: AppTheme.withCompactButtons(Theme.of(context)),
-      child: AppScreenScaffold(
-      appBar: AppBar(title: Text(title)),
-      body: SafeArea(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        unawaited(_handlePopRequested());
+      },
+      child: Theme(
+        data: AppTheme.withCompactButtons(Theme.of(context)),
+        child: AppScreenScaffold(
+          appBar: AppBar(title: Text(title)),
+          body: SafeArea(
         child: FutureBuilder<_CreateTicketData>(
           future: _dataFuture,
           builder: (context, snapshot) {
@@ -357,7 +402,8 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
           },
         ),
       ),
-    ),
+        ),
+      ),
     );
   }
 }

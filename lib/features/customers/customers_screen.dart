@@ -399,7 +399,7 @@ class _CustomerListItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: AppSurface(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -442,7 +442,7 @@ class _CustomerListItem extends StatelessWidget {
                 ),
               ),
               if (canViewDetails) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: AppViewDetailsButton(onPressed: onViewMore),

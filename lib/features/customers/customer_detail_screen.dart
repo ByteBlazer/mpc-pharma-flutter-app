@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/api_client.dart';
+import '../../app_theme.dart';
 import '../../widgets/app_screen_scaffold.dart';
+import '../../widgets/app_snack_bar.dart';
 import 'customer_models.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
@@ -21,7 +24,7 @@ class CustomerDetailScreen extends StatefulWidget {
 }
 
 class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
-  late final Future<Customer> _customerFuture;
+  late Future<Customer> _customerFuture;
 
   @override
   void initState() {
@@ -33,6 +36,30 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     setState(() {
       _customerFuture = widget.apiClient.getCustomer(id: widget.customerId);
     });
+  }
+
+  Future<void> _openCoordinatesInMaps(Customer customer) async {
+    final latitude = customer.latitude;
+    final longitude = customer.longitude;
+    if (latitude == null || longitude == null) return;
+
+    final uri = Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '$latitude,$longitude',
+    });
+
+    try {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        throw Exception('Could not open Google Maps.');
+      }
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
+    }
   }
 
   @override
@@ -90,13 +117,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                           _InfoRow(label: 'City', value: customer.city),
                           _InfoRow(label: 'Pincode', value: customer.pincode),
                           _InfoRow(label: 'Phone', value: customer.phone),
-                          _InfoRow(
-                            label: 'Latitude',
-                            value: customer.geoLatitude,
-                          ),
-                          _InfoRow(
-                            label: 'Longitude',
-                            value: customer.geoLongitude,
+                          _CoordinatesRow(
+                            customer: customer,
+                            onOpenMaps: () => _openCoordinatesInMaps(customer),
                           ),
                         ],
                       ),
@@ -107,6 +130,68 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _CoordinatesRow extends StatelessWidget {
+  const _CoordinatesRow({
+    required this.customer,
+    required this.onOpenMaps,
+  });
+
+  final Customer customer;
+  final VoidCallback onOpenMaps;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final linkColor = AppTheme.primaryAccentText(primary);
+    final lat = customer.geoLatitude.trim();
+    final lng = customer.geoLongitude.trim();
+    final hasValues = lat.isNotEmpty || lng.isNotEmpty;
+    final displayValue = !hasValues
+        ? '—'
+        : customer.hasCoordinates
+        ? '$lat, $lng'
+        : [lat, lng].where((part) => part.isNotEmpty).join(', ');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(
+            width: 132,
+            child: Text(
+              'Coordinates',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: customer.hasCoordinates
+                ? InkWell(
+                    onTap: onOpenMaps,
+                    child: Text(
+                      displayValue,
+                      style: TextStyle(
+                        color: linkColor,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                        decorationColor: linkColor,
+                      ),
+                    ),
+                  )
+                : Text(
+                    displayValue,
+                    style: const TextStyle(color: Colors.black),
+                  ),
+          ),
+        ],
       ),
     );
   }
