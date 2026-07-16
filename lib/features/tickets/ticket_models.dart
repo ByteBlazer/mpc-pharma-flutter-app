@@ -340,6 +340,8 @@ class TicketDetail {
     required this.createdBy,
     required this.createdByName,
     required this.createdByCustomerId,
+    required this.raisedForAppUserId,
+    required this.raisedForAppUserName,
     required this.assignedDepartmentId,
     required this.assignedDepartmentName,
     required this.assigneeAppUserId,
@@ -378,8 +380,18 @@ class TicketDetail {
       raisedForCustomerId: _string(json['raisedForCustomerId']),
       raisedForCustomerName: _string(json['raisedForCustomerName']),
       createdBy: _string(json['createdBy']),
-      createdByName: _string(json['createdByName']),
+      createdByName: _firstNonEmptyString(json, const [
+        'createdByName',
+        'createdByPersonName',
+        'creatorName',
+        'raisedByName',
+      ]),
       createdByCustomerId: _string(json['createdByCustomerId']),
+      raisedForAppUserId: _string(json['raisedForAppUserId']),
+      raisedForAppUserName: _firstNonEmptyString(json, const [
+        'raisedForAppUserName',
+        'raisedForAppUserPersonName',
+      ]),
       assignedDepartmentId: _string(json['assignedDepartmentId']),
       assignedDepartmentName: _string(json['assignedDepartmentName']),
       assigneeAppUserId: _string(json['assigneeAppUserId']),
@@ -425,6 +437,8 @@ class TicketDetail {
   final String createdBy;
   final String createdByName;
   final String createdByCustomerId;
+  final String raisedForAppUserId;
+  final String raisedForAppUserName;
   final String assignedDepartmentId;
   final String assignedDepartmentName;
   final String assigneeAppUserId;
@@ -476,13 +490,36 @@ class TicketDetail {
     return status == TicketStatus.open || status == TicketStatus.assigned;
   }
 
-  /// Priority may change for operational roles while the ticket is not CLOSED.
-  bool get canEditPriorityByStatus => status != TicketStatus.closed;
+  /// App-user id of the employee who raised the ticket, if any.
+  String get raisedByEmployeeId {
+    if (isCustomerSelfService) return '';
+    if (createdBy.trim().isNotEmpty) return createdBy.trim();
+    if (ticketType == TicketType.internal) {
+      return raisedForAppUserId.trim();
+    }
+    return '';
+  }
 
+  /// Display name for the primary "Raised by" line (never a raw user id).
+  /// Customer self-service → customer firm name; otherwise → employee name.
   String get raisedByLabel {
-    if (isCustomerSelfService) return 'Customer';
-    if (createdByName.isNotEmpty) return createdByName;
-    return 'Employee';
+    if (isCustomerSelfService) {
+      return raisedForCustomerName.trim();
+    }
+    final fromCreatedBy = createdByName.trim();
+    if (fromCreatedBy.isNotEmpty) return fromCreatedBy;
+    if (ticketType == TicketType.internal) {
+      final fromRaisedFor = raisedForAppUserName.trim();
+      if (fromRaisedFor.isNotEmpty) return fromRaisedFor;
+    }
+    return '';
+  }
+
+  /// Customer firm name when an employee raised on behalf of a customer.
+  String get raisedOnBehalfOfCustomerLabel {
+    if (ticketType != TicketType.raisedForCustomer) return '';
+    if (isCustomerSelfService) return '';
+    return raisedForCustomerName.trim();
   }
 }
 
@@ -503,6 +540,14 @@ class PendingTicketAttachment {
 }
 
 String _string(Object? value) => value?.toString() ?? '';
+
+String _firstNonEmptyString(JsonMap json, List<String> keys) {
+  for (final key in keys) {
+    final value = _string(json[key]).trim();
+    if (value.isNotEmpty) return value;
+  }
+  return '';
+}
 
 bool? _optionalBool(Object? value) {
   if (value is bool) return value;
