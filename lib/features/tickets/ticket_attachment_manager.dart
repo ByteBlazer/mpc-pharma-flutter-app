@@ -11,10 +11,17 @@ class TicketAttachmentLimits {
 }
 
 class TicketAttachmentManager {
-  TicketAttachmentManager(this.apiClient);
+  TicketAttachmentManager(
+    this.apiClient, {
+    int existingFileCount = 0,
+    int existingTotalSize = 0,
+  }) : _existingFileCount = existingFileCount,
+       _existingTotalSize = existingTotalSize;
 
   final ApiClient apiClient;
   final List<PendingTicketAttachment> _attachments = [];
+  int _existingFileCount;
+  int _existingTotalSize;
 
   List<PendingTicketAttachment> get attachments =>
       List<PendingTicketAttachment>.unmodifiable(_attachments);
@@ -22,10 +29,34 @@ class TicketAttachmentManager {
   List<String> get attachmentIds =>
       _attachments.map((attachment) => attachment.attachmentId).toList();
 
-  int get totalSize =>
+  int get pendingTotalSize =>
       _attachments.fold(0, (sum, attachment) => sum + attachment.fileSize);
 
-  bool get canAddMore => _attachments.length < TicketAttachmentLimits.maxFilesPerTicket;
+  int get totalSize => pendingTotalSize + _existingTotalSize;
+
+  int get totalFileCount => _attachments.length + _existingFileCount;
+
+  bool get canAddMore =>
+      totalFileCount < TicketAttachmentLimits.maxFilesPerTicket;
+
+  /// Account for files already linked to the ticket when validating new uploads.
+  void setExistingTicketUsage({
+    required int fileCount,
+    required int totalSize,
+  }) {
+    _existingFileCount = fileCount < 0 ? 0 : fileCount;
+    _existingTotalSize = totalSize < 0 ? 0 : totalSize;
+  }
+
+  void setExistingAttachments(Iterable<TicketAttachment> existing) {
+    var count = 0;
+    var size = 0;
+    for (final attachment in existing) {
+      count += 1;
+      size += attachment.fileSize;
+    }
+    setExistingTicketUsage(fileCount: count, totalSize: size);
+  }
 
   void validateCanAdd(int fileSize) {
     if (fileSize > TicketAttachmentLimits.maxFileSize) {
