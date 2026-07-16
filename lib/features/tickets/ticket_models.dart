@@ -467,17 +467,17 @@ class TicketDetail {
   /// Customer self-service complaint (`createdBy` is the system user).
   bool get isCustomerSelfService => createdBy == sytemAppUserId;
 
-  /// Description/subject may be edited only by the employee creator while
-  /// the ticket is still open / assigned / in progress. Never for
-  /// customer self-service tickets.
-  bool canEditDescription(String? currentEmployeeId) {
+  /// Subject/description may be edited only by the employee creator while
+  /// the ticket is OPEN or ASSIGNED. Never for customer self-service tickets.
+  bool canEditSubjectAndDescription(String? currentEmployeeId) {
     if (isCustomerSelfService) return false;
     if (currentEmployeeId == null || currentEmployeeId.isEmpty) return false;
     if (createdBy != currentEmployeeId) return false;
-    return status == TicketStatus.open ||
-        status == TicketStatus.assigned ||
-        status == TicketStatus.inProgress;
+    return status == TicketStatus.open || status == TicketStatus.assigned;
   }
+
+  /// Priority may change for operational roles while the ticket is not CLOSED.
+  bool get canEditPriorityByStatus => status != TicketStatus.closed;
 
   String get raisedByLabel {
     if (isCustomerSelfService) return 'Customer';

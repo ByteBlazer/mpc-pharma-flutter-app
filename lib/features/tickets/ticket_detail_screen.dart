@@ -40,6 +40,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   final _commentsScrollController = ScrollController();
   final _commentController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _subjectController = TextEditingController();
   final _addCommentButtonKey = GlobalKey();
   late final TicketAttachmentManager _commentAttachmentManager;
   late final TicketAttachmentManager _descriptionAttachmentManager;
@@ -49,6 +50,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   bool _isComposingComment = false;
   bool _isAddingCustomerAttachments = false;
   bool _isLinkingCustomerAttachments = false;
+  bool _isSavingPriority = false;
   String? _currentUserId;
 
   @override
@@ -73,6 +75,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     _commentsScrollController.dispose();
     _commentController.dispose();
     _descriptionController.dispose();
+    _subjectController.dispose();
     super.dispose();
   }
 
@@ -92,7 +95,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     });
   }
 
-  void _startComposingComment() {
+  void _startComposingComment(TicketDetail ticket) {
+    _applyExistingAttachmentUsage(_commentAttachmentManager, ticket);
     setState(() => _isComposingComment = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -106,6 +110,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
         );
       }
     });
+  }
+
+  void _applyExistingAttachmentUsage(
+    TicketAttachmentManager manager,
+    TicketDetail ticket,
+  ) {
+    manager.setExistingAttachments(ticket.attachments);
   }
 
   Future<void> _cancelComposingComment() async {
@@ -242,8 +253,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   }
 
   void _startEditingDescription(TicketDetail ticket) {
+    _subjectController.text = ticket.subject;
     _descriptionController.text = ticket.description;
     _descriptionAttachmentManager.clear();
+    _applyExistingAttachmentUsage(_descriptionAttachmentManager, ticket);
     setState(() => _isEditingDescription = true);
   }
 
@@ -254,12 +267,22 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       await _descriptionAttachmentManager.removeUnlinked(attachment.attachmentId);
     }
     _descriptionController.clear();
+    _subjectController.clear();
     if (!mounted) return;
     setState(() => _isEditingDescription = false);
   }
 
   Future<void> _saveDescription(TicketDetail ticket) async {
+    final subject = _subjectController.text.trim();
     final description = _descriptionController.text.trim();
+    if (subject.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: 'Subject cannot be empty.',
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
     if (description.isEmpty) {
       showAppSnackBar(
         context,
@@ -272,6 +295,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     setState(() => _isSavingDescription = true);
     try {
       final body = <String, Object?>{
+        'subject': subject,
         'description': description,
       };
       if (_descriptionAttachmentManager.attachmentIds.isNotEmpty) {
@@ -283,6 +307,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
         isEmployeeView: widget.isEmployeeView,
       );
       _descriptionController.clear();
+      _subjectController.clear();
       _descriptionAttachmentManager.clear();
       if (mounted) setState(() => _isEditingDescription = false);
       _refresh();
@@ -298,8 +323,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     }
   }
 
-  void _startAddingCustomerAttachments() {
+  void _startAddingCustomerAttachments(TicketDetail ticket) {
     _descriptionAttachmentManager.clear();
+    _applyExistingAttachmentUsage(_descriptionAttachmentManager, ticket);
     setState(() => _isAddingCustomerAttachments = true);
   }
 
@@ -311,6 +337,28 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     }
     if (!mounted) return;
     setState(() => _isAddingCustomerAttachments = false);
+  }
+
+  Future<void> _savePriority(TicketDetail ticket, TicketPriority priority) async {
+    if (priority == ticket.priority || _isSavingPriority) return;
+    setState(() => _isSavingPriority = true);
+    try {
+      await widget.apiClient.updateTicket(
+        ticketId: ticket.id,
+        body: {'priority': priority.apiValue},
+        isEmployeeView: true,
+      );
+      _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingPriority = false);
+    }
   }
 
   Future<void> _linkCustomerAttachments(TicketDetail ticket) async {
@@ -420,7 +468,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                       ],
                       const SizedBox(height: 16),
                       if (widget.isEmployeeView) ...[
-                        _InfoRow('Priority', ticket.priority.label),
+                        _TicketPrioritySection(
+                          apiClient: widget.apiClient,
+                          ticket: ticket,
+                          isSaving: _isSavingPriority,
+                          onChanged: (priority) => _savePriority(ticket, priority),
+                        ),
                         _InfoRow('Type', ticket.ticketType.apiValue),
                         _InfoRow(
                           'Raised by',
@@ -438,12 +491,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                       ],
                       if (widget.isEmployeeView &&
                           _isEditingDescription &&
-                          ticket.canEditDescription(_currentUserId)) ...[
+                          ticket.canEditSubjectAndDescription(_currentUserId)) ...[
+                        TextField(
+                          controller: _subjectController,
+                          enabled: !_isSavingDescription,
+                          decoration: const InputDecoration(labelText: 'Subject'),
+                        ),
+                        const SizedBox(height: 12),
                         TicketDescriptionField(
                           controller: _descriptionController,
                           attachmentManager: _descriptionAttachmentManager,
                           onAttachmentsChanged: () => setState(() {}),
-                          labelText: '',
+                          labelText: 'Description',
                           enabled: !_isSavingDescription,
                           isSubmitting: _isSavingDescription,
                           autofocus: true,
@@ -457,7 +516,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                       ] else ...[
                         _InfoRow('Description', ticket.description),
                         if (widget.isEmployeeView &&
-                            ticket.canEditDescription(_currentUserId))
+                            ticket.canEditSubjectAndDescription(_currentUserId))
                           Align(
                             alignment: Alignment.centerLeft,
                             child: TextButton(
@@ -468,7 +527,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                                   horizontal: 0,
                                 ),
                               ),
-                              child: const Text('Edit description'),
+                              child: const Text('Edit subject & description'),
                             ),
                           ),
                       ],
@@ -490,7 +549,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                           Align(
                             alignment: Alignment.centerLeft,
                             child: OutlinedButton.icon(
-                              onPressed: _startAddingCustomerAttachments,
+                              onPressed: () =>
+                                  _startAddingCustomerAttachments(ticket),
                               icon: const Icon(Icons.attach_file),
                               label: const Text('Add attachments'),
                             ),
@@ -523,7 +583,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                           canComposeComment: !ticket.isClosed,
                           isComposingComment: _isComposingComment,
                           addCommentButtonKey: _addCommentButtonKey,
-                          onStartComposing: _startComposingComment,
+                          onStartComposing: () => _startComposingComment(ticket),
                           onOpenAttachment: _downloadAttachment,
                           commentComposer: _isComposingComment && !ticket.isClosed
                               ? _CommentComposer(
@@ -725,6 +785,98 @@ class _EmployeeActionPermissions {
   final bool canStartWork;
   final bool canResolveOrInvalidate;
   final bool canClose;
+}
+
+class _TicketPrioritySection extends StatelessWidget {
+  const _TicketPrioritySection({
+    required this.apiClient,
+    required this.ticket,
+    required this.isSaving,
+    required this.onChanged,
+  });
+
+  final ApiClient apiClient;
+  final TicketDetail ticket;
+  final bool isSaving;
+  final ValueChanged<TicketPriority> onChanged;
+
+  Future<bool> _canEditPriority() async {
+    if (!ticket.canEditPriorityByStatus) return false;
+    final userId = await JwtPayload.currentUserId();
+    if (userId == null || ticket.assignedDepartmentId.isEmpty) return false;
+    if (userId == ticket.assigneeAppUserId) return true;
+    try {
+      final departments = await apiClient.getDepartments();
+      final currentDept = departments
+          .where((department) => department.id == ticket.assignedDepartmentId)
+          .firstOrNull;
+      final membership = currentDept?.users
+          .where((user) => user.id == userId)
+          .firstOrNull;
+      return membership?.isDepartmentLead == true ||
+          membership?.isTicketTriager == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: _canEditPriority(),
+      builder: (context, snapshot) {
+        final canEdit = snapshot.data == true;
+        if (!canEdit) {
+          return _InfoRow('Priority', ticket.priority.label);
+        }
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(
+                width: 140,
+                child: Text(
+                  'Priority',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: DropdownButtonFormField<TicketPriority>(
+                  key: ValueKey('priority-${ticket.id}-${ticket.priority}'),
+                  initialValue: ticket.priority,
+                  isDense: true,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                  ),
+                  items: TicketPriority.values
+                      .map(
+                        (priority) => DropdownMenuItem(
+                          value: priority,
+                          child: Text(priority.label),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: isSaving
+                      ? null
+                      : (value) {
+                          if (value != null) onChanged(value);
+                        },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _TicketAssignmentSection extends StatelessWidget {
