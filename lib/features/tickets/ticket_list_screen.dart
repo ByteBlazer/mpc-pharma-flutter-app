@@ -326,7 +326,7 @@ class _TicketSummaryCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '#${ticket.id} · ${ticket.subject}',
+                        '#${ticket.id} · ${ticket.subject.trim().isEmpty ? '—' : ticket.subject}',
                         style: const TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.w700,

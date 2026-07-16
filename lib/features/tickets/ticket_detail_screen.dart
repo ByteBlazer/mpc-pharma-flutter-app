@@ -52,7 +52,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   bool _isComposingComment = false;
   bool _isAddingCustomerAttachments = false;
   bool _isLinkingCustomerAttachments = false;
-  bool _isSavingPriority = false;
   String? _currentUserId;
 
   @override
@@ -377,28 +376,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     setState(() => _isAddingCustomerAttachments = false);
   }
 
-  Future<void> _savePriority(TicketDetail ticket, TicketPriority priority) async {
-    if (priority == ticket.priority || _isSavingPriority) return;
-    setState(() => _isSavingPriority = true);
-    try {
-      await widget.apiClient.updateTicket(
-        ticketId: ticket.id,
-        body: {'priority': priority.apiValue},
-        isEmployeeView: true,
-      );
-      _refresh();
-    } catch (error) {
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        message: error.toString(),
-        type: AppSnackBarType.error,
-      );
-    } finally {
-      if (mounted) setState(() => _isSavingPriority = false);
-    }
-  }
-
   Future<void> _linkCustomerAttachments(TicketDetail ticket) async {
     final attachmentIds = _descriptionAttachmentManager.attachmentIds;
     if (attachmentIds.isEmpty) {
@@ -477,22 +454,111 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '#${ticket.id} · ${ticket.subject}',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                color: Colors.black,
-                                fontWeight: FontWeight.w700,
+                      if (_isEditingSubject &&
+                          ticket.canEditSubjectAndDescription(_currentUserId)) ...[
+                        Text(
+                          '#${ticket.id}',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _subjectController,
+                          enabled: !_isSavingSubject,
+                          autofocus: true,
+                          decoration: const InputDecoration(labelText: 'Subject'),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            TextButton(
+                              onPressed:
+                                  _isSavingSubject ? null : _cancelEditingSubject,
+                              child: const Text('Cancel'),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              onPressed: _isSavingSubject
+                                  ? null
+                                  : () => _saveSubject(ticket),
+                              child: _isSavingSubject
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Save'),
+                            ),
+                            const Spacer(),
+                            TicketStatusChip(status: ticket.status),
+                          ],
+                        ),
+                      ] else
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text.rich(
+                                TextSpan(
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.25,
+                                      ),
+                                  children: [
+                                    TextSpan(text: '#${ticket.id} · '),
+                                    TextSpan(
+                                      text: ticket.subject.trim().isEmpty
+                                          ? '—'
+                                          : ticket.subject,
+                                    ),
+                                    if (widget.isEmployeeView &&
+                                        ticket.canEditSubjectAndDescription(
+                                          _currentUserId,
+                                        ))
+                                      WidgetSpan(
+                                        alignment: PlaceholderAlignment.middle,
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(left: 4),
+                                          child: IconButton(
+                                            tooltip: 'Edit subject',
+                                            onPressed: () =>
+                                                _startEditingSubject(ticket),
+                                            icon: const Icon(
+                                              Icons.edit_outlined,
+                                              size: 18,
+                                            ),
+                                            visualDensity: VisualDensity.compact,
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(
+                                              minWidth: 28,
+                                              minHeight: 28,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          TicketStatusChip(status: ticket.status),
-                        ],
-                      ),
+                            const SizedBox(width: 12),
+                            TicketStatusChip(status: ticket.status),
+                          ],
+                        ),
+                      if (widget.isEmployeeView) ...[
+                        const SizedBox(height: 8),
+                        _RaisedByLine(
+                          apiClient: widget.apiClient,
+                          ticket: ticket,
+                        ),
+                      ],
                       if (widget.isEmployeeView) ...[
                         const SizedBox(height: 16),
                         _EmployeeActions(
@@ -504,71 +570,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                           onClose: _closeTicket,
                         ),
                       ],
-                      const SizedBox(height: 16),
-                      if (widget.isEmployeeView) ...[
-                        _TicketPrioritySection(
-                          apiClient: widget.apiClient,
-                          ticket: ticket,
-                          isSaving: _isSavingPriority,
-                          onChanged: (priority) => _savePriority(ticket, priority),
-                        ),
-                        _InfoRow('Type', ticket.ticketType.apiValue),
-                        _InfoRow(
-                          'Raised by',
-                          ticket.isCustomerSelfService
-                              ? 'Customer'
-                              : ticket.raisedByLabel,
-                        ),
-                        _TicketAssignmentSection(
-                          apiClient: widget.apiClient,
-                          ticket: ticket,
-                          onReassigned: _refresh,
-                        ),
-                        _InfoRow('Customer', ticket.raisedForCustomerName),
-                        _InfoRow('Category', ticket.ticketComplaintCategoryName),
-                      ],
-                      if (widget.isEmployeeView &&
-                          ticket.canEditSubjectAndDescription(_currentUserId)) ...[
-                        if (_isEditingSubject) ...[
-                          TextField(
-                            controller: _subjectController,
-                            enabled: !_isSavingSubject,
-                            autofocus: true,
-                            decoration: const InputDecoration(labelText: 'Subject'),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              TextButton(
-                                onPressed: _isSavingSubject
-                                    ? null
-                                    : _cancelEditingSubject,
-                                child: const Text('Cancel'),
-                              ),
-                              const SizedBox(width: 8),
-                              FilledButton(
-                                onPressed: _isSavingSubject
-                                    ? null
-                                    : () => _saveSubject(ticket),
-                                child: _isSavingSubject
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Text('Save'),
-                              ),
-                            ],
-                          ),
-                        ] else
-                          _InfoRow(
-                            'Subject',
-                            ticket.subject,
-                            onEdit: () => _startEditingSubject(ticket),
-                          ),
-                      ],
+                      const SizedBox(height: 20),
                       if (widget.isEmployeeView &&
                           _isEditingDescription &&
                           ticket.canEditSubjectAndDescription(_currentUserId))
@@ -588,9 +590,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                               : () => _saveDescription(ticket),
                         )
                       else
-                        _InfoRow(
-                          'Description',
-                          ticket.description,
+                        _TicketDescriptionHero(
+                          description: ticket.description,
                           onEdit: widget.isEmployeeView &&
                                   ticket.canEditSubjectAndDescription(
                                     _currentUserId,
@@ -598,10 +599,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                               ? () => _startEditingDescription(ticket)
                               : null,
                         ),
-                      if (ticket.resolutionSummary.isNotEmpty)
-                        _InfoRow('Resolution', ticket.resolutionSummary),
-                      if (ticket.invalidationReason.isNotEmpty)
-                        _InfoRow('Invalidation reason', ticket.invalidationReason),
                       if (widget.isEmployeeView || ticket.isRaisedByCustomer) ...[
                         const SizedBox(height: 16),
                         _AttachmentsSection(
@@ -638,6 +635,25 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                             submitTooltip: 'Upload attachments',
                             submitIcon: Icons.cloud_upload_outlined,
                           ),
+                      ],
+                      if (ticket.resolutionSummary.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        _InfoRow('Resolution', ticket.resolutionSummary),
+                      ],
+                      if (ticket.invalidationReason.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        _InfoRow('Invalidation reason', ticket.invalidationReason),
+                      ],
+                      if (widget.isEmployeeView) ...[
+                        const SizedBox(height: 20),
+                        _InfoRow('Priority', ticket.priority.label),
+                        _TicketAssignmentSection(
+                          apiClient: widget.apiClient,
+                          ticket: ticket,
+                          onReassigned: _refresh,
+                        ),
+                        _InfoRow('Customer', ticket.raisedForCustomerName),
+                        _InfoRow('Category', ticket.ticketComplaintCategoryName),
                       ],
                       if (widget.isEmployeeView) ...[
                         const SizedBox(height: 24),
@@ -854,98 +870,6 @@ class _EmployeeActionPermissions {
   final bool canClose;
 }
 
-class _TicketPrioritySection extends StatelessWidget {
-  const _TicketPrioritySection({
-    required this.apiClient,
-    required this.ticket,
-    required this.isSaving,
-    required this.onChanged,
-  });
-
-  final ApiClient apiClient;
-  final TicketDetail ticket;
-  final bool isSaving;
-  final ValueChanged<TicketPriority> onChanged;
-
-  Future<bool> _canEditPriority() async {
-    if (!ticket.canEditPriorityByStatus) return false;
-    final userId = await JwtPayload.currentUserId();
-    if (userId == null || ticket.assignedDepartmentId.isEmpty) return false;
-    if (userId == ticket.assigneeAppUserId) return true;
-    try {
-      final departments = await apiClient.getDepartments();
-      final currentDept = departments
-          .where((department) => department.id == ticket.assignedDepartmentId)
-          .firstOrNull;
-      final membership = currentDept?.users
-          .where((user) => user.id == userId)
-          .firstOrNull;
-      return membership?.isDepartmentLead == true ||
-          membership?.isTicketTriager == true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: _canEditPriority(),
-      builder: (context, snapshot) {
-        final canEdit = snapshot.data == true;
-        if (!canEdit) {
-          return _InfoRow('Priority', ticket.priority.label);
-        }
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(
-                width: 140,
-                child: Text(
-                  'Priority',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: DropdownButtonFormField<TicketPriority>(
-                  key: ValueKey('priority-${ticket.id}-${ticket.priority}'),
-                  initialValue: ticket.priority,
-                  isDense: true,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                  ),
-                  items: TicketPriority.values
-                      .map(
-                        (priority) => DropdownMenuItem(
-                          value: priority,
-                          child: Text(priority.label),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: isSaving
-                      ? null
-                      : (value) {
-                          if (value != null) onChanged(value);
-                        },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _TicketAssignmentSection extends StatelessWidget {
   const _TicketAssignmentSection({
     required this.apiClient,
@@ -1023,23 +947,18 @@ class _TicketAssignmentSection extends StatelessWidget {
                   ? '—'
                   : ticket.assignedDepartmentName,
             ),
-            _InfoRow('Assignee', assigneeLabel),
-            if (canReassign)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () => _openReassignDialog(
-                    context,
-                    data?.departments ?? const [],
-                  ),
-                  icon: const Icon(Icons.swap_horiz, size: 18),
-                  label: const Text('Reassign'),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 0),
-                  ),
-                ),
-              ),
+            _InfoRow(
+              'Assignee',
+              assigneeLabel,
+              onEdit: canReassign
+                  ? () => _openReassignDialog(
+                      context,
+                      data?.departments ?? const [],
+                    )
+                  : null,
+              editIcon: Icons.swap_horiz,
+              editTooltip: 'Reassign',
+            ),
           ],
         );
       },
@@ -1309,16 +1228,240 @@ class _ReassignTicketDialogState extends State<_ReassignTicketDialog> {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow(this.label, this.value, {this.onEdit});
+class _RaisedByDisplay {
+  const _RaisedByDisplay({
+    required this.name,
+    this.onBehalfOfCustomer,
+  });
 
-  final String label;
-  final String value;
+  final String name;
+  final String? onBehalfOfCustomer;
+}
+
+class _RaisedByLine extends StatefulWidget {
+  const _RaisedByLine({
+    required this.apiClient,
+    required this.ticket,
+  });
+
+  final ApiClient apiClient;
+  final TicketDetail ticket;
+
+  @override
+  State<_RaisedByLine> createState() => _RaisedByLineState();
+}
+
+class _RaisedByLineState extends State<_RaisedByLine> {
+  late final Future<_RaisedByDisplay> _displayFuture = _resolveDisplay();
+
+  Future<_RaisedByDisplay> _resolveDisplay() async {
+    final ticket = widget.ticket;
+    final apiClient = widget.apiClient;
+
+    if (ticket.isCustomerSelfService) {
+      final name = await _resolveCustomerName(
+        apiClient: apiClient,
+        customerId: ticket.raisedForCustomerId,
+        fallbackName: ticket.raisedForCustomerName,
+      );
+      return _RaisedByDisplay(name: name);
+    }
+
+    final employeeName = await _resolveEmployeeName(
+      apiClient: apiClient,
+      ticket: ticket,
+    );
+
+    if (ticket.ticketType != TicketType.raisedForCustomer) {
+      return _RaisedByDisplay(name: employeeName);
+    }
+
+    final onBehalf = await _resolveCustomerName(
+      apiClient: apiClient,
+      customerId: ticket.raisedForCustomerId,
+      fallbackName: ticket.raisedOnBehalfOfCustomerLabel,
+    );
+    return _RaisedByDisplay(
+      name: employeeName,
+      onBehalfOfCustomer: onBehalf == 'Unknown' ? null : onBehalf,
+    );
+  }
+
+  Future<String> _resolveEmployeeName({
+    required ApiClient apiClient,
+    required TicketDetail ticket,
+  }) async {
+    final fromTicket = ticket.raisedByLabel;
+    if (fromTicket.isNotEmpty) return fromTicket;
+
+    final userId = ticket.raisedByEmployeeId;
+    if (userId.isEmpty) return 'Unknown';
+
+    try {
+      final users = await apiClient.getUsers();
+      final match = users.where((user) => user.id == userId).firstOrNull;
+      final name = match?.personName.trim() ?? '';
+      if (name.isNotEmpty) return name;
+    } catch (_) {
+      // Fall through to departments lookup.
+    }
+
+    try {
+      final departments = await apiClient.getDepartments();
+      for (final department in departments) {
+        final match =
+            department.users.where((user) => user.id == userId).firstOrNull;
+        final name = match?.personName.trim() ?? '';
+        if (name.isNotEmpty) return name;
+      }
+    } catch (_) {
+      // Keep Unknown if lookups fail.
+    }
+
+    return 'Unknown';
+  }
+
+  Future<String> _resolveCustomerName({
+    required ApiClient apiClient,
+    required String customerId,
+    required String fallbackName,
+  }) async {
+    final fromTicket = fallbackName.trim();
+    if (fromTicket.isNotEmpty) return fromTicket;
+
+    final id = customerId.trim();
+    if (id.isEmpty) return 'Unknown';
+
+    try {
+      final customer = await apiClient.getCustomer(id: id);
+      final name = customer.firmName.trim();
+      if (name.isNotEmpty) return name;
+    } catch (_) {
+      // Keep Unknown if lookup fails.
+    }
+
+    return 'Unknown';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_RaisedByDisplay>(
+      future: _displayFuture,
+      builder: (context, snapshot) {
+        final display = snapshot.data;
+        if (display == null || display.name.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        const primaryStyle = TextStyle(
+          color: Colors.black54,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        );
+        final onBehalf = display.onBehalfOfCustomer?.trim() ?? '';
+
+        if (onBehalf.isEmpty) {
+          return Text('Raised by ${display.name}', style: primaryStyle);
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Raised by ${display.name}', style: primaryStyle),
+            const SizedBox(height: 2),
+            Text(
+              '(On behalf of customer $onBehalf)',
+              style: primaryStyle.copyWith(
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TicketDescriptionHero extends StatelessWidget {
+  const _TicketDescriptionHero({
+    required this.description,
+    this.onEdit,
+  });
+
+  final String description;
   final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
+    final bodyStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: Colors.black,
+          fontWeight: FontWeight.w500,
+          height: 1.55,
+          fontSize: 17,
+        );
+    final text = description.trim().isEmpty ? 'No description.' : description;
+
+    return AppSurface(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'Description',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Colors.black54,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                ),
+                if (onEdit != null) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: 'Edit description',
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(text, style: bodyStyle),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow(
+    this.label,
+    this.value, {
+    this.onEdit,
+    this.editIcon = Icons.edit_outlined,
+    this.editTooltip,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback? onEdit;
+  final IconData editIcon;
+  final String? editTooltip;
+
+  @override
+  Widget build(BuildContext context) {
     if (value.trim().isEmpty && onEdit == null) return const SizedBox.shrink();
+    final displayValue = value.trim().isEmpty ? '—' : value;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -1335,20 +1478,33 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(
-              value.trim().isEmpty ? '—' : value,
-              style: const TextStyle(color: Colors.black),
+            child: Text.rich(
+              TextSpan(
+                style: const TextStyle(color: Colors.black, height: 1.35),
+                children: [
+                  TextSpan(text: displayValue),
+                  if (onEdit != null)
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: IconButton(
+                          tooltip: editTooltip ?? 'Edit $label',
+                          onPressed: onEdit,
+                          icon: Icon(editIcon, size: 18),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-          if (onEdit != null)
-            IconButton(
-              tooltip: 'Edit $label',
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            ),
         ],
       ),
     );
