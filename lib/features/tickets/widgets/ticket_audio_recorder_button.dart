@@ -31,6 +31,13 @@ class TicketAudioRecorderButton extends StatefulWidget {
 }
 
 class _TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
+  /// Prefer AAC when available (Safari / native); Opus on Chrome/Firefox; WAV last.
+  static const List<AudioEncoder> _encoderPreference = [
+    AudioEncoder.aacLc,
+    AudioEncoder.opus,
+    AudioEncoder.wav,
+  ];
+
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
   Timer? _timer;
@@ -38,6 +45,7 @@ class _TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
   bool _isRecording = false;
   bool _isUploading = false;
   String? _localPath;
+  AudioEncoder? _activeEncoder;
   PendingTicketAttachment? _uploadedAttachment;
   String? _errorMessage;
 
@@ -49,44 +57,103 @@ class _TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
     super.dispose();
   }
 
-  Future<void> _startRecording() async {
-    if (!widget.enabled || _isUploading) return;
-    if (!await _recorder.hasPermission()) {
-      setState(() => _errorMessage = 'Microphone permission is required.');
-      return;
-    }
-
-    if (_uploadedAttachment != null) {
-      await widget.attachmentManager.removeUnlinked(
-        _uploadedAttachment!.attachmentId,
-      );
-    }
-
-    final path = await _recordingPath();
-    await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc),
-      path: path,
-    );
-    setState(() {
-      _errorMessage = null;
-      _isRecording = true;
-      _elapsedSeconds = 0;
-      _localPath = path;
-      _uploadedAttachment = null;
-    });
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-      if (_elapsedSeconds >= TicketAttachmentLimits.maxRecordingSeconds) {
-        unawaited(_stopRecording());
-        return;
+  Future<AudioEncoder?> _selectEncoder() async {
+    for (final encoder in _encoderPreference) {
+      if (await _recorder.isEncoderSupported(encoder)) {
+        return encoder;
       }
-      setState(() => _elapsedSeconds++);
-    });
+    }
+    return null;
   }
 
-  Future<String> _recordingPath() async {
-    final fileName = 'voice-${DateTime.now().millisecondsSinceEpoch}.m4a';
+  String _extensionFor(AudioEncoder encoder) {
+    return switch (encoder) {
+      AudioEncoder.aacLc ||
+      AudioEncoder.aacEld ||
+      AudioEncoder.aacHe =>
+        'm4a',
+      AudioEncoder.opus => 'webm',
+      AudioEncoder.wav || AudioEncoder.pcm16bits => 'wav',
+      AudioEncoder.flac => 'flac',
+      AudioEncoder.amrNb || AudioEncoder.amrWb => 'amr',
+    };
+  }
+
+  String _mimeTypeFor(AudioEncoder encoder) {
+    return switch (encoder) {
+      AudioEncoder.aacLc ||
+      AudioEncoder.aacEld ||
+      AudioEncoder.aacHe =>
+        'audio/mp4',
+      AudioEncoder.opus => 'audio/webm',
+      AudioEncoder.wav || AudioEncoder.pcm16bits => 'audio/wav',
+      AudioEncoder.flac => 'audio/flac',
+      AudioEncoder.amrNb => 'audio/AMR',
+      AudioEncoder.amrWb => 'audio/AMR-WB',
+    };
+  }
+
+  Future<void> _startRecording() async {
+    if (!widget.enabled || _isUploading) return;
+    try {
+      if (!await _recorder.hasPermission()) {
+        if (!mounted) return;
+        setState(() => _errorMessage = 'Microphone permission is required.');
+        return;
+      }
+
+      final encoder = await _selectEncoder();
+      if (encoder == null) {
+        if (!mounted) return;
+        setState(
+          () => _errorMessage =
+              'Voice recording is not supported in this browser.',
+        );
+        return;
+      }
+
+      if (_uploadedAttachment != null) {
+        await widget.attachmentManager.removeUnlinked(
+          _uploadedAttachment!.attachmentId,
+        );
+      }
+
+      final path = await _recordingPath(encoder);
+      await _recorder.start(
+        RecordConfig(encoder: encoder),
+        path: path,
+      );
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = null;
+        _isRecording = true;
+        _elapsedSeconds = 0;
+        _localPath = path;
+        _activeEncoder = encoder;
+        _uploadedAttachment = null;
+      });
+      _timer?.cancel();
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) return;
+        if (_elapsedSeconds >= TicketAttachmentLimits.maxRecordingSeconds) {
+          unawaited(_stopRecording());
+          return;
+        }
+        setState(() => _elapsedSeconds++);
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isRecording = false;
+        _errorMessage =
+            'Could not start recording. Try another browser or device mic.';
+      });
+    }
+  }
+
+  Future<String> _recordingPath(AudioEncoder encoder) async {
+    final fileName =
+        'voice-${DateTime.now().millisecondsSinceEpoch}.${_extensionFor(encoder)}';
     if (kIsWeb) return fileName;
     final directory = await getTemporaryDirectory();
     return '${directory.path}/$fileName';
@@ -116,6 +183,7 @@ class _TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
 
   Future<void> _uploadCurrentRecording() async {
     final path = _localPath;
+    final encoder = _activeEncoder ?? AudioEncoder.aacLc;
     if (path == null) return;
     setState(() {
       _isUploading = true;
@@ -123,9 +191,10 @@ class _TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
     });
     try {
       final bytes = await _readBytes(path);
+      final extension = _extensionFor(encoder);
       final attachment = await widget.attachmentManager.uploadBytes(
-        fileName: 'voice-message.m4a',
-        mimeType: 'audio/mp4',
+        fileName: 'voice-message.$extension',
+        mimeType: _mimeTypeFor(encoder),
         bytes: bytes,
         isAudio: true,
       );
@@ -167,6 +236,7 @@ class _TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
       _isRecording = false;
       _elapsedSeconds = 0;
       _localPath = null;
+      _activeEncoder = null;
       _uploadedAttachment = null;
       _errorMessage = null;
     });
