@@ -657,15 +657,16 @@ class ApiClient {
     String? token,
     required String ticketId,
     required String assignedDepartmentId,
-    required String assigneeAppUserId,
+    String? assigneeAppUserId,
   }) async {
+    final trimmedAssignee = assigneeAppUserId?.trim() ?? '';
     final response = await _put(
       'ticket/assign/${Uri.encodeComponent(ticketId)}',
       token: token,
       requiresAuth: true,
       body: {
         'assignedDepartmentId': assignedDepartmentId,
-        'assigneeAppUserId': assigneeAppUserId,
+        if (trimmedAssignee.isNotEmpty) 'assigneeAppUserId': trimmedAssignee,
       },
     );
     return TicketDetail.fromJson(

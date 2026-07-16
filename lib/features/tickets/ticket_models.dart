@@ -450,6 +450,13 @@ class TicketDetail {
       status == TicketStatus.invalid ||
       status == TicketStatus.closed;
 
+  /// Dept/assignee may be reassigned for any status except CLOSED.
+  bool get canReassignByStatus => status != TicketStatus.closed;
+
+  /// Reassigning a resolved/invalid ticket reopens it via the assign API.
+  bool get reassignReopensTicket =>
+      status == TicketStatus.resolved || status == TicketStatus.invalid;
+
   /// Customer may add files only on self-raised complaints that are still open.
   bool get canCustomerAddAttachments =>
       isRaisedByCustomer &&

@@ -428,8 +428,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                               ? 'Customer'
                               : ticket.raisedByLabel,
                         ),
-                        _InfoRow('Department', ticket.assignedDepartmentName),
-                        _InfoRow('Assignee', ticket.assigneeName),
+                        _TicketAssignmentSection(
+                          apiClient: widget.apiClient,
+                          ticket: ticket,
+                          onReassigned: _refresh,
+                        ),
                         _InfoRow('Customer', ticket.raisedForCustomerName),
                         _InfoRow('Category', ticket.ticketComplaintCategoryName),
                       ],
@@ -722,6 +725,369 @@ class _EmployeeActionPermissions {
   final bool canStartWork;
   final bool canResolveOrInvalidate;
   final bool canClose;
+}
+
+class _TicketAssignmentSection extends StatelessWidget {
+  const _TicketAssignmentSection({
+    required this.apiClient,
+    required this.ticket,
+    required this.onReassigned,
+  });
+
+  final ApiClient apiClient;
+  final TicketDetail ticket;
+  final VoidCallback onReassigned;
+
+  Future<_TicketAssignmentViewData> _load() async {
+    final userId = await JwtPayload.currentUserId();
+    List<Department> departments = const [];
+    var canReassign = false;
+
+    if (ticket.canReassignByStatus &&
+        userId != null &&
+        ticket.assignedDepartmentId.isNotEmpty) {
+      try {
+        departments = await apiClient.getDepartments();
+        final currentDept = departments
+            .where((department) => department.id == ticket.assignedDepartmentId)
+            .firstOrNull;
+        final membership = currentDept?.users
+            .where((user) => user.id == userId)
+            .firstOrNull;
+        final isAssignee = userId == ticket.assigneeAppUserId;
+        final isLead = membership?.isDepartmentLead == true;
+        final isTriager = membership?.isTicketTriager == true;
+        canReassign = isAssignee || isLead || isTriager;
+      } catch (_) {
+        canReassign = false;
+        departments = const [];
+      }
+    }
+
+    return _TicketAssignmentViewData(
+      canReassign: canReassign,
+      departments: departments,
+    );
+  }
+
+  Future<void> _openReassignDialog(
+    BuildContext context,
+    List<Department> departments,
+  ) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => _ReassignTicketDialog(
+        apiClient: apiClient,
+        ticket: ticket,
+        departments: departments,
+      ),
+    );
+    if (saved == true) onReassigned();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final assigneeLabel =
+        ticket.assigneeName.trim().isEmpty ? 'Unassigned' : ticket.assigneeName;
+
+    return FutureBuilder<_TicketAssignmentViewData>(
+      future: _load(),
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        final canReassign = data?.canReassign == true;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _InfoRow(
+              'Department',
+              ticket.assignedDepartmentName.isEmpty
+                  ? '—'
+                  : ticket.assignedDepartmentName,
+            ),
+            _InfoRow('Assignee', assigneeLabel),
+            if (canReassign)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _openReassignDialog(
+                    context,
+                    data?.departments ?? const [],
+                  ),
+                  icon: const Icon(Icons.swap_horiz, size: 18),
+                  label: const Text('Reassign'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 0),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TicketAssignmentViewData {
+  const _TicketAssignmentViewData({
+    required this.canReassign,
+    required this.departments,
+  });
+
+  final bool canReassign;
+  final List<Department> departments;
+}
+
+class _ReassignTicketDialog extends StatefulWidget {
+  const _ReassignTicketDialog({
+    required this.apiClient,
+    required this.ticket,
+    required this.departments,
+  });
+
+  final ApiClient apiClient;
+  final TicketDetail ticket;
+  final List<Department> departments;
+
+  @override
+  State<_ReassignTicketDialog> createState() => _ReassignTicketDialogState();
+}
+
+class _ReassignTicketDialogState extends State<_ReassignTicketDialog> {
+  late String? _selectedDepartmentId;
+  /// Empty string means unassigned; null means no selection yet.
+  late String? _selectedAssigneeId;
+  bool _isSaving = false;
+  String? _errorMessage;
+
+  bool get _departmentChanged =>
+      _selectedDepartmentId != null &&
+      _selectedDepartmentId != widget.ticket.assignedDepartmentId;
+
+  List<Department> get _departmentOptions {
+    final active = widget.departments.where((dept) => dept.isActive).toList();
+    final currentId = widget.ticket.assignedDepartmentId;
+    if (currentId.isEmpty) return active;
+    final alreadyIncluded = active.any((dept) => dept.id == currentId);
+    if (alreadyIncluded) return active;
+    final current = widget.departments
+        .where((dept) => dept.id == currentId)
+        .firstOrNull;
+    if (current == null) return active;
+    return [...active, current];
+  }
+
+  Department? get _selectedDepartment {
+    final id = _selectedDepartmentId;
+    if (id == null) return null;
+    return widget.departments.where((dept) => dept.id == id).firstOrNull;
+  }
+
+  List<DepartmentUser> get _assigneeOptions {
+    final department = _selectedDepartment;
+    if (department == null) return const [];
+    final includeId = _departmentChanged
+        ? null
+        : widget.ticket.assigneeAppUserId;
+    return department.selectableUsers(includeUserId: includeId);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDepartmentId = widget.ticket.assignedDepartmentId.isEmpty
+        ? null
+        : widget.ticket.assignedDepartmentId;
+    final currentAssignee = widget.ticket.assigneeAppUserId.trim();
+    _selectedAssigneeId = currentAssignee.isEmpty ? '' : currentAssignee;
+  }
+
+  Future<void> _save() async {
+    final departmentId = _selectedDepartmentId?.trim() ?? '';
+    if (departmentId.isEmpty) {
+      setState(() => _errorMessage = 'Select a department.');
+      return;
+    }
+
+    final assigneeId = _selectedAssigneeId?.trim() ?? '';
+    if (_departmentChanged && assigneeId.isEmpty) {
+      setState(
+        () => _errorMessage =
+            'A new assignee from the new department is required when changing department.',
+      );
+      return;
+    }
+
+    if (widget.ticket.reassignReopensTicket) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Reopen ticket?'),
+          content: Text(
+            'This ticket is ${widget.ticket.status.label.toLowerCase()}. '
+            'Reassigning will reopen it '
+            '(${assigneeId.isEmpty ? 'OPEN' : 'ASSIGNED'}). Continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.apiClient.assignTicket(
+        ticketId: widget.ticket.id,
+        assignedDepartmentId: departmentId,
+        assigneeAppUserId: assigneeId.isEmpty ? null : assigneeId,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+        _errorMessage = error.toString();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final assignees = _assigneeOptions;
+    final assigneeItems = <DropdownMenuItem<String>>[
+      if (!_departmentChanged)
+        const DropdownMenuItem<String>(
+          value: '',
+          child: Text('Unassigned'),
+        ),
+      ...assignees.map(
+        (user) => DropdownMenuItem(
+          value: user.id,
+          child: Text(
+            user.isActive
+                ? user.personName
+                : '${user.personName} (Inactive)',
+          ),
+        ),
+      ),
+    ];
+    final assigneeValue = assigneeItems.any(
+          (item) => item.value == _selectedAssigneeId,
+        )
+        ? _selectedAssigneeId
+        : (_departmentChanged ? null : '');
+
+    return AlertDialog(
+      title: const Text('Reassign ticket'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: _departmentOptions.any(
+                    (dept) => dept.id == _selectedDepartmentId,
+                  )
+                  ? _selectedDepartmentId
+                  : null,
+              decoration: const InputDecoration(labelText: 'Department'),
+              items: _departmentOptions
+                  .map(
+                    (dept) => DropdownMenuItem(
+                      value: dept.id,
+                      child: Text(
+                        dept.isActive ? dept.name : '${dept.name} (Inactive)',
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: _isSaving
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _selectedDepartmentId = value;
+                        _errorMessage = null;
+                        final dept = widget.departments
+                            .where((item) => item.id == value)
+                            .firstOrNull;
+                        if (value != widget.ticket.assignedDepartmentId) {
+                          _selectedAssigneeId =
+                              dept?.activeTicketTriager?.id ?? '';
+                        } else {
+                          final current = widget.ticket.assigneeAppUserId.trim();
+                          _selectedAssigneeId =
+                              current.isEmpty ? '' : current;
+                        }
+                      });
+                    },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              key: ValueKey(
+                'reassign-assignee-$_selectedDepartmentId-$assigneeValue',
+              ),
+              initialValue: assigneeValue,
+              decoration: InputDecoration(
+                labelText: _selectedDepartmentId == null
+                    ? 'Assignee (Select Dept First)'
+                    : _departmentChanged
+                        ? 'Assignee'
+                        : 'Assignee (optional)',
+              ),
+              items: assigneeItems,
+              onChanged: _isSaving || _selectedDepartmentId == null
+                  ? null
+                  : (value) => setState(() {
+                        _selectedAssigneeId = value ?? '';
+                        _errorMessage = null;
+                      }),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _errorMessage!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isSaving ? null : _save,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {
