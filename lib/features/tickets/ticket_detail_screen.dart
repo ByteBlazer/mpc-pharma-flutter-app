@@ -660,7 +660,7 @@ class _EmployeeActions extends StatelessWidget {
         canActOnWorkStatus;
 
     return _EmployeeActionPermissions(
-      canStartWork: (isAssignee || isAdmin) &&
+      canStartWork: isAssignee &&
           (ticket.status == TicketStatus.open ||
               ticket.status == TicketStatus.assigned),
       canResolveOrInvalidate: canResolveOrInvalidate,
