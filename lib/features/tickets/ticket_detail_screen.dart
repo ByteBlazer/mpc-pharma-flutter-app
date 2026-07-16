@@ -45,6 +45,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   late final TicketAttachmentManager _commentAttachmentManager;
   late final TicketAttachmentManager _descriptionAttachmentManager;
   bool _isSubmittingComment = false;
+  bool _isEditingSubject = false;
+  bool _isSavingSubject = false;
   bool _isEditingDescription = false;
   bool _isSavingDescription = false;
   bool _isComposingComment = false;
@@ -252,12 +254,60 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     }
   }
 
-  void _startEditingDescription(TicketDetail ticket) {
+  void _startEditingSubject(TicketDetail ticket) {
     _subjectController.text = ticket.subject;
+    setState(() {
+      _isEditingSubject = true;
+      _isEditingDescription = false;
+    });
+  }
+
+  void _cancelEditingSubject() {
+    _subjectController.clear();
+    setState(() => _isEditingSubject = false);
+  }
+
+  Future<void> _saveSubject(TicketDetail ticket) async {
+    final subject = _subjectController.text.trim();
+    if (subject.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: 'Subject cannot be empty.',
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
+
+    setState(() => _isSavingSubject = true);
+    try {
+      await widget.apiClient.updateTicket(
+        ticketId: ticket.id,
+        body: {'subject': subject},
+        isEmployeeView: widget.isEmployeeView,
+      );
+      _subjectController.clear();
+      if (mounted) setState(() => _isEditingSubject = false);
+      _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingSubject = false);
+    }
+  }
+
+  void _startEditingDescription(TicketDetail ticket) {
     _descriptionController.text = ticket.description;
     _descriptionAttachmentManager.clear();
     _applyExistingAttachmentUsage(_descriptionAttachmentManager, ticket);
-    setState(() => _isEditingDescription = true);
+    setState(() {
+      _isEditingDescription = true;
+      _isEditingSubject = false;
+    });
   }
 
   Future<void> _cancelEditingDescription() async {
@@ -267,22 +317,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       await _descriptionAttachmentManager.removeUnlinked(attachment.attachmentId);
     }
     _descriptionController.clear();
-    _subjectController.clear();
     if (!mounted) return;
     setState(() => _isEditingDescription = false);
   }
 
   Future<void> _saveDescription(TicketDetail ticket) async {
-    final subject = _subjectController.text.trim();
     final description = _descriptionController.text.trim();
-    if (subject.isEmpty) {
-      showAppSnackBar(
-        context,
-        message: 'Subject cannot be empty.',
-        type: AppSnackBarType.error,
-      );
-      return;
-    }
     if (description.isEmpty) {
       showAppSnackBar(
         context,
@@ -295,7 +335,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     setState(() => _isSavingDescription = true);
     try {
       final body = <String, Object?>{
-        'subject': subject,
         'description': description,
       };
       if (_descriptionAttachmentManager.attachmentIds.isNotEmpty) {
@@ -307,7 +346,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
         isEmployeeView: widget.isEmployeeView,
       );
       _descriptionController.clear();
-      _subjectController.clear();
       _descriptionAttachmentManager.clear();
       if (mounted) setState(() => _isEditingDescription = false);
       _refresh();
@@ -490,14 +528,50 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                         _InfoRow('Category', ticket.ticketComplaintCategoryName),
                       ],
                       if (widget.isEmployeeView &&
-                          _isEditingDescription &&
                           ticket.canEditSubjectAndDescription(_currentUserId)) ...[
-                        TextField(
-                          controller: _subjectController,
-                          enabled: !_isSavingDescription,
-                          decoration: const InputDecoration(labelText: 'Subject'),
-                        ),
-                        const SizedBox(height: 12),
+                        if (_isEditingSubject) ...[
+                          TextField(
+                            controller: _subjectController,
+                            enabled: !_isSavingSubject,
+                            autofocus: true,
+                            decoration: const InputDecoration(labelText: 'Subject'),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              TextButton(
+                                onPressed: _isSavingSubject
+                                    ? null
+                                    : _cancelEditingSubject,
+                                child: const Text('Cancel'),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton(
+                                onPressed: _isSavingSubject
+                                    ? null
+                                    : () => _saveSubject(ticket),
+                                child: _isSavingSubject
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Save'),
+                              ),
+                            ],
+                          ),
+                        ] else
+                          _InfoRow(
+                            'Subject',
+                            ticket.subject,
+                            onEdit: () => _startEditingSubject(ticket),
+                          ),
+                      ],
+                      if (widget.isEmployeeView &&
+                          _isEditingDescription &&
+                          ticket.canEditSubjectAndDescription(_currentUserId))
                         TicketDescriptionField(
                           controller: _descriptionController,
                           attachmentManager: _descriptionAttachmentManager,
@@ -512,25 +586,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                           onSubmit: _isSavingDescription
                               ? null
                               : () => _saveDescription(ticket),
+                        )
+                      else
+                        _InfoRow(
+                          'Description',
+                          ticket.description,
+                          onEdit: widget.isEmployeeView &&
+                                  ticket.canEditSubjectAndDescription(
+                                    _currentUserId,
+                                  )
+                              ? () => _startEditingDescription(ticket)
+                              : null,
                         ),
-                      ] else ...[
-                        _InfoRow('Description', ticket.description),
-                        if (widget.isEmployeeView &&
-                            ticket.canEditSubjectAndDescription(_currentUserId))
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton(
-                              onPressed: () => _startEditingDescription(ticket),
-                              style: TextButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 0,
-                                ),
-                              ),
-                              child: const Text('Edit subject & description'),
-                            ),
-                          ),
-                      ],
                       if (ticket.resolutionSummary.isNotEmpty)
                         _InfoRow('Resolution', ticket.resolutionSummary),
                       if (ticket.invalidationReason.isNotEmpty)
@@ -1243,14 +1310,15 @@ class _ReassignTicketDialogState extends State<_ReassignTicketDialog> {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow(this.label, this.value);
+  const _InfoRow(this.label, this.value, {this.onEdit});
 
   final String label;
   final String value;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
-    if (value.trim().isEmpty) return const SizedBox.shrink();
+    if (value.trim().isEmpty && onEdit == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -1267,8 +1335,20 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(color: Colors.black)),
+            child: Text(
+              value.trim().isEmpty ? '—' : value,
+              style: const TextStyle(color: Colors.black),
+            ),
           ),
+          if (onEdit != null)
+            IconButton(
+              tooltip: 'Edit $label',
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
         ],
       ),
     );
