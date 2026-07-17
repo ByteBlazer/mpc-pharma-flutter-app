@@ -624,21 +624,55 @@ class _FeatureTile extends StatelessWidget {
             SizedBox(
               height: labelAreaHeight,
               width: tileWidth,
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
-                  fontSize: labelFontSize,
-                  height: 1.15,
-                ),
+              child: _HomeTileLabel(
+                label: label,
+                fontSize: labelFontSize,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HomeTileLabel extends StatelessWidget {
+  const _HomeTileLabel({
+    required this.label,
+    required this.fontSize,
+  });
+
+  final String label;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: Colors.black,
+      fontWeight: FontWeight.w600,
+      fontSize: fontSize,
+      height: 1.15,
+    );
+    final canWrapAtSpaces = label.trim().contains(RegExp(r'\s'));
+
+    if (canWrapAtSpaces) {
+      return Text(
+        label,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      );
+    }
+
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        softWrap: false,
+        style: style,
       ),
     );
   }

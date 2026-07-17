@@ -2,6 +2,25 @@ import '../../auth/app_role.dart';
 
 typedef JsonMap = Map<String, dynamic>;
 
+class UserDepartment {
+  const UserDepartment({
+    required this.id,
+    required this.name,
+  });
+
+  factory UserDepartment.fromJson(JsonMap json) {
+    return UserDepartment(
+      id: _stringValue(json['id']),
+      name: _stringValue(json['name']),
+    );
+  }
+
+  final String id;
+  final String name;
+
+  static String _stringValue(Object? value) => value?.toString() ?? '';
+}
+
 class UserAccount {
   const UserAccount({
     required this.id,
@@ -13,6 +32,7 @@ class UserAccount {
     required this.isActive,
     required this.createdAt,
     required this.roles,
+    this.departments = const [],
   });
 
   factory UserAccount.fromJson(JsonMap json) {
@@ -26,6 +46,7 @@ class UserAccount {
       isActive: json['isActive'] == true,
       createdAt: DateTime.tryParse(_stringValue(json['createdAt'])),
       roles: _parseRoles(json['roles']),
+      departments: _parseDepartments(json['departments']),
     );
   }
 
@@ -38,6 +59,7 @@ class UserAccount {
   final bool isActive;
   final DateTime? createdAt;
   final List<AppRole> roles;
+  final List<UserDepartment> departments;
 
   bool matchesSearch(String query) {
     final normalizedQuery = query.trim().toLowerCase();
@@ -52,6 +74,7 @@ class UserAccount {
       isActive ? 'active' : 'inactive',
       ...roles.map((role) => role.tokenValue),
       ...roles.map((role) => role.label),
+      ...departments.map((department) => department.name),
     ].join(' ').toLowerCase();
     return searchableText.contains(normalizedQuery);
   }
@@ -67,6 +90,15 @@ class UserAccount {
         })
         .where((role) => role.isNotEmpty)
         .toAppRoles();
+  }
+
+  static List<UserDepartment> _parseDepartments(Object? value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<JsonMap>()
+        .map(UserDepartment.fromJson)
+        .where((department) => department.name.trim().isNotEmpty)
+        .toList();
   }
 }
 

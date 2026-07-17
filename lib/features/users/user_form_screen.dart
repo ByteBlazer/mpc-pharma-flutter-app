@@ -143,6 +143,38 @@ class _UserFormScreenState extends State<UserFormScreen> {
         .toList();
   }
 
+  String get _departmentsSummary {
+    final names = widget.user?.departments
+            .map((department) => department.name.trim())
+            .where((name) => name.isNotEmpty)
+            .toList() ??
+        const [];
+    if (names.isEmpty) return 'Not tagged to any department';
+    return names.join(', ');
+  }
+
+  void _showDepartmentsInfo(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Department tags'),
+          content: const Text(
+            'You cannot change department tags from this screen.\n\n'
+            'To add or remove this user from a department, go to Home → '
+            'Departments, open the department, and update its members.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppScreenScaffold(
@@ -239,6 +271,28 @@ class _UserFormScreenState extends State<UserFormScreen> {
                         ),
                         if (_isEditing) ...[
                           const SizedBox(height: 16),
+                          InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Departments',
+                              enabled: false,
+                              suffixIcon: IconButton(
+                                tooltip: 'How to change department tags',
+                                onPressed: () => _showDepartmentsInfo(context),
+                                icon: Icon(
+                                  Icons.info_outline,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              _departmentsSummary,
+                              style: TextStyle(
+                                color: Theme.of(context).disabledColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
                             value: _isActive,

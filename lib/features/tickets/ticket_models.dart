@@ -264,8 +264,11 @@ class TicketSummary {
     required this.priority,
     required this.ticketType,
     required this.subject,
+    required this.assignedDepartmentId,
     required this.assignedDepartmentName,
+    required this.assigneeAppUserId,
     required this.assigneeName,
+    required this.createdBy,
     required this.customerFirmName,
     required this.createdByName,
     required this.createdAt,
@@ -285,8 +288,11 @@ class TicketSummary {
           TicketType.fromApi(_string(json['ticketType'])) ??
           TicketType.raisedForCustomer,
       subject: _string(json['subject']),
+      assignedDepartmentId: _string(json['assignedDepartmentId']),
       assignedDepartmentName: _string(json['assignedDepartmentName']),
+      assigneeAppUserId: _string(json['assigneeAppUserId']),
       assigneeName: _string(json['assigneeName']),
+      createdBy: _string(json['createdBy']),
       customerFirmName: _string(json['customerFirmName']),
       createdByName: _string(json['createdByName']),
       createdAt: DateTime.tryParse(_string(json['createdAt'])),
@@ -300,8 +306,11 @@ class TicketSummary {
   final TicketPriority priority;
   final TicketType ticketType;
   final String subject;
+  final String assignedDepartmentId;
   final String assignedDepartmentName;
+  final String assigneeAppUserId;
   final String assigneeName;
+  final String createdBy;
   final String customerFirmName;
   final String createdByName;
   final DateTime? createdAt;
