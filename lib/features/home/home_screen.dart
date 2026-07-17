@@ -8,12 +8,15 @@ import '../../app_theme.dart';
 import '../../auth/jwt_payload.dart';
 import '../../utils/build_timestamp.dart';
 import '../../widgets/app_brand_page_background.dart';
+import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/simulation_mode_banner.dart';
 import '../auth/impersonate_screen.dart';
 import '../customers/customers_screen.dart';
 import '../departments/departments_screen.dart';
 import '../locations/locations_screen.dart';
+import '../notifications/notification_inbox_controller.dart';
+import '../notifications/notifications_screen.dart';
 import '../settings/settings_screen.dart';
 import '../tickets/tickets_screen.dart';
 import '../users/users_screen.dart';
@@ -24,7 +27,7 @@ bool _isWideHomeLayout(double width) => width > 500;
 
 double _homeTileWidth(double width) => _isWideHomeLayout(width) ? 88.0 : 68.0;
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.apiClient,
@@ -32,6 +35,7 @@ class HomeScreen extends StatelessWidget {
     required this.onSessionReplaced,
     required this.onExitSimulation,
     required this.isSimulationMode,
+    this.notificationInbox,
   });
 
   final ApiClient apiClient;
@@ -39,9 +43,50 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onSessionReplaced;
   final Future<void> Function() onExitSimulation;
   final bool isSimulationMode;
+  final NotificationInboxController? notificationInbox;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    widget.notificationInbox?.addListener(_onInboxChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.notificationInbox != widget.notificationInbox) {
+      oldWidget.notificationInbox?.removeListener(_onInboxChanged);
+      widget.notificationInbox?.addListener(_onInboxChanged);
+    }
+  }
+
+  void _onInboxChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.notificationInbox?.removeListener(_onInboxChanged);
+    super.dispose();
+  }
+
+  Future<void> _loginAgain() async {
+    await widget.onLoginAgain();
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final inbox = widget.notificationInbox;
+    final showAuthError =
+        inbox != null && inbox.isAuthError && inbox.hasError;
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -53,32 +98,40 @@ class HomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 960),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const _HomeWelcomeCard(),
-                            const SizedBox(height: 28),
-                            _HomeFeatureGrid(
-                              isSimulationMode: isSimulationMode,
-                              apiClient: apiClient,
-                              onLoginAgain: onLoginAgain,
-                              onSessionReplaced: onSessionReplaced,
+                child: showAuthError
+                    ? AppLoadErrorState(
+                        title: 'Session expired',
+                        message: inbox.error.toString(),
+                        onRetry: () => inbox.refresh(),
+                        onLoginAgain: _loginAgain,
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 960),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const _HomeWelcomeCard(),
+                                  const SizedBox(height: 28),
+                                  _HomeFeatureGrid(
+                                    isSimulationMode: widget.isSimulationMode,
+                                    apiClient: widget.apiClient,
+                                    onLoginAgain: widget.onLoginAgain,
+                                    onSessionReplaced: widget.onSessionReplaced,
+                                    notificationInbox: inbox,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
               ),
-              if (isSimulationMode)
+              if (widget.isSimulationMode)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                   child: Center(
@@ -86,12 +139,12 @@ class HomeScreen extends StatelessWidget {
                       constraints: const BoxConstraints(maxWidth: 960),
                       child: SimulationModeBanner(
                         isVisible: true,
-                        onExitSimulation: onExitSimulation,
+                        onExitSimulation: widget.onExitSimulation,
                       ),
                     ),
                   ),
                 ),
-              _HomeBuildTimestamp(apiClient: apiClient),
+              _HomeBuildTimestamp(apiClient: widget.apiClient),
             ],
           ),
         ),
@@ -172,59 +225,37 @@ class _HomeWelcomeCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Welcome back',
-                        style: Theme.of(context).textTheme.labelMedium
+                        user.username.trim().isEmpty
+                            ? 'Welcome'
+                            : 'Welcome, ${user.username}',
+                        style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
-                              color: accentText,
+                              color: Colors.black,
                               fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
                             ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        user.username,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.black,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                        ),
-                      ),
-                      if (user.baseLocationName.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: primary.withValues(alpha: 0.07),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: primary.withValues(alpha: 0.12),
+                      if (user.baseLocationName.trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.place_outlined,
+                              size: 16,
+                              color: accentText,
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.location_on_outlined,
-                                size: 15,
-                                color: accentText,
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                user.baseLocationName,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Colors.black87,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                               ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  user.baseLocationName,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: Colors.black87,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ],
@@ -271,12 +302,14 @@ class _HomeFeatureGrid extends StatelessWidget {
     required this.apiClient,
     required this.onLoginAgain,
     required this.onSessionReplaced,
+    this.notificationInbox,
   });
 
   final bool isSimulationMode;
   final ApiClient apiClient;
   final Future<void> Function() onLoginAgain;
   final VoidCallback onSessionReplaced;
+  final NotificationInboxController? notificationInbox;
 
   Future<_HomeFeatureVisibility> _loadVisibility() async {
     final showImpersonate =
@@ -284,11 +317,13 @@ class _HomeFeatureGrid extends StatelessWidget {
     final showTickets = await JwtPayload.currentUserIsEmployee();
     final showComplaints = await JwtPayload.currentUserIsCustomer();
     final showSettings = await JwtPayload.currentUserIsAppAdmin();
+    final showNotifications = showTickets;
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
       showTickets: showTickets,
       showComplaints: showComplaints,
       showSettings: showSettings,
+      showNotifications: showNotifications,
     );
   }
 
@@ -323,6 +358,22 @@ class _HomeFeatureGrid extends StatelessWidget {
                 builder: (_) => TicketsScreen(
                   apiClient: apiClient,
                   onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showNotifications)
+        _FeatureTile(
+          icon: Icons.notifications_outlined,
+          label: 'Notifications',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => NotificationsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                  inboxController: notificationInbox,
                 ),
               ),
             );
@@ -489,12 +540,14 @@ class _HomeFeatureVisibility {
     required this.showTickets,
     required this.showComplaints,
     required this.showSettings,
+    required this.showNotifications,
   });
 
   final bool showImpersonate;
   final bool showTickets;
   final bool showComplaints;
   final bool showSettings;
+  final bool showNotifications;
 }
 
 class _FeatureTile extends StatelessWidget {

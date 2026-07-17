@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../auth/jwt_payload.dart';
+import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_surface.dart';
@@ -255,9 +256,11 @@ class _ImpersonateScreenState extends State<ImpersonateScreen> {
                               }
 
                               if (snapshot.hasError) {
-                                return _ErrorState(
+                                return AppLoadErrorState(
+                                  title: 'Failed to load people',
                                   message: snapshot.error.toString(),
                                   onRetry: _refresh,
+                                  onLoginAgain: widget.onLoginAgain,
                                 );
                               }
 
@@ -475,31 +478,6 @@ class _ImpersonateData {
 
   final List<UserAccount> employees;
   final List<CustomerSummary> customers;
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.black),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
-        ],
-      ),
-    );
-  }
 }
 
 class _AlreadyImpersonating extends StatelessWidget {

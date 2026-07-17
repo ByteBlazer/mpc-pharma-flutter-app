@@ -7,6 +7,7 @@ import '../../api/api_client.dart';
 import '../../app_theme.dart';
 import '../../auth/app_role.dart';
 import '../../auth/jwt_payload.dart';
+import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_surface.dart';
@@ -487,7 +488,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return Center(child: Text(snapshot.error.toString()));
+              return AppLoadErrorState(
+                title: widget.isEmployeeView
+                    ? 'Failed to load Ticket'
+                    : 'Failed to load Complaint',
+                message: snapshot.error.toString(),
+                onRetry: _refresh,
+                onLoginAgain: widget.onLoginAgain,
+              );
             }
             final ticket = snapshot.data;
             if (ticket == null) {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../app_theme.dart';
+import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_multi_select_field.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
@@ -35,7 +36,7 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
   final _descriptionController = TextEditingController();
   final _subjectController = TextEditingController();
   late final TicketAttachmentManager _attachmentManager;
-  late final Future<_CreateTicketData> _dataFuture;
+  late Future<_CreateTicketData> _dataFuture;
 
   String? _selectedCustomerId;
   String? _selectedCategoryId;
@@ -108,6 +109,12 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
           ? results[2] as List<CustomerSummary>
           : const [],
     );
+  }
+
+  void _refreshData() {
+    setState(() {
+      _dataFuture = _loadData();
+    });
   }
 
   Department? _selectedDepartment(_CreateTicketData data) {
@@ -221,7 +228,12 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return Center(child: Text(snapshot.error.toString()));
+              return AppLoadErrorState(
+                title: 'Failed to load ticket form',
+                message: snapshot.error.toString(),
+                onRetry: _refreshData,
+                onLoginAgain: widget.onLoginAgain,
+              );
             }
             final data = snapshot.data ?? const _CreateTicketData.empty();
             final departments = data.departments.where((d) => d.isActive).toList();

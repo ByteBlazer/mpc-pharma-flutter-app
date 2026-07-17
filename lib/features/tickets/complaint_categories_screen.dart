@@ -4,6 +4,7 @@ import '../../api/api_client.dart';
 import '../../app_theme.dart';
 import '../../widgets/app_async_list_loader.dart';
 import '../../widgets/app_list_controls_row.dart';
+import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_surface.dart';
@@ -151,15 +152,11 @@ class _ComplaintCategoriesScreenState extends State<ComplaintCategoriesScreen> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(snapshot.error.toString()),
-                    const SizedBox(height: 16),
-                    OutlinedButton(onPressed: _refresh, child: const Text('Retry')),
-                  ],
-                ),
+              return AppLoadErrorState(
+                title: 'Failed to load complaint categories',
+                message: snapshot.error.toString(),
+                onRetry: _refresh,
+                onLoginAgain: widget.onLoginAgain,
               );
             }
 
@@ -303,23 +300,17 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: isActive ? const Color(0xFFE8F5E9) : const Color(0xFFEEEEEE),
+        color: isActive ? colorScheme.primary : Colors.black,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: isActive ? const Color(0xFF2E7D32) : Colors.black38,
-        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Text(
           isActive ? 'Active' : 'Inactive',
-          style: TextStyle(
-            color: isActive ? const Color(0xFF2E7D32) : Colors.black54,
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 12),
         ),
       ),
     );

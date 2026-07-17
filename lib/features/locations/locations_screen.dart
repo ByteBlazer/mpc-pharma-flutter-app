@@ -6,6 +6,7 @@ import '../../api/api_client.dart';
 import '../../utils/download_file.dart';
 import '../../widgets/app_async_list_loader.dart';
 import '../../widgets/app_list_controls_row.dart';
+import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_surface.dart';
@@ -162,7 +163,8 @@ class _LocationsScreenState extends State<LocationsScreen> {
             }
 
             if (snapshot.hasError) {
-              return _ErrorState(
+              return AppLoadErrorState(
+                title: 'Failed to load Locations',
                 message: snapshot.error.toString(),
                 onRetry: _refresh,
                 onLoginAgain: widget.onLoginAgain,
@@ -499,72 +501,5 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({
-    required this.message,
-    required this.onRetry,
-    required this.onLoginAgain,
-  });
 
-  final String message;
-  final VoidCallback onRetry;
-  final Future<void> Function() onLoginAgain;
 
-  bool get _isAuthError {
-    final normalized = message.toLowerCase();
-    return normalized.contains('token') ||
-        normalized.contains('expired') ||
-        normalized.contains('unauthorized') ||
-        normalized.contains('401');
-  }
-
-  Future<void> _loginAgain(BuildContext context) async {
-    await onLoginAgain();
-    if (!context.mounted) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Failed to load Locations',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.black),
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _isAuthError
-                        ? () => _loginAgain(context)
-                        : onRetry,
-                    child: Text(_isAuthError ? 'Login Again' : 'Retry'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

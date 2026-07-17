@@ -7,6 +7,7 @@ import 'auth_models.dart';
 import 'auth_token_store.dart';
 import '../features/customers/customer_models.dart' hide JsonMap;
 import '../features/departments/department_models.dart' hide JsonMap;
+import '../features/notifications/notification_models.dart' hide JsonMap;
 import '../features/tickets/ticket_models.dart' hide JsonMap;
 import '../features/users/user_models.dart' hide JsonMap;
 
@@ -572,6 +573,30 @@ class ApiClient {
   Future<List<TicketSummary>> getTickets({String? token}) async {
     final response = await _get('ticket', token: token, requiresAuth: true);
     return _decodeJsonList(response.body).map(TicketSummary.fromJson).toList();
+  }
+
+  Future<List<AppNotification>> getNotifications({String? token}) async {
+    final response = await _get(
+      'notification',
+      token: token,
+      requiresAuth: true,
+    );
+    return _decodeJsonList(response.body).map(AppNotification.fromJson).toList();
+  }
+
+  Future<void> markNotificationRead({
+    String? token,
+    required String notificationId,
+  }) async {
+    await _put(
+      'notification/${Uri.encodeComponent(notificationId)}/read',
+      token: token,
+      requiresAuth: true,
+    );
+  }
+
+  Future<void> markAllNotificationsRead({String? token}) async {
+    await _put('notification/read-all', token: token, requiresAuth: true);
   }
 
   Future<TicketDetail> getTicket({

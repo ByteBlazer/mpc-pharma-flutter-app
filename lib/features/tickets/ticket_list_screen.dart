@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/api_client.dart';
 import '../../app_theme.dart';
 import '../../widgets/app_async_list_loader.dart';
+import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_surface.dart';
@@ -117,10 +118,13 @@ class _TicketListScreenState extends State<TicketListScreen> {
                             );
                           }
                           if (snapshot.hasError) {
-                            return _TicketListMessage(
+                            return AppLoadErrorState(
+                              title: widget.isEmployeeView
+                                  ? 'Failed to load Tickets'
+                                  : 'Failed to load Complaints',
                               message: snapshot.error.toString(),
-                              actionLabel: 'Retry',
-                              onAction: _refresh,
+                              onRetry: _refresh,
+                              onLoginAgain: widget.onLoginAgain,
                             );
                           }
                           final tickets =
@@ -443,32 +447,17 @@ class _TicketCardMetaRow extends StatelessWidget {
 }
 
 class _TicketListMessage extends StatelessWidget {
-  const _TicketListMessage({
-    required this.message,
-    this.actionLabel,
-    this.onAction,
-  });
+  const _TicketListMessage({required this.message});
 
   final String message;
-  final String? actionLabel;
-  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.black),
-          ),
-          if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: 16),
-            OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
-          ],
-        ],
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.black),
       ),
     );
   }

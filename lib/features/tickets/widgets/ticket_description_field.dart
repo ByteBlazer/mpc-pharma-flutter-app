@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app_theme.dart';
 import '../ticket_attachment_manager.dart';
@@ -316,6 +317,29 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
     }
   }
 
+  Future<void> _openDraftAttachment(PendingTicketAttachment attachment) async {
+    if (attachment.isAudio &&
+        widget.showAudioRecorder &&
+        _canEdit) {
+      await _audioRecorderKey.currentState?.openForVoiceClip(attachment);
+      return;
+    }
+
+    try {
+      final download = await widget.attachmentManager.apiClient
+          .getTicketAttachmentDownload(attachmentId: attachment.attachmentId);
+      final uri = Uri.parse(download.downloadUrl);
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        throw Exception('Could not open ${attachment.fileName}.');
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
+
   Future<void> _handleCancel() async {
     final onCancel = widget.onCancel;
     if (onCancel == null) return;
@@ -386,19 +410,18 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                   ...pending.map((attachment) {
                     final isRemoving =
                         _removingIds.contains(attachment.attachmentId);
+                    final canOpen = !isBusy && !isRemoving;
                     return _ComposerAttachmentTile(
                       fileName: attachment.fileName,
                       mimeType: attachment.mimeType,
                       isBusy: isRemoving,
                       busyTooltip: 'Removing ${attachment.fileName}…',
+                      openTooltip: attachment.isAudio
+                          ? 'Review voice message'
+                          : 'Open ${attachment.fileName}',
                       enabled: _canEdit && !isBusy,
-                      onOpen: attachment.isAudio &&
-                              widget.showAudioRecorder &&
-                              _canEdit &&
-                              !isBusy &&
-                              !isRemoving
-                          ? () => _audioRecorderKey.currentState
-                              ?.openForVoiceClip(attachment)
+                      onOpen: canOpen
+                          ? () => _openDraftAttachment(attachment)
                           : null,
                       onRemove: isRemoving
                           ? null
@@ -478,6 +501,7 @@ class _ComposerAttachmentTile extends StatelessWidget {
     this.mimeType,
     this.isBusy = false,
     this.busyTooltip,
+    this.openTooltip,
     this.enabled = false,
     this.onOpen,
     this.onRemove,
@@ -487,6 +511,7 @@ class _ComposerAttachmentTile extends StatelessWidget {
   final String? mimeType;
   final bool isBusy;
   final String? busyTooltip;
+  final String? openTooltip;
   final bool enabled;
   final VoidCallback? onOpen;
   final Future<void> Function()? onRemove;
@@ -515,7 +540,7 @@ class _ComposerAttachmentTile extends StatelessWidget {
       message: isBusy
           ? (busyTooltip ?? fileName)
           : canOpen
-              ? 'Review voice message'
+              ? (openTooltip ?? fileName)
               : fileName,
       child: SizedBox(
         width: 64,
