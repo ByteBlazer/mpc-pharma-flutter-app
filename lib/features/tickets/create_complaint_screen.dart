@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../app_theme.dart';
+import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/unsaved_changes_dialog.dart';
@@ -61,6 +62,12 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
     super.initState();
     _attachmentManager = TicketAttachmentManager(widget.apiClient);
     _categoriesFuture = widget.apiClient.getComplaintCategories();
+  }
+
+  void _refreshCategories() {
+    setState(() {
+      _categoriesFuture = widget.apiClient.getComplaintCategories();
+    });
   }
 
   @override
@@ -127,33 +134,32 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
         child: AppScreenScaffold(
           appBar: AppBar(title: const Text('New complaint')),
           body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      FutureBuilder<List<ComplaintCategory>>(
-                        future: _categoriesFuture,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState !=
-                              ConnectionState.done) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-                          if (snapshot.hasError) {
-                            return Text(
-                              snapshot.error.toString(),
-                              style: const TextStyle(color: Colors.black),
-                            );
-                          }
-                          final categories = (snapshot.data ?? const [])
-                              .where((category) => category.isActive)
-                              .toList();
-                          return DropdownButtonFormField<String>(
+            child: FutureBuilder<List<ComplaintCategory>>(
+              future: _categoriesFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return AppLoadErrorState(
+                    title: 'Failed to load complaint form',
+                    message: snapshot.error.toString(),
+                    onRetry: _refreshCategories,
+                    onLoginAgain: widget.onLoginAgain,
+                  );
+                }
+                final categories = (snapshot.data ?? const [])
+                    .where((category) => category.isActive)
+                    .toList();
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          DropdownButtonFormField<String>(
                             initialValue: _selectedCategoryId,
                             decoration: const InputDecoration(
                               labelText: 'Category',
@@ -171,36 +177,36 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
                                 : (value) => setState(
                                     () => _selectedCategoryId = value,
                                   ),
-                          );
-                        },
+                          ),
+                          const SizedBox(height: 20),
+                          TicketDescriptionField(
+                            controller: _descriptionController,
+                            attachmentManager: _attachmentManager,
+                            onAttachmentsChanged: () => setState(() {}),
+                            enabled: !_isSubmitting,
+                          ),
+                          const SizedBox(height: 24),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: ElevatedButton(
+                              onPressed: _isSubmitting ? null : _submit,
+                              child: _isSubmitting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Submit complaint'),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                      TicketDescriptionField(
-                        controller: _descriptionController,
-                        attachmentManager: _attachmentManager,
-                        onAttachmentsChanged: () => setState(() {}),
-                        enabled: !_isSubmitting,
-                      ),
-                      const SizedBox(height: 24),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: ElevatedButton(
-                          onPressed: _isSubmitting ? null : _submit,
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text('Submit complaint'),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ),

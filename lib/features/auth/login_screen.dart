@@ -11,6 +11,8 @@ import '../../widgets/app_brand_page_background.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/simulation_mode_banner.dart';
 import '../home/home_screen.dart';
+import '../notifications/notification_bell_button.dart';
+import '../notifications/notification_inbox_controller.dart';
 import 'user_profile_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -43,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
   int _resendSeconds = 0;
   Timer? _resendTimer;
+  NotificationInboxController? _notificationInbox;
   bool get _canSendOtp =>
       !_isLoading && !_otpSent && _isValidPhone(_phoneController.text.trim());
   bool get _canVerifyOtp =>
@@ -61,6 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _resendTimer?.cancel();
+    _disposeNotificationInbox();
     _phoneController.removeListener(_handlePhoneChange);
     _otpController.removeListener(_handleOtpChange);
     _phoneController.dispose();
@@ -69,6 +73,47 @@ class _LoginScreenState extends State<LoginScreen> {
       _apiClient.close();
     }
     super.dispose();
+  }
+
+  void _disposeNotificationInbox() {
+    final inbox = _notificationInbox;
+    if (inbox == null) return;
+    inbox.removeListener(_onNotificationInboxChanged);
+    inbox.dispose();
+    _notificationInbox = null;
+  }
+
+  void _onNotificationInboxChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _syncNotificationInbox() async {
+    if (!_isLoggedIn) {
+      _disposeNotificationInbox();
+      if (mounted) setState(() {});
+      return;
+    }
+
+    final isEmployee = await JwtPayload.currentUserIsEmployee(
+      tokenStore: _tokenStore,
+    );
+    if (!mounted) return;
+
+    if (!isEmployee) {
+      _disposeNotificationInbox();
+      setState(() {});
+      return;
+    }
+
+    if (_notificationInbox != null) {
+      await _notificationInbox!.refresh(silent: true);
+      return;
+    }
+
+    final inbox = NotificationInboxController(_apiClient);
+    inbox.addListener(_onNotificationInboxChanged);
+    inbox.startPolling();
+    setState(() => _notificationInbox = inbox);
   }
 
   void _handlePhoneChange() {
@@ -88,6 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
           token != null && JwtPayload.isImpersonation(token);
       _isCheckingSession = false;
     });
+    await _syncNotificationInbox();
   }
 
   Future<void> _sendOtp() async {
@@ -146,6 +192,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoggedIn = true;
         _isSimulationMode = false;
       });
+      await _syncNotificationInbox();
     } catch (error) {
       if (!mounted) return;
       setState(() => _errorMessage = error.toString());
@@ -161,6 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _sessionVersion++;
       _isSimulationMode = true;
     });
+    unawaited(_syncNotificationInbox());
   }
 
   Future<void> _exitSimulation() async {
@@ -178,10 +226,12 @@ class _LoginScreenState extends State<LoginScreen> {
       _sessionVersion++;
       _isSimulationMode = false;
     });
+    await _syncNotificationInbox();
   }
 
   Future<void> _logout() async {
     await _tokenStore.clearToken();
+    _disposeNotificationInbox();
     if (!mounted) return;
     setState(() {
       _isLoggedIn = false;
@@ -227,6 +277,12 @@ class _LoginScreenState extends State<LoginScreen> {
               isVisible: _isSimulationMode,
               onExitSimulation: _exitSimulation,
             ),
+          if (_isLoggedIn && _notificationInbox != null)
+            NotificationBellButton(
+              apiClient: _apiClient,
+              onLoginAgain: _logout,
+              controller: _notificationInbox!,
+            ),
           if (_isLoggedIn)
             IconButton(
               tooltip: 'User profile',
@@ -247,6 +303,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onSessionReplaced: _onSessionReplaced,
               onExitSimulation: _exitSimulation,
               isSimulationMode: _isSimulationMode,
+              notificationInbox: _notificationInbox,
             )
           : AppGradientScaffoldBody(
               child: SafeArea(
