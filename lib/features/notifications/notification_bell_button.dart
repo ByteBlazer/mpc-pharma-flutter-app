@@ -23,14 +23,49 @@ class NotificationBellButton extends StatefulWidget {
   State<NotificationBellButton> createState() => _NotificationBellButtonState();
 }
 
-class _NotificationBellButtonState extends State<NotificationBellButton> {
+class _NotificationBellButtonState extends State<NotificationBellButton>
+    with SingleTickerProviderStateMixin {
   final GlobalKey _buttonKey = GlobalKey();
   bool _isMarkingAll = false;
+  late final AnimationController _ringController;
+  late final Animation<double> _ringAngle;
+  late final Animation<double> _ringScale;
 
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onChanged);
+    _ringController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    );
+    // Zoom in → strong shake → zoom out → rest.
+    _ringScale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 2.0).chain(
+          CurveTween(curve: Curves.easeOutBack),
+        ),
+        weight: 3,
+      ),
+      TweenSequenceItem(tween: ConstantTween(2.0), weight: 8),
+      TweenSequenceItem(
+        tween: Tween(begin: 2.0, end: 1.0).chain(
+          CurveTween(curve: Curves.easeIn),
+        ),
+        weight: 3,
+      ),
+      TweenSequenceItem(tween: ConstantTween(1.0), weight: 14),
+    ]).animate(_ringController);
+    _ringAngle = TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(0.0), weight: 3),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.38), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 0.38, end: -0.38), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: -0.38, end: 0.30), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 0.30, end: -0.24), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: -0.24, end: 0.0), weight: 1),
+      TweenSequenceItem(tween: ConstantTween(0.0), weight: 17),
+    ]).animate(_ringController);
+    _syncRingAnimation();
   }
 
   @override
@@ -39,17 +74,32 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_onChanged);
       widget.controller.addListener(_onChanged);
+      _syncRingAnimation();
     }
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_onChanged);
+    _ringController.dispose();
     super.dispose();
   }
 
   void _onChanged() {
+    _syncRingAnimation();
     if (mounted) setState(() {});
+  }
+
+  void _syncRingAnimation() {
+    final hasUnread = widget.controller.unreadCount > 0;
+    if (hasUnread) {
+      if (!_ringController.isAnimating) {
+        _ringController.repeat();
+      }
+    } else if (_ringController.isAnimating || _ringController.value != 0) {
+      _ringController.stop();
+      _ringController.value = 0;
+    }
   }
 
   Future<void> _openPanel() async {
@@ -170,9 +220,23 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
             fontWeight: FontWeight.w700,
           ),
         ),
-        child: const Icon(
-          Icons.notifications_outlined,
-          color: Colors.white,
+        child: AnimatedBuilder(
+          animation: _ringController,
+          builder: (context, child) {
+            if (unread <= 0) return child!;
+            return Transform.scale(
+              scale: _ringScale.value,
+              child: Transform.rotate(
+                angle: _ringAngle.value,
+                alignment: Alignment.topCenter,
+                child: child,
+              ),
+            );
+          },
+          child: const Icon(
+            Icons.notifications_outlined,
+            color: Colors.white,
+          ),
         ),
       ),
     );
