@@ -16,12 +16,7 @@ import 'ticket_detail_screen.dart';
 import 'ticket_models.dart';
 import 'widgets/ticket_status_chip.dart';
 
-enum _EmployeeTicketTab {
-  assignedToMe,
-  raisedByMe,
-  myDepartment,
-  all,
-}
+enum _EmployeeTicketTab { assignedToMe, raisedByMe, myDepartment, all }
 
 class TicketListScreen extends StatefulWidget {
   const TicketListScreen({
@@ -51,6 +46,7 @@ class _TicketListScreenState extends State<TicketListScreen>
     with SingleTickerProviderStateMixin {
   static const _lastTabPrefsKey = 'ticket_list_last_tab';
   static const _missedSlaOnlyPrefsKey = 'ticket_list_missed_sla_only';
+  static const _showClosedTicketsPrefsKey = 'ticket_list_show_closed';
 
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
@@ -59,6 +55,7 @@ class _TicketListScreenState extends State<TicketListScreen>
   String _searchQuery = '';
   _TicketListData _listData = const _TicketListData.empty();
   bool _missedSlaOnly = false;
+  bool _showClosedTickets = false;
 
   @override
   void initState() {
@@ -82,10 +79,14 @@ class _TicketListScreenState extends State<TicketListScreen>
       (tab) => tab.name == savedTabName,
       orElse: () => _EmployeeTicketTab.assignedToMe,
     );
-    final missedSlaOnly =
-        preferences.getBool(_missedSlaOnlyPrefsKey) ?? false;
+    final missedSlaOnly = preferences.getBool(_missedSlaOnlyPrefsKey) ?? false;
+    final showClosedTickets =
+        preferences.getBool(_showClosedTicketsPrefsKey) ?? false;
     if (!mounted) return;
-    setState(() => _missedSlaOnly = missedSlaOnly);
+    setState(() {
+      _missedSlaOnly = missedSlaOnly;
+      _showClosedTickets = showClosedTickets;
+    });
     final controller = _tabController;
     if (controller != null && controller.index != lastTab.index) {
       controller.index = lastTab.index;
@@ -105,9 +106,19 @@ class _TicketListScreenState extends State<TicketListScreen>
     await preferences.setBool(_missedSlaOnlyPrefsKey, _missedSlaOnly);
   }
 
+  Future<void> _persistShowClosedTickets() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_showClosedTicketsPrefsKey, _showClosedTickets);
+  }
+
   void _onMissedSlaOnlyChanged(bool value) {
     setState(() => _missedSlaOnly = value);
     _persistMissedSlaOnly();
+  }
+
+  void _onShowClosedTicketsChanged(bool value) {
+    setState(() => _showClosedTickets = value);
+    _persistShowClosedTickets();
   }
 
   @override
@@ -188,6 +199,9 @@ class _TicketListScreenState extends State<TicketListScreen>
   }
 
   bool _matchesListFilters(TicketSummary ticket) {
+    if (!_showClosedTickets && ticket.status == TicketStatus.closed) {
+      return false;
+    }
     if (_missedSlaOnly && !ticket.slaMissed) return false;
     return ticket.matchesSearch(_searchQuery);
   }
@@ -199,9 +213,7 @@ class _TicketListScreenState extends State<TicketListScreen>
     }
     final tab = _EmployeeTicketTab.values[_tabController!.index];
     return filtered
-        .where(
-          (ticket) => _belongsToTab(ticket: ticket, tab: tab, data: data),
-        )
+        .where((ticket) => _belongsToTab(ticket: ticket, tab: tab, data: data))
         .toList();
   }
 
@@ -274,7 +286,7 @@ class _TicketListScreenState extends State<TicketListScreen>
                       const SizedBox(height: 12),
                       FutureBuilder<_TicketListData>(
                         key: ValueKey(
-                          'tabs-${_loader.refreshToken}-$_missedSlaOnly',
+                          'tabs-${_loader.refreshToken}-$_missedSlaOnly-$_showClosedTickets',
                         ),
                         future: _loader.future,
                         builder: (context, snapshot) {
@@ -290,19 +302,26 @@ class _TicketListScreenState extends State<TicketListScreen>
                         },
                       ),
                       const SizedBox(height: 8),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        value: _missedSlaOnly,
-                        title: const Text(
-                          'Missed SLA only',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        subtitle: const Text(
-                          'Show only open tickets past their category SLA',
-                          style: TextStyle(color: Colors.black54, fontSize: 13),
-                        ),
-                        onChanged: _onMissedSlaOnlyChanged,
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _EmployeeTicketTabChip(
+                            label: 'Show Missed SLA only',
+                            selected: _missedSlaOnly,
+                            primary: primary,
+                            onTap: () =>
+                                _onMissedSlaOnlyChanged(!_missedSlaOnly),
+                          ),
+                          _EmployeeTicketTabChip(
+                            label: 'Include closed tickets',
+                            selected: _showClosedTickets,
+                            primary: primary,
+                            onTap: () => _onShowClosedTicketsChanged(
+                              !_showClosedTickets,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                     const SizedBox(height: 12),
@@ -334,9 +353,7 @@ class _TicketListScreenState extends State<TicketListScreen>
 
                           final tickets = _visibleTickets(data);
                           if (tickets.isEmpty) {
-                            return _TicketListMessage(
-                              message: _emptyMessage(),
-                            );
+                            return _TicketListMessage(message: _emptyMessage());
                           }
                           if (!widget.isEmployeeView) {
                             return _CustomerComplaintList(
@@ -392,8 +409,7 @@ class _TicketListScreenState extends State<TicketListScreen>
     return switch (tab) {
       _EmployeeTicketTab.assignedToMe => 'No tickets assigned to you.',
       _EmployeeTicketTab.raisedByMe => 'You have not raised any tickets.',
-      _EmployeeTicketTab.myDepartment =>
-        'No tickets in your department(s).',
+      _EmployeeTicketTab.myDepartment => 'No tickets in your department(s).',
       _EmployeeTicketTab.all => 'No tickets found for the last 90 days.',
     };
   }
@@ -407,9 +423,9 @@ class _TicketListData {
   });
 
   const _TicketListData.empty()
-      : tickets = const [],
-        currentUserId = '',
-        myDepartmentIds = const {};
+    : tickets = const [],
+      currentUserId = '',
+      myDepartmentIds = const {};
 
   final List<TicketSummary> tickets;
   final String currentUserId;
@@ -469,8 +485,7 @@ class _EmployeeTicketTabSelector extends StatelessWidget {
                     splashFactory: NoSplash.splashFactory,
                     padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
                     tabs: [
-                      for (final label in labels)
-                        Tab(height: 36, text: label),
+                      for (final label in labels) Tab(height: 36, text: label),
                     ],
                   ),
                 ),
@@ -522,9 +537,7 @@ class _EmployeeTicketTabChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: selected ? primary : Colors.black26,
-            ),
+            border: Border.all(color: selected ? primary : Colors.black26),
           ),
           child: Text(
             label,
@@ -656,6 +669,7 @@ class _TicketSummaryCard extends StatelessWidget {
         : ticket.createdByName.trim();
     final assigneeName = ticket.assigneeName.trim();
     final departmentName = ticket.assignedDepartmentName.trim();
+    final categoryLabel = ticket.categoryDisplayLabel;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -707,6 +721,37 @@ class _TicketSummaryCard extends StatelessWidget {
                       color: primary,
                     ),
                   ],
+                  if (categoryLabel.isNotEmpty) ...[
+                    SizedBox(height: partyName.isNotEmpty ? 4 : 8),
+                    _TicketCardMetaRow(
+                      icon: Icons.category_outlined,
+                      label: 'Category',
+                      value: categoryLabel,
+                      color: primary,
+                      trailing: ticket.slaMissed
+                          ? DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryGlyph(primary),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                child: Text(
+                                  'Missed SLA',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                  ],
                   if (assigneeName.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     _TicketCardMetaRow(
@@ -741,12 +786,14 @@ class _TicketCardMetaRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.color,
+    this.trailing,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final Color color;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -756,27 +803,41 @@ class _TicketCardMetaRow extends StatelessWidget {
         Icon(icon, size: 16, color: color.withValues(alpha: 0.85)),
         const SizedBox(width: 6),
         Expanded(
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: '$label · ',
-                  style: TextStyle(
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Flexible(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '$label · ',
+                        style: TextStyle(
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      TextSpan(
+                        text: value,
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                TextSpan(
-                  text: value,
-                  style: const TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                  ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 6),
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: trailing!,
                 ),
               ],
-            ),
+            ],
           ),
         ),
       ],

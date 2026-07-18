@@ -318,12 +318,14 @@ class _HomeFeatureGrid extends StatelessWidget {
     final showComplaints = await JwtPayload.currentUserIsCustomer();
     final showSettings = await JwtPayload.currentUserIsAppAdmin();
     final showNotifications = showTickets;
+    final showCustomers = await JwtPayload.currentUserHasWebAccess();
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
       showTickets: showTickets,
       showComplaints: showComplaints,
       showSettings: showSettings,
       showNotifications: showNotifications,
+      showCustomers: showCustomers,
     );
   }
 
@@ -394,61 +396,66 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
-      _FeatureTile(
-        icon: Icons.people_alt_outlined,
-        label: 'Users',
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) =>
-                  UsersScreen(apiClient: apiClient, onLoginAgain: onLoginAgain),
-            ),
-          );
-        },
-      ),
-      _FeatureTile(
-        icon: Icons.business_outlined,
-        label: 'Departments',
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => DepartmentsScreen(
-                apiClient: apiClient,
-                onLoginAgain: onLoginAgain,
+      if (visibility.showSettings) ...[
+        _FeatureTile(
+          icon: Icons.people_alt_outlined,
+          label: 'Users',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => UsersScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
               ),
-            ),
-          );
-        },
-      ),
-      _FeatureTile(
-        icon: Icons.storefront_outlined,
-        label: 'Customers',
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => CustomersScreen(
-                apiClient: apiClient,
-                onLoginAgain: onLoginAgain,
+            );
+          },
+        ),
+        _FeatureTile(
+          icon: Icons.business_outlined,
+          label: 'Departments',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => DepartmentsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
               ),
-            ),
-          );
-        },
-      ),
-      _FeatureTile(
-        icon: Icons.map_outlined,
-        label: 'Locations',
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => LocationsScreen(
-                apiClient: apiClient,
-                onLoginAgain: onLoginAgain,
+            );
+          },
+        ),
+      ],
+      if (visibility.showCustomers)
+        _FeatureTile(
+          icon: Icons.storefront_outlined,
+          label: 'Customers',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => CustomersScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
               ),
-            ),
-          );
-        },
-      ),
-      if (visibility.showSettings)
+            );
+          },
+        ),
+      if (visibility.showSettings) ...[
+        _FeatureTile(
+          icon: Icons.map_outlined,
+          label: 'Locations',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => LocationsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
         _FeatureTile(
           icon: Icons.settings_outlined,
           label: 'Settings',
@@ -463,6 +470,7 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
+      ],
     ];
   }
 
@@ -541,6 +549,7 @@ class _HomeFeatureVisibility {
     required this.showComplaints,
     required this.showSettings,
     required this.showNotifications,
+    required this.showCustomers,
   });
 
   final bool showImpersonate;
@@ -548,6 +557,7 @@ class _HomeFeatureVisibility {
   final bool showComplaints;
   final bool showSettings;
   final bool showNotifications;
+  final bool showCustomers;
 }
 
 class _FeatureTile extends StatelessWidget {
