@@ -284,7 +284,16 @@ class _DepartmentsScreenState extends State<DepartmentsScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScreenScaffold(
-      appBar: AppBar(title: const Text('Departments')),
+      appBar: AppBar(
+        title: const Text('Departments'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: FutureBuilder<_DepartmentsData>(
           key: ValueKey(_loader.refreshToken),

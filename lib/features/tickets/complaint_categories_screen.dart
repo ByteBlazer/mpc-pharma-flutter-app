@@ -133,7 +133,16 @@ class _ComplaintCategoriesScreenState extends State<ComplaintCategoriesScreen> {
     return Theme(
       data: AppTheme.withCompactButtons(Theme.of(context)),
       child: AppScreenScaffold(
-      appBar: AppBar(title: const Text('Complaint categories')),
+      appBar: AppBar(
+        title: const Text('Complaint categories'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final data = await _loader.future;

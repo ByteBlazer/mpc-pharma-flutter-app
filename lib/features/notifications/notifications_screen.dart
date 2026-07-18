@@ -110,7 +110,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Theme(
       data: AppTheme.withCompactButtons(Theme.of(context)),
       child: AppScreenScaffold(
-        appBar: AppBar(title: const Text('Notifications')),
+        appBar: AppBar(
+          title: const Text('Notifications'),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh',
+              onPressed: () => _controller.refresh(),
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
         body: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

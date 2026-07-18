@@ -338,7 +338,16 @@ class _TicketListScreenState extends State<TicketListScreen>
     return Theme(
       data: AppTheme.withCompactButtons(Theme.of(context)),
       child: AppScreenScaffold(
-        appBar: AppBar(title: Text(widget.title)),
+        appBar: AppBar(
+          title: Text(widget.title),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh',
+              onPressed: _refresh,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
         floatingActionButton: widget.createLabel == null
             ? null
             : FloatingActionButton.extended(
