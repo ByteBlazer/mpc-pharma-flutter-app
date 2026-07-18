@@ -97,17 +97,29 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
   }
 
   Future<_CreateTicketData> _loadData() async {
+    if (_isCustomerTicket) {
+      final results = await Future.wait([
+        widget.apiClient.getComplaintCategories(),
+        widget.apiClient.getDepartments(),
+        widget.apiClient.getCustomersLightweight(),
+      ]);
+      return _CreateTicketData(
+        complaintCategories: results[0] as List<ComplaintCategory>,
+        internalCategories: const [],
+        departments: results[1] as List<Department>,
+        customers: results[2] as List<CustomerSummary>,
+      );
+    }
+
     final results = await Future.wait([
-      widget.apiClient.getComplaintCategories(),
+      widget.apiClient.getInternalCategories(),
       widget.apiClient.getDepartments(),
-      if (_isCustomerTicket) widget.apiClient.getCustomersLightweight(),
     ]);
     return _CreateTicketData(
-      categories: results[0] as List<ComplaintCategory>,
+      complaintCategories: const [],
+      internalCategories: results[0] as List<InternalCategory>,
       departments: results[1] as List<Department>,
-      customers: _isCustomerTicket
-          ? results[2] as List<CustomerSummary>
-          : const [],
+      customers: const [],
     );
   }
 
@@ -134,7 +146,7 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
 
   void _applyCategoryDefaults(_CreateTicketData data, String? categoryId) {
     if (categoryId == null) return;
-    final category = data.categories
+    final category = data.complaintCategories
         .where((item) => item.id == categoryId)
         .firstOrNull;
     if (category == null) return;
@@ -153,7 +165,7 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
       _showError('Select a customer.');
       return;
     }
-    if (_isCustomerTicket && (_selectedCategoryId == null || _selectedCategoryId!.isEmpty)) {
+    if (_selectedCategoryId == null || _selectedCategoryId!.isEmpty) {
       _showError('Select a category.');
       return;
     }
@@ -170,10 +182,6 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
       return;
     }
     final subject = _subjectController.text.trim();
-    if (!_isCustomerTicket && subject.isEmpty) {
-      _showError('Enter a subject.');
-      return;
-    }
 
     final body = <String, dynamic>{
       'ticketType': widget.ticketType.apiValue,
@@ -187,6 +195,8 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
     if (_isCustomerTicket) {
       body['customerId'] = _selectedCustomerId;
       body['ticketComplaintCategoryId'] = _selectedCategoryId;
+    } else {
+      body['ticketInternalCategoryId'] = _selectedCategoryId;
     }
 
     setState(() => _isSubmitting = true);
@@ -237,7 +247,10 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
             }
             final data = snapshot.data ?? const _CreateTicketData.empty();
             final departments = data.departments.where((d) => d.isActive).toList();
-            final categories = data.categories.where((c) => c.isActive).toList();
+            final complaintCategories =
+                data.complaintCategories.where((c) => c.isActive).toList();
+            final internalCategories =
+                data.internalCategories.where((c) => c.isActive).toList();
             final users = _departmentUsers(data);
 
             return SingleChildScrollView(
@@ -287,7 +300,7 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                           decoration: const InputDecoration(
                             labelText: 'Category',
                           ),
-                          items: categories
+                          items: complaintCategories
                               .map(
                                 (category) => DropdownMenuItem(
                                   value: category.id,
@@ -301,6 +314,27 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                                   _selectedCategoryId = value;
                                   _applyCategoryDefaults(data, value);
                                 }),
+                        ),
+                        const SizedBox(height: 16),
+                      ] else ...[
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedCategoryId,
+                          decoration: const InputDecoration(
+                            labelText: 'Category',
+                          ),
+                          items: internalCategories
+                              .map(
+                                (category) => DropdownMenuItem(
+                                  value: category.id,
+                                  child: Text(category.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _isSubmitting
+                              ? null
+                              : (value) => setState(
+                                    () => _selectedCategoryId = value,
+                                  ),
                         ),
                         const SizedBox(height: 16),
                       ],
@@ -359,10 +393,8 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                       TextField(
                         controller: _subjectController,
                         enabled: !_isSubmitting,
-                        decoration: InputDecoration(
-                          labelText: _isCustomerTicket
-                              ? 'Subject (optional)'
-                              : 'Subject',
+                        decoration: const InputDecoration(
+                          labelText: 'Subject (optional)',
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -422,17 +454,20 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
 
 class _CreateTicketData {
   const _CreateTicketData({
-    required this.categories,
+    required this.complaintCategories,
+    required this.internalCategories,
     required this.departments,
     required this.customers,
   });
 
   const _CreateTicketData.empty()
-    : categories = const [],
+    : complaintCategories = const [],
+      internalCategories = const [],
       departments = const [],
       customers = const [];
 
-  final List<ComplaintCategory> categories;
+  final List<ComplaintCategory> complaintCategories;
+  final List<InternalCategory> internalCategories;
   final List<Department> departments;
   final List<CustomerSummary> customers;
 }

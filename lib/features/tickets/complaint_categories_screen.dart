@@ -273,6 +273,11 @@ class _ComplaintCategoryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
+                      'SLA ${category.slaDaysLabel}',
+                      style: TextStyle(color: textColor),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
                       'ID ${category.id}',
                       style: TextStyle(color: textColor.withValues(alpha: 0.7)),
                     ),
