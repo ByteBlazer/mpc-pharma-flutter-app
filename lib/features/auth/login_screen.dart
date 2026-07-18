@@ -94,12 +94,12 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final isEmployee = await JwtPayload.currentUserIsEmployee(
+    final hasWebAccess = await JwtPayload.currentUserHasWebAccess(
       tokenStore: _tokenStore,
     );
     if (!mounted) return;
 
-    if (!isEmployee) {
+    if (!hasWebAccess) {
       _disposeNotificationInbox();
       setState(() {});
       return;
