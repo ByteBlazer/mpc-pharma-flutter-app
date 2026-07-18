@@ -8,6 +8,8 @@ import 'auth_token_store.dart';
 import '../features/customers/customer_models.dart' hide JsonMap;
 import '../features/departments/department_models.dart' hide JsonMap;
 import '../features/notifications/notification_models.dart' hide JsonMap;
+import '../features/settings/backup_models.dart' hide JsonMap;
+import '../features/settings/setting_models.dart' hide JsonMap;
 import '../features/tickets/ticket_models.dart' hide JsonMap;
 import '../features/users/user_models.dart' hide JsonMap;
 
@@ -856,6 +858,89 @@ class ApiClient {
       requiresAuth: true,
     );
     return Department.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<List<BackupFile>> listDatabaseBackups({String? token}) async {
+    final response = await _get(
+      'setting/backups',
+      token: token,
+      requiresAuth: true,
+    );
+    final json = _decodeJsonObject(response.body);
+    final raw = json['backups'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<JsonMap>()
+        .map(BackupFile.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<CreateBackupResult> createDatabaseBackup({String? token}) async {
+    final response = await _post(
+      'setting/backup',
+      token: token,
+      requiresAuth: true,
+      body: const <String, dynamic>{},
+    );
+    return CreateBackupResult.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<List<int>> downloadDatabaseBackup({
+    String? token,
+    required String filename,
+  }) async {
+    final response = await _get(
+      'setting/backup/download/${Uri.encodeComponent(filename)}',
+      token: token,
+      requiresAuth: true,
+    );
+    return response.bodyBytes;
+  }
+
+  Future<RestoreBackupResult> restoreDatabaseBackup({
+    String? token,
+    required String filename,
+    required String passkey,
+  }) async {
+    final response = await _post(
+      'setting/restore',
+      token: token,
+      requiresAuth: true,
+      body: {
+        'filename': filename,
+        'passkey': passkey,
+      },
+    );
+    return RestoreBackupResult.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<AppSetting> getAppSetting({
+    String? token,
+    required String settingName,
+  }) async {
+    final response = await _get(
+      'setting/${Uri.encodeComponent(settingName)}',
+      token: token,
+      requiresAuth: true,
+    );
+    return AppSetting.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<UpdateAppSettingResult> updateAppSetting({
+    String? token,
+    required String settingName,
+    required String settingValue,
+  }) async {
+    final response = await _put(
+      'setting',
+      token: token,
+      requiresAuth: true,
+      body: {
+        'settingName': settingName,
+        'settingValue': settingValue,
+      },
+    );
+    return UpdateAppSettingResult.fromJson(_decodeJsonObject(response.body));
   }
 
   Future<http.Response> _get(

@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/api_client.dart';
 import '../../app_theme.dart';
 import '../../auth/jwt_payload.dart';
+import '../../utils/download_file.dart';
 import '../../widgets/app_async_list_loader.dart';
 import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
@@ -45,8 +48,6 @@ class TicketListScreen extends StatefulWidget {
 class _TicketListScreenState extends State<TicketListScreen>
     with SingleTickerProviderStateMixin {
   static const _lastTabPrefsKey = 'ticket_list_last_tab';
-  static const _missedSlaOnlyPrefsKey = 'ticket_list_missed_sla_only';
-  static const _showClosedTicketsPrefsKey = 'ticket_list_show_closed';
 
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
@@ -66,27 +67,20 @@ class _TicketListScreenState extends State<TicketListScreen>
         vsync: this,
       );
       _tabController!.addListener(_onTabChanged);
-      _loadEmployeeListPrefs();
+      _loadLastTabPreference();
     }
     _loader.initialize(_loadData);
     _searchController.addListener(_onSearchChanged);
   }
 
-  Future<void> _loadEmployeeListPrefs() async {
+  Future<void> _loadLastTabPreference() async {
     final preferences = await SharedPreferences.getInstance();
     final savedTabName = preferences.getString(_lastTabPrefsKey);
     final lastTab = _EmployeeTicketTab.values.firstWhere(
       (tab) => tab.name == savedTabName,
       orElse: () => _EmployeeTicketTab.assignedToMe,
     );
-    final missedSlaOnly = preferences.getBool(_missedSlaOnlyPrefsKey) ?? false;
-    final showClosedTickets =
-        preferences.getBool(_showClosedTicketsPrefsKey) ?? false;
     if (!mounted) return;
-    setState(() {
-      _missedSlaOnly = missedSlaOnly;
-      _showClosedTickets = showClosedTickets;
-    });
     final controller = _tabController;
     if (controller != null && controller.index != lastTab.index) {
       controller.index = lastTab.index;
@@ -101,24 +95,12 @@ class _TicketListScreenState extends State<TicketListScreen>
     await preferences.setString(_lastTabPrefsKey, tab.name);
   }
 
-  Future<void> _persistMissedSlaOnly() async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setBool(_missedSlaOnlyPrefsKey, _missedSlaOnly);
-  }
-
-  Future<void> _persistShowClosedTickets() async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setBool(_showClosedTicketsPrefsKey, _showClosedTickets);
-  }
-
   void _onMissedSlaOnlyChanged(bool value) {
     setState(() => _missedSlaOnly = value);
-    _persistMissedSlaOnly();
   }
 
   void _onShowClosedTicketsChanged(bool value) {
     setState(() => _showClosedTickets = value);
-    _persistShowClosedTickets();
   }
 
   @override
@@ -170,6 +152,81 @@ class _TicketListScreenState extends State<TicketListScreen>
     return _loader.reload(load: _loadData, setState: setState);
   }
 
+  bool get _isAllTicketsTab {
+    final controller = _tabController;
+    if (!widget.isEmployeeView || controller == null) return false;
+    return _EmployeeTicketTab.values[controller.index] ==
+        _EmployeeTicketTab.all;
+  }
+
+  Future<void> _downloadTickets() async {
+    try {
+      final data = await _loader.future;
+      final fileName =
+          'mpc-pharma-tickets-${DateTime.now().millisecondsSinceEpoch}.csv';
+      await downloadFile(
+        fileName: fileName,
+        bytes: utf8.encode(_ticketsToCsv(data.tickets)),
+        mimeType: 'text/csv;charset=utf-8',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
+    }
+  }
+
+  String _ticketsToCsv(List<TicketSummary> tickets) {
+    final rows = <List<String>>[
+      [
+        'ID',
+        'Subject',
+        'Status',
+        'Priority',
+        'Type',
+        'Category',
+        'Department',
+        'Assignee',
+        'Customer',
+        'Raised By',
+        'Created At',
+        'Last Updated At',
+        'SLA Missed',
+        'SLA Hours',
+      ],
+      ...tickets.map(
+        (ticket) => [
+          ticket.id,
+          ticket.subject,
+          ticket.status.label,
+          ticket.priority.label,
+          ticket.isCustomerTicket ? 'Customer' : 'Internal',
+          ticket.isCustomerTicket
+              ? ticket.ticketComplaintCategoryName
+              : ticket.ticketInternalCategoryName,
+          ticket.assignedDepartmentName,
+          ticket.assigneeName,
+          ticket.customerFirmName,
+          ticket.createdByName,
+          ticket.createdAt?.toLocal().toString() ?? '',
+          ticket.lastUpdatedAt?.toLocal().toString() ?? '',
+          ticket.slaMissed ? 'Yes' : 'No',
+          ticket.slaHours?.toString() ?? '',
+        ],
+      ),
+    ];
+
+    return rows.map((row) => row.map(_csvCell).join(',')).join('\n');
+  }
+
+  String _csvCell(String value) {
+    final escaped = value.replaceAll('"', '""');
+    return '"$escaped"';
+  }
+
   Future<void> _handleCreate() async {
     final saved = await widget.onCreate();
     if (!mounted || saved != true) return;
@@ -199,7 +256,6 @@ class _TicketListScreenState extends State<TicketListScreen>
     }
     if (_missedSlaOnly) {
       setState(() => _missedSlaOnly = false);
-      await _persistMissedSlaOnly();
     }
     await _persistLastTab();
   }
@@ -347,6 +403,24 @@ class _TicketListScreenState extends State<TicketListScreen>
                           ),
                         ],
                       ),
+                      if (_isAllTicketsTab) ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: OutlinedButton.icon(
+                            onPressed: _downloadTickets,
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 44),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            icon: const Icon(Icons.download_outlined),
+                            label: const Text('Download'),
+                          ),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 12),
                     Expanded(
@@ -710,25 +784,38 @@ class _TicketSummaryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        '#${ticket.id} · ${ticket.subject.trim().isEmpty ? '—' : ticket.subject}',
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.w700,
+                      child: Text.rich(
+                        TextSpan(
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          children: [
+                            TextSpan(text: '#${ticket.id}'),
+                            if (isHighPriority)
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 2),
+                                  child: Tooltip(
+                                    message: 'High priority',
+                                    child: Icon(
+                                      Icons.priority_high_rounded,
+                                      size: 18,
+                                      color: Colors.red.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            TextSpan(
+                              text:
+                                  ' · ${ticket.subject.trim().isEmpty ? '—' : ticket.subject}',
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    if (isHighPriority) ...[
-                      const SizedBox(width: 8),
-                      Tooltip(
-                        message: 'High priority',
-                        child: Icon(
-                          Icons.priority_high_rounded,
-                          size: 20,
-                          color: Colors.red.shade700,
-                        ),
-                      ),
-                    ],
                     const SizedBox(width: 8),
                     TicketStatusChip(status: ticket.status),
                   ],
