@@ -5,6 +5,7 @@ import '../../app_theme.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_surface.dart';
 import '../tickets/complaint_categories_screen.dart';
+import '../tickets/internal_categories_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
@@ -35,12 +36,30 @@ class SettingsScreen extends StatelessWidget {
                     _SettingsMenuTile(
                       icon: Icons.category_outlined,
                       title: 'Customer complaint categories',
-                      subtitle: 'Add or edit categories used when raising complaints',
+                      subtitle:
+                          'Add or edit categories used when raising complaints',
                       color: primary,
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => ComplaintCategoriesScreen(
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    _SettingsMenuTile(
+                      icon: Icons.confirmation_number_outlined,
+                      title: 'Internal ticket categories',
+                      subtitle:
+                          'Add or edit categories used for internal tickets',
+                      color: primary,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => InternalCategoriesScreen(
                               apiClient: apiClient,
                               onLoginAgain: onLoginAgain,
                             ),

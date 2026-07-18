@@ -467,6 +467,7 @@ class ApiClient {
     String? token,
     required String name,
     required String assignedDepartmentId,
+    required int slaHours,
     bool isActive = true,
   }) async {
     final response = await _post(
@@ -476,6 +477,7 @@ class ApiClient {
       body: {
         'name': name,
         'assignedDepartmentId': assignedDepartmentId,
+        'slaHours': slaHours,
         'isActive': isActive,
       },
     );
@@ -487,6 +489,7 @@ class ApiClient {
     required String categoryId,
     required String name,
     required String assignedDepartmentId,
+    required int slaHours,
     required bool isActive,
   }) async {
     final response = await _put(
@@ -496,10 +499,61 @@ class ApiClient {
       body: {
         'name': name,
         'assignedDepartmentId': assignedDepartmentId,
+        'slaHours': slaHours,
         'isActive': isActive,
       },
     );
     return ComplaintCategory.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<List<InternalCategory>> getInternalCategories({String? token}) async {
+    final response = await _get(
+      'ticket/internal-category',
+      token: token,
+      requiresAuth: true,
+    );
+    return _decodeJsonList(response.body)
+        .map(InternalCategory.fromJson)
+        .toList();
+  }
+
+  Future<InternalCategory> createInternalCategory({
+    String? token,
+    required String name,
+    required int slaHours,
+    bool isActive = true,
+  }) async {
+    final response = await _post(
+      'ticket/internal-category',
+      token: token,
+      requiresAuth: true,
+      body: {
+        'name': name,
+        'slaHours': slaHours,
+        'isActive': isActive,
+      },
+    );
+    return InternalCategory.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<InternalCategory> updateInternalCategory({
+    String? token,
+    required String categoryId,
+    required String name,
+    required int slaHours,
+    required bool isActive,
+  }) async {
+    final response = await _put(
+      'ticket/internal-category/${Uri.encodeComponent(categoryId)}',
+      token: token,
+      requiresAuth: true,
+      body: {
+        'name': name,
+        'slaHours': slaHours,
+        'isActive': isActive,
+      },
+    );
+    return InternalCategory.fromJson(_decodeJsonObject(response.body));
   }
 
   Future<TicketAttachmentInitResponse> initiateTicketAttachmentUpload({

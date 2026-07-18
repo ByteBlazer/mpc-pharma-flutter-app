@@ -709,7 +709,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                           onReassigned: _refresh,
                         ),
                         _InfoRow('Customer', ticket.raisedForCustomerName),
-                        _InfoRow('Category', ticket.ticketComplaintCategoryName),
+                        _InfoRow(
+                          'Category',
+                          ticket.ticketType == TicketType.internal
+                              ? ticket.ticketInternalCategoryName
+                              : ticket.ticketComplaintCategoryName,
+                        ),
                       ],
                       if (widget.isEmployeeView) ...[
                         const SizedBox(height: 24),

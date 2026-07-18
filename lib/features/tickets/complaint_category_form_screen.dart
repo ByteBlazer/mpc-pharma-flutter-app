@@ -27,6 +27,7 @@ class _ComplaintCategoryFormScreenState
     extends State<ComplaintCategoryFormScreen> {
   late final TextEditingController _nameController;
   late bool _isActive;
+  late int _slaDays;
   String? _selectedDepartmentId;
   bool _isSaving = false;
   String? _errorMessage;
@@ -54,6 +55,7 @@ class _ComplaintCategoryFormScreenState
     super.initState();
     final category = widget.category;
     _nameController = TextEditingController(text: category?.name ?? '');
+    _slaDays = category?.slaDays ?? 1;
     _isActive = category?.isActive ?? true;
     _selectedDepartmentId = category?.assignedDepartmentId;
   }
@@ -74,6 +76,9 @@ class _ComplaintCategoryFormScreenState
     if (_selectedDepartmentId == null || _selectedDepartmentId!.isEmpty) {
       return 'Select a department.';
     }
+    if (!ComplaintCategory.slaDayOptions.contains(_slaDays)) {
+      return 'Select SLA days.';
+    }
     return null;
   }
 
@@ -92,17 +97,20 @@ class _ComplaintCategoryFormScreenState
     try {
       final name = _nameController.text.trim();
       final departmentId = _selectedDepartmentId!;
+      final slaHours = ComplaintCategory.slaHoursFromDays(_slaDays);
       if (_isEditing) {
         await widget.apiClient.updateComplaintCategory(
           categoryId: widget.category!.id,
           name: name,
           assignedDepartmentId: departmentId,
+          slaHours: slaHours,
           isActive: _isActive,
         );
       } else {
         await widget.apiClient.createComplaintCategory(
           name: name,
           assignedDepartmentId: departmentId,
+          slaHours: slaHours,
           isActive: _isActive,
         );
       }
@@ -184,6 +192,31 @@ class _ComplaintCategoryFormScreenState
                       const Text(
                         'New complaints in this category are routed to this department by default.',
                         style: TextStyle(color: Colors.black54, fontSize: 13),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<int>(
+                        initialValue: _slaDays,
+                        decoration: const InputDecoration(
+                          labelText: 'SLA Days',
+                        ),
+                        items: [
+                          for (final days in ComplaintCategory.slaDayOptions)
+                            DropdownMenuItem(
+                              value: days,
+                              child: Text(
+                                days == 1 ? '1 day' : '$days days',
+                              ),
+                            ),
+                        ],
+                        onChanged: _isSaving
+                            ? null
+                            : (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _slaDays = value;
+                                  _errorMessage = null;
+                                });
+                              },
                       ),
                       if (_isEditing) ...[
                         const SizedBox(height: 16),

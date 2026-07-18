@@ -76,6 +76,7 @@ class ComplaintCategory {
     required this.name,
     required this.assignedDepartmentId,
     required this.assignedDepartmentName,
+    required this.slaHours,
     required this.isActive,
   });
 
@@ -85,6 +86,7 @@ class ComplaintCategory {
       name: _string(json['name']),
       assignedDepartmentId: _string(json['assignedDepartmentId']),
       assignedDepartmentName: _string(json['assignedDepartmentName']),
+      slaHours: _positiveInt(json['slaHours']) ?? 24,
       isActive: json['isActive'] == true,
     );
   }
@@ -93,7 +95,21 @@ class ComplaintCategory {
   final String name;
   final String assignedDepartmentId;
   final String assignedDepartmentName;
+  final int slaHours;
   final bool isActive;
+
+  static const slaHoursPerDay = 24;
+  static const slaDayOptions = [1, 2, 3, 4, 5, 6, 7];
+
+  /// UI representation of [slaHours] as whole days (1–7).
+  int get slaDays {
+    final days = (slaHours / slaHoursPerDay).round();
+    return days.clamp(slaDayOptions.first, slaDayOptions.last);
+  }
+
+  String get slaDaysLabel => slaDays == 1 ? '1 day' : '$slaDays days';
+
+  static int slaHoursFromDays(int days) => days * slaHoursPerDay;
 
   bool matchesSearch(String query) {
     final normalized = query.trim().toLowerCase();
@@ -102,6 +118,55 @@ class ComplaintCategory {
       id,
       name,
       assignedDepartmentName,
+      '$slaHours',
+      slaDaysLabel,
+      isActive ? 'active' : 'inactive',
+    ].join(' ').toLowerCase().contains(normalized);
+  }
+}
+
+class InternalCategory {
+  const InternalCategory({
+    required this.id,
+    required this.name,
+    required this.slaHours,
+    required this.isActive,
+  });
+
+  factory InternalCategory.fromJson(JsonMap json) {
+    return InternalCategory(
+      id: _string(json['id']),
+      name: _string(json['name']),
+      slaHours: _positiveInt(json['slaHours']) ?? 24,
+      isActive: json['isActive'] == true,
+    );
+  }
+
+  final String id;
+  final String name;
+  final int slaHours;
+  final bool isActive;
+
+  static const slaHoursPerDay = ComplaintCategory.slaHoursPerDay;
+  static const slaDayOptions = ComplaintCategory.slaDayOptions;
+
+  int get slaDays {
+    final days = (slaHours / slaHoursPerDay).round();
+    return days.clamp(slaDayOptions.first, slaDayOptions.last);
+  }
+
+  String get slaDaysLabel => slaDays == 1 ? '1 day' : '$slaDays days';
+
+  static int slaHoursFromDays(int days) => days * slaHoursPerDay;
+
+  bool matchesSearch(String query) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) return true;
+    return [
+      id,
+      name,
+      '$slaHours',
+      slaDaysLabel,
       isActive ? 'active' : 'inactive',
     ].join(' ').toLowerCase().contains(normalized);
   }
@@ -274,6 +339,7 @@ class TicketSummary {
     required this.createdAt,
     required this.lastUpdatedAt,
     this.raisedByCustomer,
+    this.slaMissed = false,
   });
 
   factory TicketSummary.fromJson(JsonMap json) {
@@ -298,6 +364,7 @@ class TicketSummary {
       createdAt: DateTime.tryParse(_string(json['createdAt'])),
       lastUpdatedAt: DateTime.tryParse(_string(json['lastUpdatedAt'])),
       raisedByCustomer: _optionalBool(json['raisedByCustomer']),
+      slaMissed: json['slaMissed'] == true,
     );
   }
 
@@ -318,6 +385,9 @@ class TicketSummary {
 
   /// Customer JWT only: true = self-raised, false = company-raised.
   final bool? raisedByCustomer;
+
+  /// Employee list only: open ticket past its category SLA.
+  final bool slaMissed;
 
   bool get isRaisedByCustomer => raisedByCustomer == true;
 
@@ -363,6 +433,8 @@ class TicketDetail {
     required this.assigneeName,
     required this.ticketComplaintCategoryId,
     required this.ticketComplaintCategoryName,
+    required this.ticketInternalCategoryId,
+    required this.ticketInternalCategoryName,
     required this.attachments,
     required this.comments,
     required this.activity,
@@ -413,6 +485,8 @@ class TicketDetail {
       assigneeName: _string(json['assigneeName']),
       ticketComplaintCategoryId: _string(json['ticketComplaintCategoryId']),
       ticketComplaintCategoryName: _string(json['ticketComplaintCategoryName']),
+      ticketInternalCategoryId: _string(json['ticketInternalCategoryId']),
+      ticketInternalCategoryName: _string(json['ticketInternalCategoryName']),
       attachments: attachmentsJson is List
           ? attachmentsJson
                 .whereType<JsonMap>()
@@ -460,6 +534,8 @@ class TicketDetail {
   final String assigneeName;
   final String ticketComplaintCategoryId;
   final String ticketComplaintCategoryName;
+  final String ticketInternalCategoryId;
+  final String ticketInternalCategoryName;
   final List<TicketAttachment> attachments;
   final List<TicketComment> comments;
   final List<TicketActivity> activity;
@@ -555,6 +631,12 @@ class PendingTicketAttachment {
 }
 
 String _string(Object? value) => value?.toString() ?? '';
+
+int? _positiveInt(Object? value) {
+  final parsed = value is int ? value : int.tryParse(_string(value));
+  if (parsed == null || parsed < 1) return null;
+  return parsed;
+}
 
 String _firstNonEmptyString(JsonMap json, List<String> keys) {
   for (final key in keys) {

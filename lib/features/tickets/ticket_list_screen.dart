@@ -21,64 +21,6 @@ enum _EmployeeTicketTab {
   raisedByMe,
   myDepartment,
   all,
-  custom,
-}
-
-enum _CustomFilterBy {
-  assignedToMe,
-  raisedByMe,
-  myDepartment,
-  all;
-
-  String get label => switch (this) {
-    _CustomFilterBy.assignedToMe => 'Assigned to me',
-    _CustomFilterBy.raisedByMe => 'Raised by me',
-    _CustomFilterBy.myDepartment => 'My department',
-    _CustomFilterBy.all => 'All tickets',
-  };
-
-  _EmployeeTicketTab get scopeTab => switch (this) {
-    _CustomFilterBy.assignedToMe => _EmployeeTicketTab.assignedToMe,
-    _CustomFilterBy.raisedByMe => _EmployeeTicketTab.raisedByMe,
-    _CustomFilterBy.myDepartment => _EmployeeTicketTab.myDepartment,
-    _CustomFilterBy.all => _EmployeeTicketTab.all,
-  };
-
-  static _CustomFilterBy fromStorage(String? value) {
-    return _CustomFilterBy.values.firstWhere(
-      (item) => item.name == value,
-      orElse: () => _CustomFilterBy.all,
-    );
-  }
-}
-
-enum _CustomOpenForMoreThan {
-  oneDay(1, 'More than 1 day'),
-  twoDays(2, 'More than 2 days'),
-  threeDays(3, 'More than 3 days'),
-  fourDays(4, 'More than 4 days'),
-  fivePlus(5, '5+ days');
-
-  const _CustomOpenForMoreThan(this.days, this.label);
-
-  final int days;
-  final String label;
-
-  /// `fivePlus` means open for 5 or more days; others mean strictly more than N days.
-  bool matchesAge(Duration age) {
-    if (this == _CustomOpenForMoreThan.fivePlus) {
-      return age.inDays >= days;
-    }
-    return age > Duration(days: days);
-  }
-
-  static _CustomOpenForMoreThan fromStorage(String? value) {
-    if (value == 'fiveDays') return _CustomOpenForMoreThan.fivePlus;
-    return _CustomOpenForMoreThan.values.firstWhere(
-      (item) => item.name == value,
-      orElse: () => _CustomOpenForMoreThan.oneDay,
-    );
-  }
 }
 
 class TicketListScreen extends StatefulWidget {
@@ -107,9 +49,8 @@ class TicketListScreen extends StatefulWidget {
 
 class _TicketListScreenState extends State<TicketListScreen>
     with SingleTickerProviderStateMixin {
-  static const _customFilterByPrefsKey = 'ticket_list_custom_filter_by';
-  static const _customOpenForPrefsKey = 'ticket_list_custom_open_for';
   static const _lastTabPrefsKey = 'ticket_list_last_tab';
+  static const _missedSlaOnlyPrefsKey = 'ticket_list_missed_sla_only';
 
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
@@ -117,8 +58,7 @@ class _TicketListScreenState extends State<TicketListScreen>
   TabController? _tabController;
   String _searchQuery = '';
   _TicketListData _listData = const _TicketListData.empty();
-  _CustomFilterBy _customFilterBy = _CustomFilterBy.all;
-  _CustomOpenForMoreThan _customOpenFor = _CustomOpenForMoreThan.oneDay;
+  bool _missedSlaOnly = false;
 
   @override
   void initState() {
@@ -137,34 +77,19 @@ class _TicketListScreenState extends State<TicketListScreen>
 
   Future<void> _loadEmployeeListPrefs() async {
     final preferences = await SharedPreferences.getInstance();
-    final filterBy = _CustomFilterBy.fromStorage(
-      preferences.getString(_customFilterByPrefsKey),
-    );
-    final openFor = _CustomOpenForMoreThan.fromStorage(
-      preferences.getString(_customOpenForPrefsKey),
-    );
+    final savedTabName = preferences.getString(_lastTabPrefsKey);
     final lastTab = _EmployeeTicketTab.values.firstWhere(
-      (tab) => tab.name == preferences.getString(_lastTabPrefsKey),
+      (tab) => tab.name == savedTabName,
       orElse: () => _EmployeeTicketTab.assignedToMe,
     );
+    final missedSlaOnly =
+        preferences.getBool(_missedSlaOnlyPrefsKey) ?? false;
     if (!mounted) return;
-    setState(() {
-      _customFilterBy = filterBy;
-      _customOpenFor = openFor;
-    });
+    setState(() => _missedSlaOnly = missedSlaOnly);
     final controller = _tabController;
-    if (controller == null) return;
-    if (controller.index != lastTab.index) {
+    if (controller != null && controller.index != lastTab.index) {
       controller.index = lastTab.index;
-    } else if (lastTab == _EmployeeTicketTab.custom) {
-      _clearSearch();
     }
-  }
-
-  Future<void> _persistCustomFilterPrefs() async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_customFilterByPrefsKey, _customFilterBy.name);
-    await preferences.setString(_customOpenForPrefsKey, _customOpenFor.name);
   }
 
   Future<void> _persistLastTab() async {
@@ -175,22 +100,14 @@ class _TicketListScreenState extends State<TicketListScreen>
     await preferences.setString(_lastTabPrefsKey, tab.name);
   }
 
-  void _clearSearch() {
-    if (_searchController.text.isEmpty && _searchQuery.isEmpty) return;
-    _searchQuery = '';
-    _searchController.clear();
+  Future<void> _persistMissedSlaOnly() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_missedSlaOnlyPrefsKey, _missedSlaOnly);
   }
 
-  void _onCustomFilterByChanged(_CustomFilterBy? value) {
-    if (value == null || value == _customFilterBy) return;
-    setState(() => _customFilterBy = value);
-    _persistCustomFilterPrefs();
-  }
-
-  void _onCustomOpenForChanged(_CustomOpenForMoreThan? value) {
-    if (value == null || value == _customOpenFor) return;
-    setState(() => _customOpenFor = value);
-    _persistCustomFilterPrefs();
+  void _onMissedSlaOnlyChanged(bool value) {
+    setState(() => _missedSlaOnly = value);
+    _persistMissedSlaOnly();
   }
 
   @override
@@ -205,10 +122,6 @@ class _TicketListScreenState extends State<TicketListScreen>
 
   void _onTabChanged() {
     if (_tabController == null || _tabController!.indexIsChanging) return;
-    final tab = _EmployeeTicketTab.values[_tabController!.index];
-    if (tab == _EmployeeTicketTab.custom) {
-      _clearSearch();
-    }
     setState(() {});
     _persistLastTab();
   }
@@ -271,46 +184,21 @@ class _TicketListScreenState extends State<TicketListScreen>
         ticket.assignedDepartmentId.isNotEmpty &&
             data.myDepartmentIds.contains(ticket.assignedDepartmentId),
       _EmployeeTicketTab.all => true,
-      _EmployeeTicketTab.custom =>
-        _belongsToTab(
-              ticket: ticket,
-              tab: _customFilterBy.scopeTab,
-              data: data,
-            ) &&
-            _matchesCustomOpenFor(ticket),
     };
   }
 
-  bool _isStillOpen(TicketStatus status) {
-    return switch (status) {
-      TicketStatus.open ||
-      TicketStatus.assigned ||
-      TicketStatus.inProgress =>
-        true,
-      TicketStatus.resolved ||
-      TicketStatus.invalid ||
-      TicketStatus.closed =>
-        false,
-    };
-  }
-
-  bool _matchesCustomOpenFor(TicketSummary ticket) {
-    if (!_isStillOpen(ticket.status)) return false;
-    final createdAt = ticket.createdAt;
-    if (createdAt == null) return false;
-    final age = DateTime.now().difference(createdAt);
-    return _customOpenFor.matchesAge(age);
+  bool _matchesListFilters(TicketSummary ticket) {
+    if (_missedSlaOnly && !ticket.slaMissed) return false;
+    return ticket.matchesSearch(_searchQuery);
   }
 
   List<TicketSummary> _visibleTickets(_TicketListData data) {
-    final searched = data.tickets
-        .where((ticket) => ticket.matchesSearch(_searchQuery))
-        .toList();
+    final filtered = data.tickets.where(_matchesListFilters).toList();
     if (!widget.isEmployeeView || _tabController == null) {
-      return searched;
+      return filtered;
     }
     final tab = _EmployeeTicketTab.values[_tabController!.index];
-    return searched
+    return filtered
         .where(
           (ticket) => _belongsToTab(ticket: ticket, tab: tab, data: data),
         )
@@ -319,6 +207,7 @@ class _TicketListScreenState extends State<TicketListScreen>
 
   int _tabCount(_EmployeeTicketTab tab, _TicketListData data) {
     return data.tickets
+        .where(_matchesListFilters)
         .where((ticket) => _belongsToTab(ticket: ticket, tab: tab, data: data))
         .length;
   }
@@ -329,7 +218,6 @@ class _TicketListScreenState extends State<TicketListScreen>
       _EmployeeTicketTab.raisedByMe => 'Raised by me',
       _EmployeeTicketTab.myDepartment => 'My department',
       _EmployeeTicketTab.all => 'All tickets',
-      _EmployeeTicketTab.custom => 'Custom',
     };
   }
 
@@ -385,7 +273,9 @@ class _TicketListScreenState extends State<TicketListScreen>
                     if (widget.isEmployeeView && _tabController != null) ...[
                       const SizedBox(height: 12),
                       FutureBuilder<_TicketListData>(
-                        key: ValueKey('tabs-${_loader.refreshToken}'),
+                        key: ValueKey(
+                          'tabs-${_loader.refreshToken}-$_missedSlaOnly',
+                        ),
                         future: _loader.future,
                         builder: (context, snapshot) {
                           final data = snapshot.data ?? _listData;
@@ -399,23 +289,20 @@ class _TicketListScreenState extends State<TicketListScreen>
                           );
                         },
                       ),
-                      AnimatedBuilder(
-                        animation: _tabController!,
-                        builder: (context, _) {
-                          final isCustom =
-                              _EmployeeTicketTab.values[_tabController!.index] ==
-                              _EmployeeTicketTab.custom;
-                          if (!isCustom) return const SizedBox.shrink();
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 20),
-                            child: _CustomTicketFilterForm(
-                              filterBy: _customFilterBy,
-                              openFor: _customOpenFor,
-                              onFilterByChanged: _onCustomFilterByChanged,
-                              onOpenForChanged: _onCustomOpenForChanged,
-                            ),
-                          );
-                        },
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        value: _missedSlaOnly,
+                        title: const Text(
+                          'Missed SLA only',
+                          style: TextStyle(color: Colors.black),
+                        ),
+                        subtitle: const Text(
+                          'Show only open tickets past their category SLA',
+                          style: TextStyle(color: Colors.black54, fontSize: 13),
+                        ),
+                        onChanged: _onMissedSlaOnlyChanged,
                       ),
                     ],
                     const SizedBox(height: 12),
@@ -499,14 +386,15 @@ class _TicketListScreenState extends State<TicketListScreen>
       }
       return 'No matches in the $tabName tab. Try another tab, or check All tickets.';
     }
+    if (_missedSlaOnly) {
+      return 'No missed-SLA tickets in the ${_tabTitle(tab)} tab.';
+    }
     return switch (tab) {
       _EmployeeTicketTab.assignedToMe => 'No tickets assigned to you.',
       _EmployeeTicketTab.raisedByMe => 'You have not raised any tickets.',
       _EmployeeTicketTab.myDepartment =>
         'No tickets in your department(s).',
       _EmployeeTicketTab.all => 'No tickets found for the last 90 days.',
-      _EmployeeTicketTab.custom =>
-        'No open tickets match your custom filters.',
     };
   }
 }
@@ -526,77 +414,6 @@ class _TicketListData {
   final List<TicketSummary> tickets;
   final String currentUserId;
   final Set<String> myDepartmentIds;
-}
-
-class _CustomTicketFilterForm extends StatelessWidget {
-  const _CustomTicketFilterForm({
-    required this.filterBy,
-    required this.openFor,
-    required this.onFilterByChanged,
-    required this.onOpenForChanged,
-  });
-
-  final _CustomFilterBy filterBy;
-  final _CustomOpenForMoreThan openFor;
-  final ValueChanged<_CustomFilterBy?> onFilterByChanged;
-  final ValueChanged<_CustomOpenForMoreThan?> onOpenForChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final sideBySide = constraints.maxWidth >= 560;
-        final filterField = DropdownButtonFormField<_CustomFilterBy>(
-          key: ValueKey('custom-filter-by-${filterBy.name}'),
-          initialValue: filterBy,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Filter by'),
-          items: [
-            for (final option in _CustomFilterBy.values)
-              DropdownMenuItem(
-                value: option,
-                child: Text(option.label),
-              ),
-          ],
-          onChanged: onFilterByChanged,
-        );
-        final openForField = DropdownButtonFormField<_CustomOpenForMoreThan>(
-          key: ValueKey('custom-open-for-${openFor.name}'),
-          initialValue: openFor,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Open for'),
-          items: [
-            for (final option in _CustomOpenForMoreThan.values)
-              DropdownMenuItem(
-                value: option,
-                child: Text(option.label),
-              ),
-          ],
-          onChanged: onOpenForChanged,
-        );
-
-        if (sideBySide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: filterField),
-              const SizedBox(width: 12),
-              Expanded(child: openForField),
-            ],
-          );
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            filterField,
-            const SizedBox(height: 12),
-            openForField,
-          ],
-        );
-      },
-    );
-  }
 }
 
 class _EmployeeTicketTabSelector extends StatelessWidget {
