@@ -120,7 +120,16 @@ class _InternalCategoriesScreenState extends State<InternalCategoriesScreen> {
     return Theme(
       data: AppTheme.withCompactButtons(Theme.of(context)),
       child: AppScreenScaffold(
-        appBar: AppBar(title: const Text('Internal categories')),
+        appBar: AppBar(
+          title: const Text('Internal categories'),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh',
+              onPressed: _refresh,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _addCategory,
           icon: const Icon(Icons.add),

@@ -152,7 +152,16 @@ class _LocationsScreenState extends State<LocationsScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScreenScaffold(
-      appBar: AppBar(title: const Text('Locations')),
+      appBar: AppBar(
+        title: const Text('Locations'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: FutureBuilder<List<BaseLocation>>(
           key: ValueKey(_loader.refreshToken),
