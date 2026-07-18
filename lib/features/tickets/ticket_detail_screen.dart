@@ -614,6 +614,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                           apiClient: widget.apiClient,
                           ticket: ticket,
                         ),
+                        const SizedBox(height: 8),
+                        _TicketAssigneeHeader(
+                          apiClient: widget.apiClient,
+                          ticket: ticket,
+                          onReassigned: _refresh,
+                        ),
                       ],
                       if (widget.isEmployeeView) ...[
                         const SizedBox(height: 16),
@@ -692,24 +698,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                             submitIcon: Icons.cloud_upload_outlined,
                           ),
                       ],
-                      if (ticket.resolutionSummary.isNotEmpty) ...[
+                      if (ticket.resolutionSummary.isNotEmpty ||
+                          ticket.invalidationReason.isNotEmpty ||
+                          widget.isEmployeeView) ...[
                         const SizedBox(height: 16),
-                        _InfoRow('Resolution', ticket.resolutionSummary),
-                      ],
-                      if (ticket.invalidationReason.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        _InfoRow('Invalidation reason', ticket.invalidationReason),
-                      ],
-                      if (widget.isEmployeeView) ...[
-                        const SizedBox(height: 20),
-                        _InfoRow('Priority', ticket.priority.label),
-                        _TicketAssignmentSection(
-                          apiClient: widget.apiClient,
+                        _TicketFieldsPanel(
                           ticket: ticket,
-                          onReassigned: _refresh,
+                          isEmployeeView: widget.isEmployeeView,
                         ),
-                        _InfoRow('Customer', ticket.raisedForCustomerName),
-                        _InfoRow('Category', ticket.categoryDisplayLabel),
                       ],
                       if (widget.isEmployeeView) ...[
                         const SizedBox(height: 24),
@@ -855,7 +851,7 @@ class _EmployeeActions extends StatelessWidget {
         ticket.status == TicketStatus.open ||
         ticket.status == TicketStatus.assigned ||
         ticket.status == TicketStatus.inProgress;
-    final canResolveOrInvalidate =
+    final canActOnTicket =
         (isAssignee || isDepartmentLead || isTicketTriager) &&
         canActOnWorkStatus;
 
@@ -863,7 +859,8 @@ class _EmployeeActions extends StatelessWidget {
       canStartWork: isAssignee &&
           (ticket.status == TicketStatus.open ||
               ticket.status == TicketStatus.assigned),
-      canResolveOrInvalidate: canResolveOrInvalidate,
+      canResolve: canActOnTicket && ticket.status == TicketStatus.inProgress,
+      canInvalidate: canActOnTicket,
       canClose: isAdmin &&
           (ticket.status == TicketStatus.resolved ||
               ticket.status == TicketStatus.invalid),
@@ -890,13 +887,13 @@ class _EmployeeActions extends StatelessWidget {
                 icon: const Icon(Icons.play_arrow_rounded, size: 20),
                 label: const Text('Start work'),
               ),
-            if (permissions.canResolveOrInvalidate)
+            if (permissions.canResolve)
               ElevatedButton.icon(
                 onPressed: onResolve,
                 icon: const Icon(Icons.check_circle_outline, size: 20),
                 label: const Text('Resolve'),
               ),
-            if (permissions.canResolveOrInvalidate)
+            if (permissions.canInvalidate)
               ElevatedButton.icon(
                 onPressed: onInvalidate,
                 icon: const Icon(Icons.block_flipped, size: 20),
@@ -918,17 +915,19 @@ class _EmployeeActions extends StatelessWidget {
 class _EmployeeActionPermissions {
   const _EmployeeActionPermissions({
     required this.canStartWork,
-    required this.canResolveOrInvalidate,
+    required this.canResolve,
+    required this.canInvalidate,
     required this.canClose,
   });
 
   final bool canStartWork;
-  final bool canResolveOrInvalidate;
+  final bool canResolve;
+  final bool canInvalidate;
   final bool canClose;
 }
 
-class _TicketAssignmentSection extends StatelessWidget {
-  const _TicketAssignmentSection({
+class _TicketAssigneeHeader extends StatelessWidget {
+  const _TicketAssigneeHeader({
     required this.apiClient,
     required this.ticket,
     required this.onReassigned,
@@ -989,33 +988,58 @@ class _TicketAssignmentSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final assigneeLabel =
         ticket.assigneeName.trim().isEmpty ? 'Unassigned' : ticket.assigneeName;
+    final theme = Theme.of(context);
 
     return FutureBuilder<_TicketAssignmentViewData>(
       future: _load(),
       builder: (context, snapshot) {
         final data = snapshot.data;
         final canReassign = data?.canReassign == true;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _InfoRow(
-              'Department',
-              ticket.assignedDepartmentName.isEmpty
-                  ? '—'
-                  : ticket.assignedDepartmentName,
-            ),
-            _InfoRow(
+            Text(
               'Assignee',
-              assigneeLabel,
-              onEdit: canReassign
-                  ? () => _openReassignDialog(
-                      context,
-                      data?.departments ?? const [],
-                    )
-                  : null,
-              editIcon: Icons.swap_horiz,
-              editTooltip: 'Reassign',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.black54,
+                fontWeight: FontWeight.w600,
+              ),
             ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                assigneeLabel,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w700,
+                  height: 1.25,
+                ),
+              ),
+            ),
+            if (canReassign) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Reassign',
+                onPressed: () => _openReassignDialog(
+                  context,
+                  data?.departments ?? const [],
+                ),
+                icon: const Icon(Icons.swap_horiz, size: 16),
+                style: IconButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  fixedSize: const Size(26, 26),
+                  minimumSize: const Size(26, 26),
+                  maximumSize: const Size(26, 26),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ],
           ],
         );
       },
@@ -1501,24 +1525,14 @@ class _TicketDescriptionHero extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow(
-    this.label,
-    this.value, {
-    this.onEdit,
-    this.editIcon = Icons.edit_outlined,
-    this.editTooltip,
-  });
+  const _InfoRow(this.label, this.value);
 
   final String label;
   final String value;
-  final VoidCallback? onEdit;
-  final IconData editIcon;
-  final String? editTooltip;
 
   @override
   Widget build(BuildContext context) {
-    if (value.trim().isEmpty && onEdit == null) return const SizedBox.shrink();
-    final displayValue = value.trim().isEmpty ? '—' : value;
+    if (value.trim().isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -1535,34 +1549,60 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text.rich(
-              TextSpan(
-                style: const TextStyle(color: Colors.black, height: 1.35),
-                children: [
-                  TextSpan(text: displayValue),
-                  if (onEdit != null)
-                    WidgetSpan(
-                      alignment: PlaceholderAlignment.middle,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: IconButton(
-                          tooltip: editTooltip ?? 'Edit $label',
-                          onPressed: onEdit,
-                          icon: Icon(editIcon, size: 18),
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 28,
-                            minHeight: 28,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.black, height: 1.35),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TicketFieldsPanel extends StatelessWidget {
+  const _TicketFieldsPanel({
+    required this.ticket,
+    required this.isEmployeeView,
+  });
+
+  final TicketDetail ticket;
+  final bool isEmployeeView;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSurface(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Details',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            if (ticket.resolutionSummary.isNotEmpty)
+              _InfoRow('Resolution', ticket.resolutionSummary),
+            if (ticket.invalidationReason.isNotEmpty)
+              _InfoRow('Invalidation reason', ticket.invalidationReason),
+            if (isEmployeeView) ...[
+              _InfoRow('Priority', ticket.priority.label),
+              _InfoRow(
+                'Department',
+                ticket.assignedDepartmentName.isEmpty
+                    ? '—'
+                    : ticket.assignedDepartmentName,
+              ),
+              _InfoRow('Customer', ticket.raisedForCustomerName),
+              _InfoRow('Category', ticket.categoryDisplayLabel),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1576,28 +1616,42 @@ class _AttachmentsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (attachments.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Attachments',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: attachments
-              .map(
-                (attachment) => _AttachmentGridTile(
-                  attachment: attachment,
-                  onOpen: () => onOpen(attachment),
-                ),
+    return AppSurface(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Attachments',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            if (attachments.isEmpty)
+              const Text(
+                'No attachments.',
+                style: TextStyle(color: Colors.black54, height: 1.35),
               )
-              .toList(),
+            else
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: attachments
+                    .map(
+                      (attachment) => _AttachmentGridTile(
+                        attachment: attachment,
+                        onOpen: () => onOpen(attachment),
+                      ),
+                    )
+                    .toList(),
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
