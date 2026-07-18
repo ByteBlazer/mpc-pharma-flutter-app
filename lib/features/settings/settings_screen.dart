@@ -6,6 +6,8 @@ import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_surface.dart';
 import '../tickets/complaint_categories_screen.dart';
 import '../tickets/internal_categories_screen.dart';
+import 'database_management_screen.dart';
+import 'miscellaneous_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
@@ -60,6 +62,40 @@ class SettingsScreen extends StatelessWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => InternalCategoriesScreen(
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    _SettingsMenuTile(
+                      icon: Icons.tune_outlined,
+                      title: 'Miscellaneous',
+                      subtitle:
+                          'Location heartbeat, scan cool-off, ERP and SMS flags',
+                      color: primary,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => MiscellaneousSettingsScreen(
+                              apiClient: apiClient,
+                              onLoginAgain: onLoginAgain,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    _SettingsMenuTile(
+                      icon: Icons.storage_outlined,
+                      title: 'Database Management',
+                      subtitle:
+                          'Create, download, or restore database backups',
+                      color: primary,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => DatabaseManagementScreen(
                               apiClient: apiClient,
                               onLoginAgain: onLoginAgain,
                             ),
