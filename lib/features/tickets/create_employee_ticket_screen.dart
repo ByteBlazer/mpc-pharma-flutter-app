@@ -32,7 +32,8 @@ class CreateEmployeeTicketScreen extends StatefulWidget {
       _CreateEmployeeTicketScreenState();
 }
 
-class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen> {
+class _CreateEmployeeTicketScreenState
+    extends State<CreateEmployeeTicketScreen> {
   final _descriptionController = TextEditingController();
   final _subjectController = TextEditingController();
   late final TicketAttachmentManager _attachmentManager;
@@ -46,7 +47,8 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
   bool _isSubmitting = false;
   bool _allowExitWithoutPrompt = false;
 
-  bool get _isCustomerTicket => widget.ticketType == TicketType.raisedForCustomer;
+  bool get _isCustomerTicket =>
+      widget.ticketType == TicketType.raisedForCustomer;
 
   bool get _hasUnsavedChanges {
     if (_allowExitWithoutPrompt) return false;
@@ -138,9 +140,9 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
   }
 
   List<DepartmentUser> _departmentUsers(_CreateTicketData data) {
-    return _selectedDepartment(data)?.selectableUsers(
-          includeUserId: _selectedAssigneeId,
-        ) ??
+    return _selectedDepartment(
+          data,
+        )?.selectableUsers(includeUserId: _selectedAssigneeId) ??
         const [];
   }
 
@@ -161,7 +163,8 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
     final description = _descriptionController.text.trim();
     final departmentId = _selectedDepartmentId;
     final assigneeId = _selectedAssigneeId;
-    if (_isCustomerTicket && (_selectedCustomerId == null || _selectedCustomerId!.isEmpty)) {
+    if (_isCustomerTicket &&
+        (_selectedCustomerId == null || _selectedCustomerId!.isEmpty)) {
       _showError('Select a customer.');
       return;
     }
@@ -223,7 +226,9 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
 
   @override
   Widget build(BuildContext context) {
-    final title = _isCustomerTicket ? 'Raise for customer' : 'Internal ticket';
+    final title = _isCustomerTicket
+        ? 'On behalf of customer'
+        : 'Internal ticket';
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -235,223 +240,240 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
         child: AppScreenScaffold(
           appBar: AppBar(title: Text(title)),
           body: SafeArea(
-        child: FutureBuilder<_CreateTicketData>(
-          future: _dataFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return AppLoadErrorState(
-                title: 'Failed to load ticket form',
-                message: snapshot.error.toString(),
-                onRetry: _refreshData,
-                onLoginAgain: widget.onLoginAgain,
-              );
-            }
-            final data = snapshot.data ?? const _CreateTicketData.empty();
-            final departments = data.departments.where((d) => d.isActive).toList();
-            final complaintCategories =
-                data.complaintCategories.where((c) => c.isActive).toList();
-            final internalCategories =
-                data.internalCategories.where((c) => c.isActive).toList();
-            final users = _departmentUsers(data);
+            child: FutureBuilder<_CreateTicketData>(
+              future: _dataFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return AppLoadErrorState(
+                    title: 'Failed to load ticket form',
+                    message: snapshot.error.toString(),
+                    onRetry: _refreshData,
+                    onLoginAgain: widget.onLoginAgain,
+                  );
+                }
+                final data = snapshot.data ?? const _CreateTicketData.empty();
+                final departments = data.departments
+                    .where((d) => d.isActive)
+                    .toList();
+                final complaintCategories = data.complaintCategories
+                    .where((c) => c.isActive)
+                    .toList();
+                final internalCategories = data.internalCategories
+                    .where((c) => c.isActive)
+                    .toList();
+                final users = _departmentUsers(data);
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 720),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_isCustomerTicket)
-                        AppMultiSelectField<String>(
-                          fieldLabel: 'Customer',
-                          dialogTitle: 'Select customer',
-                          searchLabel: 'Search customers',
-                          searchHint: 'ID, firm name, city...',
-                          emptySelectionText: 'Select customer',
-                          countLabel: 'customers',
-                          singleSelect: true,
-                          selectedValues: {
-                            ?_selectedCustomerId,
-                          },
-                          enabled: !_isSubmitting,
-                          items: data.customers
-                              .map(
-                                (customer) => AppMultiSelectItem<String>(
-                                  value: customer.id,
-                                  label:
-                                      '${customer.firmName} (${customer.id})',
-                                  searchText:
-                                      '${customer.id} ${customer.firmName} ${customer.city}',
-                                  subtitle: customer.city.isEmpty
-                                      ? null
-                                      : customer.city,
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (values) => setState(
-                            () => _selectedCustomerId =
-                                values.isEmpty ? null : values.first,
-                          ),
-                        ),
-                      if (_isCustomerTicket) const SizedBox(height: 16),
-                      if (_isCustomerTicket) ...[
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedCategoryId,
-                          decoration: const InputDecoration(
-                            labelText: 'Category',
-                          ),
-                          items: complaintCategories
-                              .map(
-                                (category) => DropdownMenuItem(
-                                  value: category.id,
-                                  child: Text(category.name),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: _isSubmitting
-                              ? null
-                              : (value) => setState(() {
-                                  _selectedCategoryId = value;
-                                  _applyCategoryDefaults(data, value);
-                                }),
-                        ),
-                        const SizedBox(height: 16),
-                      ] else ...[
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedCategoryId,
-                          decoration: const InputDecoration(
-                            labelText: 'Category',
-                          ),
-                          items: internalCategories
-                              .map(
-                                (category) => DropdownMenuItem(
-                                  value: category.id,
-                                  child: Text(category.name),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: _isSubmitting
-                              ? null
-                              : (value) => setState(
-                                    () => _selectedCategoryId = value,
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_isCustomerTicket)
+                            AppMultiSelectField<String>(
+                              fieldLabel: 'Customer',
+                              dialogTitle: 'Select customer',
+                              searchLabel: 'Search customers',
+                              searchHint: 'ID, firm name, city...',
+                              emptySelectionText: 'Select customer',
+                              countLabel: 'customers',
+                              singleSelect: true,
+                              selectedValues: {?_selectedCustomerId},
+                              enabled: !_isSubmitting,
+                              items: data.customers
+                                  .map(
+                                    (customer) => AppMultiSelectItem<String>(
+                                      value: customer.id,
+                                      label:
+                                          '${customer.firmName} (${customer.id})',
+                                      searchText:
+                                          '${customer.id} ${customer.firmName} ${customer.city}',
+                                      subtitle: customer.city.isEmpty
+                                          ? null
+                                          : customer.city,
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (values) => setState(
+                                () => _selectedCustomerId = values.isEmpty
+                                    ? null
+                                    : values.first,
+                              ),
+                            ),
+                          if (_isCustomerTicket) const SizedBox(height: 16),
+                          if (_isCustomerTicket) ...[
+                            DropdownButtonFormField<String>(
+                              initialValue: _selectedCategoryId,
+                              decoration: const InputDecoration(
+                                labelText: 'Category',
+                              ),
+                              items: complaintCategories
+                                  .map(
+                                    (category) => DropdownMenuItem(
+                                      value: category.id,
+                                      child: Text(category.name),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: _isSubmitting
+                                  ? null
+                                  : (value) => setState(() {
+                                      _selectedCategoryId = value;
+                                      _applyCategoryDefaults(data, value);
+                                    }),
+                            ),
+                            const SizedBox(height: 16),
+                          ] else ...[
+                            DropdownButtonFormField<String>(
+                              initialValue: _selectedCategoryId,
+                              decoration: const InputDecoration(
+                                labelText: 'Category',
+                              ),
+                              items: internalCategories
+                                  .map(
+                                    (category) => DropdownMenuItem(
+                                      value: category.id,
+                                      child: Text(category.name),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: _isSubmitting
+                                  ? null
+                                  : (value) => setState(
+                                      () => _selectedCategoryId = value,
+                                    ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedDepartmentId,
+                            decoration: const InputDecoration(
+                              labelText: 'Department',
+                            ),
+                            items: departments
+                                .map(
+                                  (department) => DropdownMenuItem(
+                                    value: department.id,
+                                    child: Text(department.name),
                                   ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedDepartmentId,
-                        decoration: const InputDecoration(labelText: 'Department'),
-                        items: departments
-                            .map(
-                              (department) => DropdownMenuItem(
-                                value: department.id,
-                                child: Text(department.name),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _isSubmitting
-                            ? null
-                            : (value) => setState(() {
-                                _selectedDepartmentId = value;
-                                final department = data.departments
-                                    .where((item) => item.id == value)
-                                    .firstOrNull;
-                                _selectedAssigneeId =
-                                    department?.activeTicketTriager?.id;
-                              }),
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        key: ValueKey(
-                          'assignee-$_selectedDepartmentId-$_selectedAssigneeId',
-                        ),
-                        initialValue: users.any((user) => user.id == _selectedAssigneeId)
-                            ? _selectedAssigneeId
-                            : null,
-                        decoration: InputDecoration(
-                          labelText: _selectedDepartmentId == null
-                              ? 'Assignee (Select Dept First)'
-                              : 'Assignee',
-                        ),
-                        items: users
-                            .map(
-                              (user) => DropdownMenuItem(
-                                value: user.id,
-                                child: Text(
-                                  user.isActive
-                                      ? user.personName
-                                      : '${user.personName} (Inactive)',
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _isSubmitting || _selectedDepartmentId == null
-                            ? null
-                            : (value) => setState(() => _selectedAssigneeId = value),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _subjectController,
-                        enabled: !_isSubmitting,
-                        decoration: InputDecoration(
-                          labelText: _isCustomerTicket
-                              ? 'Subject (optional)'
-                              : 'Subject',
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<TicketPriority>(
-                        initialValue: _priority,
-                        decoration: const InputDecoration(labelText: 'Priority'),
-                        items: TicketPriority.values
-                            .map(
-                              (priority) => DropdownMenuItem(
-                                value: priority,
-                                child: Text(priority.label),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _isSubmitting
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  setState(() => _priority = value);
-                                }
-                              },
-                      ),
-                      const SizedBox(height: 20),
-                      TicketDescriptionField(
-                        controller: _descriptionController,
-                        attachmentManager: _attachmentManager,
-                        onAttachmentsChanged: () => setState(() {}),
-                        enabled: !_isSubmitting,
-                      ),
-                      const SizedBox(height: 24),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: ElevatedButton(
-                          onPressed: _isSubmitting ? null : () => _submit(data),
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Text('Create ticket'),
-                        ),
+                                .toList(),
+                            onChanged: _isSubmitting
+                                ? null
+                                : (value) => setState(() {
+                                    _selectedDepartmentId = value;
+                                    final department = data.departments
+                                        .where((item) => item.id == value)
+                                        .firstOrNull;
+                                    _selectedAssigneeId =
+                                        department?.activeTicketTriager?.id;
+                                  }),
+                          ),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            key: ValueKey(
+                              'assignee-$_selectedDepartmentId-$_selectedAssigneeId',
+                            ),
+                            initialValue:
+                                users.any(
+                                  (user) => user.id == _selectedAssigneeId,
+                                )
+                                ? _selectedAssigneeId
+                                : null,
+                            decoration: InputDecoration(
+                              labelText: _selectedDepartmentId == null
+                                  ? 'Assignee (Select Dept First)'
+                                  : 'Assignee',
+                            ),
+                            items: users
+                                .map(
+                                  (user) => DropdownMenuItem(
+                                    value: user.id,
+                                    child: Text(
+                                      user.isActive
+                                          ? user.personName
+                                          : '${user.personName} (Inactive)',
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged:
+                                _isSubmitting || _selectedDepartmentId == null
+                                ? null
+                                : (value) => setState(
+                                    () => _selectedAssigneeId = value,
+                                  ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _subjectController,
+                            enabled: !_isSubmitting,
+                            decoration: InputDecoration(
+                              labelText: _isCustomerTicket
+                                  ? 'Subject (optional)'
+                                  : 'Subject',
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<TicketPriority>(
+                            initialValue: _priority,
+                            decoration: const InputDecoration(
+                              labelText: 'Priority',
+                            ),
+                            items: TicketPriority.values
+                                .map(
+                                  (priority) => DropdownMenuItem(
+                                    value: priority,
+                                    child: Text(priority.label),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: _isSubmitting
+                                ? null
+                                : (value) {
+                                    if (value != null) {
+                                      setState(() => _priority = value);
+                                    }
+                                  },
+                          ),
+                          const SizedBox(height: 20),
+                          TicketDescriptionField(
+                            controller: _descriptionController,
+                            attachmentManager: _attachmentManager,
+                            onAttachmentsChanged: () => setState(() {}),
+                            enabled: !_isSubmitting,
+                          ),
+                          const SizedBox(height: 24),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: ElevatedButton(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () => _submit(data),
+                              child: _isSubmitting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Create ticket'),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+                );
+              },
+            ),
+          ),
         ),
       ),
     );

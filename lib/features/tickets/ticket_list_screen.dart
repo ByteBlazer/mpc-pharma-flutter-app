@@ -177,7 +177,31 @@ class _TicketListScreenState extends State<TicketListScreen>
     if (message != null) {
       showAppSnackBar(context, message: message, type: AppSnackBarType.success);
     }
+    if (widget.isEmployeeView) {
+      await _showRaisedByMeAfterCreate();
+    }
     await _refresh();
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+  }
+
+  Future<void> _showRaisedByMeAfterCreate() async {
+    final controller = _tabController;
+    if (controller == null) return;
+
+    final raisedByMeIndex = _EmployeeTicketTab.raisedByMe.index;
+    if (controller.index != raisedByMeIndex) {
+      controller.index = raisedByMeIndex;
+    }
+    if (_searchController.text.isNotEmpty) {
+      _searchController.clear();
+    }
+    if (_missedSlaOnly) {
+      setState(() => _missedSlaOnly = false);
+      await _persistMissedSlaOnly();
+    }
+    await _persistLastTab();
   }
 
   bool _belongsToTab({

@@ -25,7 +25,7 @@ class TicketsScreen extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.storefront_outlined),
-              title: const Text('Raise for customer'),
+              title: const Text('On behalf of customer'),
               onTap: () =>
                   Navigator.of(context).pop(TicketType.raisedForCustomer),
             ),
