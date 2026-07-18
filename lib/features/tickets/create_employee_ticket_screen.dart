@@ -182,6 +182,10 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
       return;
     }
     final subject = _subjectController.text.trim();
+    if (!_isCustomerTicket && subject.isEmpty) {
+      _showError('Enter a subject.');
+      return;
+    }
 
     final body = <String, dynamic>{
       'ticketType': widget.ticketType.apiValue,
@@ -393,8 +397,10 @@ class _CreateEmployeeTicketScreenState extends State<CreateEmployeeTicketScreen>
                       TextField(
                         controller: _subjectController,
                         enabled: !_isSubmitting,
-                        decoration: const InputDecoration(
-                          labelText: 'Subject (optional)',
+                        decoration: InputDecoration(
+                          labelText: _isCustomerTicket
+                              ? 'Subject (optional)'
+                              : 'Subject',
                         ),
                       ),
                       const SizedBox(height: 16),

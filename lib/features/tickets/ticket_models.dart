@@ -338,6 +338,9 @@ class TicketSummary {
     required this.createdByName,
     required this.createdAt,
     required this.lastUpdatedAt,
+    this.ticketComplaintCategoryName = '',
+    this.ticketInternalCategoryName = '',
+    this.slaHours,
     this.raisedByCustomer,
     this.slaMissed = false,
   });
@@ -363,6 +366,9 @@ class TicketSummary {
       createdByName: _string(json['createdByName']),
       createdAt: DateTime.tryParse(_string(json['createdAt'])),
       lastUpdatedAt: DateTime.tryParse(_string(json['lastUpdatedAt'])),
+      ticketComplaintCategoryName: _string(json['ticketComplaintCategoryName']),
+      ticketInternalCategoryName: _string(json['ticketInternalCategoryName']),
+      slaHours: _positiveInt(json['slaHours']),
       raisedByCustomer: _optionalBool(json['raisedByCustomer']),
       slaMissed: json['slaMissed'] == true,
     );
@@ -382,16 +388,27 @@ class TicketSummary {
   final String createdByName;
   final DateTime? createdAt;
   final DateTime? lastUpdatedAt;
+  final String ticketComplaintCategoryName;
+  final String ticketInternalCategoryName;
+  final int? slaHours;
 
   /// Customer JWT only: true = self-raised, false = company-raised.
   final bool? raisedByCustomer;
 
-  /// Employee list only: open ticket past its category SLA.
+  /// Employee list only: ticket past its category SLA.
   final bool slaMissed;
 
   bool get isRaisedByCustomer => raisedByCustomer == true;
 
   bool get isCustomerTicket => ticketType == TicketType.raisedForCustomer;
+
+  String get categoryDisplayLabel {
+    final name = (ticketType == TicketType.internal
+            ? ticketInternalCategoryName
+            : ticketComplaintCategoryName)
+        .trim();
+    return _categoryNameWithSla(name: name, slaHours: slaHours);
+  }
 
   bool matchesSearch(String query) {
     final normalized = query.trim().toLowerCase();
@@ -406,6 +423,8 @@ class TicketSummary {
       assigneeName,
       customerFirmName,
       createdByName,
+      ticketComplaintCategoryName,
+      ticketInternalCategoryName,
     ].join(' ').toLowerCase().contains(normalized);
   }
 }
@@ -435,6 +454,7 @@ class TicketDetail {
     required this.ticketComplaintCategoryName,
     required this.ticketInternalCategoryId,
     required this.ticketInternalCategoryName,
+    this.slaHours,
     required this.attachments,
     required this.comments,
     required this.activity,
@@ -487,6 +507,7 @@ class TicketDetail {
       ticketComplaintCategoryName: _string(json['ticketComplaintCategoryName']),
       ticketInternalCategoryId: _string(json['ticketInternalCategoryId']),
       ticketInternalCategoryName: _string(json['ticketInternalCategoryName']),
+      slaHours: _positiveInt(json['slaHours']),
       attachments: attachmentsJson is List
           ? attachmentsJson
                 .whereType<JsonMap>()
@@ -536,6 +557,7 @@ class TicketDetail {
   final String ticketComplaintCategoryName;
   final String ticketInternalCategoryId;
   final String ticketInternalCategoryName;
+  final int? slaHours;
   final List<TicketAttachment> attachments;
   final List<TicketComment> comments;
   final List<TicketActivity> activity;
@@ -548,6 +570,14 @@ class TicketDetail {
   final bool? raisedByCustomer;
 
   bool get isRaisedByCustomer => raisedByCustomer == true;
+
+  String get categoryDisplayLabel {
+    final name = (ticketType == TicketType.internal
+            ? ticketInternalCategoryName
+            : ticketComplaintCategoryName)
+        .trim();
+    return _categoryNameWithSla(name: name, slaHours: slaHours);
+  }
 
   bool get isClosed => status == TicketStatus.closed;
   bool get isTerminal =>
@@ -631,6 +661,17 @@ class PendingTicketAttachment {
 }
 
 String _string(Object? value) => value?.toString() ?? '';
+
+String _categoryNameWithSla({required String name, required int? slaHours}) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return '';
+  final hours = slaHours;
+  if (hours == null || hours < 1) return trimmed;
+  final days = (hours / ComplaintCategory.slaHoursPerDay).round();
+  if (days < 1) return trimmed;
+  final daysLabel = days == 1 ? '1 day' : '$days days';
+  return '$trimmed | SLA: $daysLabel';
+}
 
 int? _positiveInt(Object? value) {
   final parsed = value is int ? value : int.tryParse(_string(value));
