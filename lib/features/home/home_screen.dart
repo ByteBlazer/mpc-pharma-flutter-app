@@ -314,11 +314,12 @@ class _HomeFeatureGrid extends StatelessWidget {
   Future<_HomeFeatureVisibility> _loadVisibility() async {
     final showImpersonate =
         !isSimulationMode && await JwtPayload.canStartImpersonation();
-    final showTickets = await JwtPayload.currentUserIsEmployee();
+    final hasWebAccess = await JwtPayload.currentUserHasWebAccess();
+    final showTickets = hasWebAccess;
     final showComplaints = await JwtPayload.currentUserIsCustomer();
     final showSettings = await JwtPayload.currentUserIsAppAdmin();
-    final showNotifications = showTickets;
-    final showCustomers = await JwtPayload.currentUserHasWebAccess();
+    final showNotifications = hasWebAccess;
+    final showCustomers = hasWebAccess;
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
       showTickets: showTickets,
