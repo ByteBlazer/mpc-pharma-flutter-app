@@ -463,11 +463,17 @@ class _ScanScreenState extends State<ScanScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 10),
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
                             onPressed: _isLoading ? null : _toggleScanning,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 18,
+                              ),
+                            ),
                             icon: Icon(
                               _isScanning
                                   ? Icons.stop_circle_outlined

@@ -145,4 +145,12 @@ abstract final class JwtPayload {
         roles.hasRole(AppRole.appTripCreator) ||
         roles.hasRole(AppRole.appAdmin);
   }
+
+  static Future<bool> currentUserCanAccessQueueAndTrips({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final roles = await currentRoles(tokenStore: tokenStore);
+    return roles.hasRole(AppRole.appTripCreator) ||
+        roles.hasRole(AppRole.appAdmin);
+  }
 }
