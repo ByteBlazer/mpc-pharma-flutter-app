@@ -35,6 +35,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   final _audioPlayer = AudioPlayer();
   MobileScannerController? _scannerController;
+  CameraFacing _activeCameraFacing = CameraFacing.back;
 
   bool _scanMode = true; // true = SCAN, false = UNSCAN
   bool _isScanning = false;
@@ -60,14 +61,37 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   Future<void> _ensureScannerController() async {
-    // Desktop/web webcams are typically user-facing. Requesting
-    // CameraFacing.back (environment) often fails with NotFoundError in Chrome
-    // even when Cheese/OS can open the same camera.
     _scannerController ??= MobileScannerController(
       detectionSpeed: DetectionSpeed.normal,
-      facing: kIsWeb ? CameraFacing.front : CameraFacing.back,
+      facing: CameraFacing.back,
       autoStart: false,
     );
+  }
+
+  /// Prefer rear camera; fall back to front if rear is unavailable (e.g. some
+  /// desktop browsers).
+  Future<void> _startPreferredCamera() async {
+    final controller = _scannerController!;
+    await controller.start(cameraDirection: CameraFacing.back);
+    if (controller.value.isRunning) {
+      _activeCameraFacing = CameraFacing.back;
+      return;
+    }
+
+    await controller.start(cameraDirection: CameraFacing.front);
+    if (controller.value.isRunning) {
+      _activeCameraFacing = CameraFacing.front;
+      return;
+    }
+
+    final error = controller.value.error;
+    throw error ??
+        const MobileScannerException(
+          errorCode: MobileScannerErrorCode.genericError,
+          errorDetails: MobileScannerErrorDetails(
+            message: 'Could not open any camera.',
+          ),
+        );
   }
 
   Future<bool> _requestCameraPermission() async {
@@ -149,7 +173,7 @@ class _ScanScreenState extends State<ScanScreen> {
     if (!mounted) return;
 
     try {
-      await _scannerController!.start();
+      await _startPreferredCamera();
       await WakelockPlus.enable();
     } catch (error) {
       if (!mounted) return;
@@ -353,7 +377,14 @@ class _ScanScreenState extends State<ScanScreen> {
     if (!_isScanning || _isLoading) return;
     try {
       await _ensureScannerController();
-      await _scannerController!.start();
+      await _scannerController!.start(cameraDirection: _activeCameraFacing);
+      if (!_scannerController!.value.isRunning &&
+          _activeCameraFacing == CameraFacing.back) {
+        await _scannerController!.start(cameraDirection: CameraFacing.front);
+        if (_scannerController!.value.isRunning) {
+          _activeCameraFacing = CameraFacing.front;
+        }
+      }
     } catch (_) {}
   }
 
