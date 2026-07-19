@@ -129,7 +129,7 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
     if (!_signatureController.isNotEmpty) return null;
     final bytes = await _signatureController.toPngBytes();
     if (bytes == null || bytes.isEmpty) return null;
-    return base64Encode(bytes);
+    return encodeSignatureBytes(bytes);
   }
 
   Future<void> _submit() async {
