@@ -22,6 +22,7 @@ import '../scan/scan_screen.dart';
 import '../settings/settings_screen.dart';
 import '../tickets/tickets_screen.dart';
 import '../trips/trips_screen.dart';
+import '../my_trips/my_trips_screen.dart';
 import '../users/users_screen.dart';
 
 const _homeTileSpacing = 20.0;
@@ -326,6 +327,7 @@ class _HomeFeatureGrid extends StatelessWidget {
     final showScan = await JwtPayload.currentUserCanAccessScan();
     final showQueueAndTrips =
         await JwtPayload.currentUserCanAccessQueueAndTrips();
+    final showMyTrips = await JwtPayload.currentUserCanAccessMyTrips();
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
       showTickets: showTickets,
@@ -335,6 +337,7 @@ class _HomeFeatureGrid extends StatelessWidget {
       showCustomers: showCustomers,
       showScan: showScan,
       showQueueAndTrips: showQueueAndTrips,
+      showMyTrips: showMyTrips,
     );
   }
 
@@ -533,6 +536,21 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
+      if (visibility.showMyTrips)
+        _FeatureTile(
+          icon: Icons.route_outlined,
+          label: 'My Trips',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => MyTripsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
     ];
   }
 
@@ -656,6 +674,7 @@ class _HomeFeatureVisibility {
     required this.showCustomers,
     required this.showScan,
     required this.showQueueAndTrips,
+    required this.showMyTrips,
   });
 
   final bool showImpersonate;
@@ -666,6 +685,7 @@ class _HomeFeatureVisibility {
   final bool showCustomers;
   final bool showScan;
   final bool showQueueAndTrips;
+  final bool showMyTrips;
 }
 
 class _FeatureTile extends StatelessWidget {

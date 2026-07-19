@@ -4,11 +4,13 @@ import 'app_environment.dart';
 import 'app_theme.dart';
 import 'features/auth/login_screen.dart';
 import 'navigation/browser_history_sync.dart';
+import 'services/trip_heartbeat_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   configureBrowserHistorySync();
   await AppEnvironment.load();
+  TripHeartbeatService.initForegroundTask();
   runApp(const MpcPharmaApp());
 }
 

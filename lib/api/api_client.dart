@@ -8,6 +8,7 @@ import 'auth_models.dart';
 import 'auth_token_store.dart';
 import '../features/customers/customer_models.dart' hide JsonMap;
 import '../features/departments/department_models.dart' hide JsonMap;
+import '../features/my_trips/my_trips_models.dart' hide JsonMap;
 import '../features/notifications/notification_models.dart' hide JsonMap;
 import '../features/queue/queue_models.dart' hide JsonMap;
 import '../features/queue/schedule_models.dart' hide JsonMap;
@@ -120,14 +121,60 @@ class ApiClient {
 
   Future<void> sendLocation({
     String? token,
-    required JsonMap locationData,
+    required String latitude,
+    required String longitude,
   }) async {
     await _post(
       'location/register',
       token: token,
       requiresAuth: true,
-      body: locationData,
+      body: {
+        'latitude': latitude,
+        'longitude': longitude,
+      },
     );
+  }
+
+  Future<TripActionResult> registerLocation({
+    String? token,
+    required String latitude,
+    required String longitude,
+  }) async {
+    try {
+      final response = await _post(
+        'location/register',
+        token: token,
+        requiresAuth: true,
+        body: {
+          'latitude': latitude,
+          'longitude': longitude,
+        },
+      );
+      return TripActionResult.fromHttp(
+        statusCode: response.statusCode,
+        json: _decodeJsonObject(response.body),
+      );
+    } on TimeoutException {
+      return TripActionResult.unreachable();
+    } on MissingAuthTokenException {
+      rethrow;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) rethrow;
+      try {
+        return TripActionResult.fromHttp(
+          statusCode: error.statusCode,
+          json: _decodeJsonObject(error.responseBody),
+        );
+      } catch (_) {
+        return TripActionResult(
+          statusCode: error.statusCode,
+          success: false,
+          message: error.toString(),
+        );
+      }
+    } catch (_) {
+      return TripActionResult.unreachable();
+    }
   }
 
   Future<DispatchQueueResponse> getDispatchQueueList({String? token}) async {
@@ -294,101 +341,255 @@ class ApiClient {
     }
   }
 
-  Future<JsonMap> getMyTripsList({String? token}) async {
+  Future<MyTripsListResponse> getMyTripsList({String? token}) async {
     final response = await _get(
       'trip/my-trips',
       token: token,
       requiresAuth: true,
     );
-    return _decodeJsonObject(response.body);
+    return MyTripsListResponse.fromJson(_decodeJsonObject(response.body));
   }
 
-  Future<JsonMap> startTrip({String? token, required String tripId}) async {
-    final response = await _post(
-      'trip/start/${Uri.encodeComponent(tripId)}',
-      token: token,
-      requiresAuth: true,
-    );
-    return _decodeJsonObject(response.body);
-  }
-
-  Future<JsonMap> getSingleTripDetails({
+  Future<TripActionResult> startTrip({
     String? token,
-    required String tripId,
+    required int tripId,
+  }) async {
+    try {
+      final response = await _post(
+        'trip/start/${Uri.encodeComponent(tripId.toString())}',
+        token: token,
+        requiresAuth: true,
+      );
+      return TripActionResult.fromHttp(
+        statusCode: response.statusCode,
+        json: _decodeJsonObject(response.body),
+      );
+    } on TimeoutException {
+      return TripActionResult.unreachable();
+    } on MissingAuthTokenException {
+      rethrow;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) rethrow;
+      try {
+        return TripActionResult.fromHttp(
+          statusCode: error.statusCode,
+          json: _decodeJsonObject(error.responseBody),
+        );
+      } catch (_) {
+        return TripActionResult(
+          statusCode: error.statusCode,
+          success: false,
+          message: error.toString(),
+        );
+      }
+    } catch (_) {
+      return TripActionResult.unreachable();
+    }
+  }
+
+  Future<SingleTripDetails> getSingleTripDetails({
+    String? token,
+    required int tripId,
   }) async {
     final response = await _get(
-      'trip/${Uri.encodeComponent(tripId)}',
+      'trip/${Uri.encodeComponent(tripId.toString())}',
       token: token,
       requiresAuth: true,
     );
-    return _decodeJsonObject(response.body);
+    return SingleTripDetails.fromJson(_decodeJsonObject(response.body));
   }
 
-  Future<JsonMap> dropOff({
+  Future<TripActionResult> dropOffLot({
     String? token,
-    required String tripId,
+    required int tripId,
     required String heading,
   }) async {
-    final response = await _post(
-      'trip/drop-off-lot/${Uri.encodeComponent(tripId)}/${Uri.encodeComponent(heading)}',
-      token: token,
-      requiresAuth: true,
-    );
-    return _decodeJsonObject(response.body);
+    try {
+      final response = await _post(
+        'trip/drop-off-lot/${Uri.encodeComponent(tripId.toString())}/${Uri.encodeComponent(heading)}',
+        token: token,
+        requiresAuth: true,
+      );
+      return TripActionResult.fromHttp(
+        statusCode: response.statusCode,
+        json: _decodeJsonObject(response.body),
+      );
+    } on TimeoutException {
+      return TripActionResult.unreachable();
+    } on MissingAuthTokenException {
+      rethrow;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) rethrow;
+      try {
+        return TripActionResult.fromHttp(
+          statusCode: error.statusCode,
+          json: _decodeJsonObject(error.responseBody),
+        );
+      } catch (_) {
+        return TripActionResult(
+          statusCode: error.statusCode,
+          success: false,
+          message: error.toString(),
+        );
+      }
+    } catch (_) {
+      return TripActionResult.unreachable();
+    }
   }
 
-  Future<JsonMap> endTrip({String? token, required String tripId}) async {
-    final response = await _post(
-      'trip/end/${Uri.encodeComponent(tripId)}',
-      token: token,
-      requiresAuth: true,
-    );
-    return _decodeJsonObject(response.body);
-  }
-
-  Future<JsonMap> markAsDelivered({
+  Future<TripActionResult> endTrip({
     String? token,
-    required String docId,
-    required JsonMap body,
+    required int tripId,
+  }) async {
+    try {
+      final response = await _post(
+        'trip/end/${Uri.encodeComponent(tripId.toString())}',
+        token: token,
+        requiresAuth: true,
+      );
+      return TripActionResult.fromHttp(
+        statusCode: response.statusCode,
+        json: _decodeJsonObject(response.body),
+      );
+    } on TimeoutException {
+      return TripActionResult.unreachable();
+    } on MissingAuthTokenException {
+      rethrow;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) rethrow;
+      try {
+        return TripActionResult.fromHttp(
+          statusCode: error.statusCode,
+          json: _decodeJsonObject(error.responseBody),
+        );
+      } catch (_) {
+        return TripActionResult(
+          statusCode: error.statusCode,
+          success: false,
+          message: error.toString(),
+        );
+      }
+    } catch (_) {
+      return TripActionResult.unreachable();
+    }
+  }
+
+  Future<MarkDeliveriesBatchResult> markDeliveriesBatch({
+    String? token,
+    required int tripId,
+    required List<String> docIds,
+    required String signature,
     required bool updateCustomerLocation,
+    String deliveryComment = '',
+    double? deliveryLatitude,
+    double? deliveryLongitude,
   }) async {
-    final response = await _put(
-      'doc/mark-delivery/${Uri.encodeComponent(docId)}',
-      token: token,
-      requiresAuth: true,
-      queryParameters: {
-        'updateCustomerLocation': updateCustomerLocation.toString(),
-      },
-      body: body,
-    );
-    return _decodeJsonObject(response.body);
+    try {
+      final body = <String, dynamic>{
+        'tripId': tripId,
+        'docIds': docIds,
+        'signature': signature,
+        'deliveryComment': deliveryComment,
+        'updateCustomerLocation': updateCustomerLocation,
+        'deliveryLatitude': deliveryLatitude,
+        'deliveryLongitude': deliveryLongitude,
+      };
+      final response = await _put(
+        'doc/mark-deliveries-batch',
+        token: token,
+        requiresAuth: true,
+        body: body,
+      );
+      return MarkDeliveriesBatchResult.fromHttp(
+        statusCode: response.statusCode,
+        json: _decodeJsonObject(response.body),
+      );
+    } on TimeoutException {
+      return MarkDeliveriesBatchResult.unreachable();
+    } on MissingAuthTokenException {
+      rethrow;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) rethrow;
+      try {
+        return MarkDeliveriesBatchResult.fromHttp(
+          statusCode: error.statusCode,
+          json: _decodeJsonObject(error.responseBody),
+        );
+      } catch (_) {
+        return MarkDeliveriesBatchResult(
+          statusCode: error.statusCode,
+          success: false,
+          message: error.toString(),
+        );
+      }
+    } catch (_) {
+      return MarkDeliveriesBatchResult.unreachable();
+    }
   }
 
-  Future<JsonMap> markAsUnDelivered({
+  Future<TripActionResult> markAsUnDelivered({
     String? token,
     required String docId,
-    required JsonMap body,
+    required String failureComment,
   }) async {
-    final response = await _put(
-      'doc/mark-delivery-failed/${Uri.encodeComponent(docId)}',
-      token: token,
-      requiresAuth: true,
-      body: body,
-    );
-    return _decodeJsonObject(response.body);
+    try {
+      final response = await _put(
+        'doc/mark-delivery-failed/${Uri.encodeComponent(docId)}',
+        token: token,
+        requiresAuth: true,
+        body: {'failureComment': failureComment},
+      );
+      return TripActionResult.fromHttp(
+        statusCode: response.statusCode,
+        json: _decodeJsonObject(response.body),
+      );
+    } on TimeoutException {
+      return TripActionResult.unreachable();
+    } on MissingAuthTokenException {
+      rethrow;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) rethrow;
+      try {
+        return TripActionResult.fromHttp(
+          statusCode: error.statusCode,
+          json: _decodeJsonObject(error.responseBody),
+        );
+      } catch (_) {
+        return TripActionResult(
+          statusCode: error.statusCode,
+          success: false,
+          message: error.toString(),
+        );
+      }
+    } catch (_) {
+      return TripActionResult.unreachable();
+    }
   }
 
-  Future<JsonMap> getRecentSignature({
+  Future<RecentSignatureResult> getRecentSignature({
     String? token,
-    required String tripId,
+    required int tripId,
     required String docId,
   }) async {
-    final response = await _get(
-      'doc/recent-signature/${Uri.encodeComponent(tripId)}/${Uri.encodeComponent(docId)}',
-      token: token,
-      requiresAuth: true,
-    );
-    return _decodeJsonObject(response.body);
+    try {
+      final response = await _get(
+        'doc/recent-signature/${Uri.encodeComponent(tripId.toString())}/${Uri.encodeComponent(docId)}',
+        token: token,
+        requiresAuth: true,
+      );
+      final json = _decodeJsonObject(response.body);
+      final signature = json['signature']?.toString() ?? '';
+      if (signature.isEmpty) return RecentSignatureResult.none();
+      return RecentSignatureResult.found(signature);
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) rethrow;
+      // 400 "no recent signature" is a normal empty case.
+      return RecentSignatureResult.none(error.toString());
+    } on MissingAuthTokenException {
+      rethrow;
+    } catch (_) {
+      return RecentSignatureResult.none();
+    }
   }
 
   Future<List<UserAccount>> getUsers({String? token}) async {
