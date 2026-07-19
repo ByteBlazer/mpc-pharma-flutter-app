@@ -17,9 +17,11 @@ import '../departments/departments_screen.dart';
 import '../locations/locations_screen.dart';
 import '../notifications/notification_inbox_controller.dart';
 import '../notifications/notifications_screen.dart';
+import '../queue/queue_screen.dart';
 import '../scan/scan_screen.dart';
 import '../settings/settings_screen.dart';
 import '../tickets/tickets_screen.dart';
+import '../trips/trips_screen.dart';
 import '../users/users_screen.dart';
 
 const _homeTileSpacing = 20.0;
@@ -322,6 +324,8 @@ class _HomeFeatureGrid extends StatelessWidget {
     final showNotifications = hasWebAccess;
     final showCustomers = hasWebAccess;
     final showScan = await JwtPayload.currentUserCanAccessScan();
+    final showQueueAndTrips =
+        await JwtPayload.currentUserCanAccessQueueAndTrips();
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
       showTickets: showTickets,
@@ -330,6 +334,7 @@ class _HomeFeatureGrid extends StatelessWidget {
       showNotifications: showNotifications,
       showCustomers: showCustomers,
       showScan: showScan,
+      showQueueAndTrips: showQueueAndTrips,
     );
   }
 
@@ -498,6 +503,36 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
+      if (visibility.showQueueAndTrips)
+        _FeatureTile(
+          icon: Icons.queue_outlined,
+          label: 'Queue',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => QueueScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showQueueAndTrips)
+        _FeatureTile(
+          icon: Icons.local_shipping_outlined,
+          label: 'Trips',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TripsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
     ];
   }
 
@@ -620,6 +655,7 @@ class _HomeFeatureVisibility {
     required this.showNotifications,
     required this.showCustomers,
     required this.showScan,
+    required this.showQueueAndTrips,
   });
 
   final bool showImpersonate;
@@ -629,6 +665,7 @@ class _HomeFeatureVisibility {
   final bool showNotifications;
   final bool showCustomers;
   final bool showScan;
+  final bool showQueueAndTrips;
 }
 
 class _FeatureTile extends StatelessWidget {

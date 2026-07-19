@@ -1,3 +1,5 @@
+import '../../utils/api_message.dart';
+
 typedef JsonMap = Map<String, dynamic>;
 
 class ScanDocResult {
@@ -15,7 +17,7 @@ class ScanDocResult {
     return ScanDocResult(
       statusCode: statusCode,
       success: json['success'] == true,
-      message: (json['message'] ?? json['error'] ?? '').toString().trim(),
+      message: formatApiMessage(json['message'] ?? json['error'], fallback: ''),
       docId: json['docId']?.toString() ?? '',
     );
   }

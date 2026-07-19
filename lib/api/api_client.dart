@@ -9,11 +9,15 @@ import 'auth_token_store.dart';
 import '../features/customers/customer_models.dart' hide JsonMap;
 import '../features/departments/department_models.dart' hide JsonMap;
 import '../features/notifications/notification_models.dart' hide JsonMap;
+import '../features/queue/queue_models.dart' hide JsonMap;
+import '../features/queue/schedule_models.dart' hide JsonMap;
 import '../features/scan/scan_models.dart' hide JsonMap;
 import '../features/settings/backup_models.dart' hide JsonMap;
 import '../features/settings/setting_models.dart' hide JsonMap;
 import '../features/tickets/ticket_models.dart' hide JsonMap;
+import '../features/trips/trips_models.dart' hide JsonMap;
 import '../features/users/user_models.dart' hide JsonMap;
+import '../utils/api_message.dart';
 
 typedef JsonMap = Map<String, dynamic>;
 
@@ -126,13 +130,13 @@ class ApiClient {
     );
   }
 
-  Future<JsonMap> getDispatchQueueList({String? token}) async {
+  Future<DispatchQueueResponse> getDispatchQueueList({String? token}) async {
     final response = await _get(
       'doc/dispatch-queue',
       token: token,
       requiresAuth: true,
     );
-    return _decodeJsonObject(response.body);
+    return DispatchQueueResponse.fromJson(_decodeJsonObject(response.body));
   }
 
   Future<ScanDocResult> scanDoc({
@@ -185,47 +189,109 @@ class ApiClient {
     }
   }
 
-  Future<JsonMap> getDriverList({String? token}) async {
+  Future<DriverListResponse> getDriverList({String? token}) async {
     final response = await _get(
       'trip/available-drivers',
       token: token,
       requiresAuth: true,
     );
-    return _decodeJsonObject(response.body);
+    return DriverListResponse.fromJson(_decodeJsonObject(response.body));
   }
 
-  Future<JsonMap> scheduleNewTrip({
+  Future<ScheduleNewTripResult> scheduleNewTrip({
     String? token,
-    required JsonMap scheduleNewTripRequest,
+    required String route,
+    required List<String> userIds,
+    required String driverId,
+    required String vehicleNbr,
   }) async {
-    final response = await _post(
-      'trip',
-      token: token,
-      requiresAuth: true,
-      body: scheduleNewTripRequest,
-    );
-    return _decodeJsonObject(response.body);
+    try {
+      final response = await _post(
+        'trip',
+        token: token,
+        requiresAuth: true,
+        body: {
+          'route': route,
+          'userIds': userIds,
+          'driverId': driverId,
+          'vehicleNbr': vehicleNbr,
+        },
+      );
+      return ScheduleNewTripResult.fromHttp(
+        statusCode: response.statusCode,
+        json: _decodeJsonObject(response.body),
+      );
+    } on TimeoutException {
+      return ScheduleNewTripResult.unreachable();
+    } on MissingAuthTokenException {
+      rethrow;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        rethrow;
+      }
+      try {
+        return ScheduleNewTripResult.fromHttp(
+          statusCode: error.statusCode,
+          json: _decodeJsonObject(error.responseBody),
+        );
+      } catch (_) {
+        return ScheduleNewTripResult(
+          statusCode: error.statusCode,
+          success: false,
+          message: error.toString(),
+        );
+      }
+    } catch (_) {
+      return ScheduleNewTripResult.unreachable();
+    }
   }
 
-  Future<JsonMap> getScheduledList({String? token}) async {
+  Future<ScheduledTripsResponse> getScheduledList({String? token}) async {
     final response = await _get(
       'trip/scheduled-trips-same-location',
       token: token,
       requiresAuth: true,
     );
-    return _decodeJsonObject(response.body);
+    return ScheduledTripsResponse.fromJson(_decodeJsonObject(response.body));
   }
 
-  Future<JsonMap> cancelScheduledTrip({
+  Future<CancelTripResult> cancelScheduledTrip({
     String? token,
-    required String tripId,
+    required int tripId,
   }) async {
-    final response = await _post(
-      'trip/cancel/${Uri.encodeComponent(tripId)}',
-      token: token,
-      requiresAuth: true,
-    );
-    return _decodeJsonObject(response.body);
+    try {
+      final response = await _post(
+        'trip/cancel/${Uri.encodeComponent(tripId.toString())}',
+        token: token,
+        requiresAuth: true,
+      );
+      return CancelTripResult.fromHttp(
+        statusCode: response.statusCode,
+        json: _decodeJsonObject(response.body),
+      );
+    } on TimeoutException {
+      return CancelTripResult.unreachable();
+    } on MissingAuthTokenException {
+      rethrow;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        rethrow;
+      }
+      try {
+        return CancelTripResult.fromHttp(
+          statusCode: error.statusCode,
+          json: _decodeJsonObject(error.responseBody),
+        );
+      } catch (_) {
+        return CancelTripResult(
+          statusCode: error.statusCode,
+          success: false,
+          message: error.toString(),
+        );
+      }
+    } catch (_) {
+      return CancelTripResult.unreachable();
+    }
   }
 
   Future<JsonMap> getMyTripsList({String? token}) async {
@@ -1168,7 +1234,8 @@ class ApiException implements Exception {
       final decoded = jsonDecode(body);
       if (decoded is JsonMap) {
         final message = decoded['message'] ?? decoded['error'];
-        return message?.toString();
+        if (message == null) return null;
+        return formatApiMessage(message, fallback: '');
       }
     } on FormatException {
       return body;
