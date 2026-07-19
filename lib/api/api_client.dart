@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -8,6 +9,7 @@ import 'auth_token_store.dart';
 import '../features/customers/customer_models.dart' hide JsonMap;
 import '../features/departments/department_models.dart' hide JsonMap;
 import '../features/notifications/notification_models.dart' hide JsonMap;
+import '../features/scan/scan_models.dart' hide JsonMap;
 import '../features/settings/backup_models.dart' hide JsonMap;
 import '../features/settings/setting_models.dart' hide JsonMap;
 import '../features/tickets/ticket_models.dart' hide JsonMap;
@@ -133,18 +135,54 @@ class ApiClient {
     return _decodeJsonObject(response.body);
   }
 
-  Future<JsonMap> scanDoc({
+  Future<ScanDocResult> scanDoc({
     String? token,
     required String barcode,
     required bool unscan,
   }) async {
-    final response = await _post(
-      'doc/scan-and-add/${Uri.encodeComponent(barcode)}',
-      token: token,
-      requiresAuth: true,
-      queryParameters: {'unscan': unscan.toString()},
-    );
-    return _decodeJsonObject(response.body);
+    final trimmed = barcode.trim();
+    if (trimmed.isEmpty) {
+      return const ScanDocResult(
+        statusCode: 400,
+        success: false,
+        message: 'Barcode is required.',
+      );
+    }
+
+    try {
+      final response = await _post(
+        'doc/scan-and-add/${Uri.encodeComponent(trimmed)}',
+        token: token,
+        requiresAuth: true,
+        queryParameters: {'unscan': unscan.toString()},
+      ).timeout(const Duration(seconds: 25));
+      return ScanDocResult.fromHttp(
+        statusCode: response.statusCode,
+        json: _decodeJsonObject(response.body),
+      );
+    } on TimeoutException {
+      return ScanDocResult.unreachable();
+    } on MissingAuthTokenException {
+      rethrow;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        rethrow;
+      }
+      try {
+        return ScanDocResult.fromHttp(
+          statusCode: error.statusCode,
+          json: _decodeJsonObject(error.responseBody),
+        );
+      } catch (_) {
+        return ScanDocResult(
+          statusCode: error.statusCode,
+          success: false,
+          message: error.toString(),
+        );
+      }
+    } catch (_) {
+      return ScanDocResult.unreachable();
+    }
   }
 
   Future<JsonMap> getDriverList({String? token}) async {

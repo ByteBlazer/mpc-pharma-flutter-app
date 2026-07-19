@@ -35,6 +35,8 @@
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record voice messages for ticket and complaint attachments.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan invoice barcodes to add or remove documents from the dispatch queue.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

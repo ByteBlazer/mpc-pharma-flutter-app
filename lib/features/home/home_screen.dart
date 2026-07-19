@@ -17,6 +17,7 @@ import '../departments/departments_screen.dart';
 import '../locations/locations_screen.dart';
 import '../notifications/notification_inbox_controller.dart';
 import '../notifications/notifications_screen.dart';
+import '../scan/scan_screen.dart';
 import '../settings/settings_screen.dart';
 import '../tickets/tickets_screen.dart';
 import '../users/users_screen.dart';
@@ -320,6 +321,7 @@ class _HomeFeatureGrid extends StatelessWidget {
     final showSettings = await JwtPayload.currentUserIsAppAdmin();
     final showNotifications = hasWebAccess;
     final showCustomers = hasWebAccess;
+    final showScan = await JwtPayload.currentUserCanAccessScan();
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
       showTickets: showTickets,
@@ -327,10 +329,11 @@ class _HomeFeatureGrid extends StatelessWidget {
       showSettings: showSettings,
       showNotifications: showNotifications,
       showCustomers: showCustomers,
+      showScan: showScan,
     );
   }
 
-  List<Widget> _buildTiles(
+  List<Widget> _buildGeneralTiles(
     BuildContext context,
     _HomeFeatureVisibility visibility,
   ) {
@@ -475,6 +478,83 @@ class _HomeFeatureGrid extends StatelessWidget {
     ];
   }
 
+  List<Widget> _buildTripsTiles(
+    BuildContext context,
+    _HomeFeatureVisibility visibility,
+  ) {
+    return [
+      if (visibility.showScan)
+        _FeatureTile(
+          icon: Icons.qr_code_scanner,
+          label: 'Scan',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ScanScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+    ];
+  }
+
+  Widget _buildTileSection({
+    required String title,
+    required List<Widget> tiles,
+    required double tileWidth,
+    required int columns,
+    required double gridWidth,
+  }) {
+    if (tiles.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Center(
+          child: SizedBox(
+            width: gridWidth,
+            child: Column(
+              children: [
+                for (
+                  var rowStart = 0;
+                  rowStart < tiles.length;
+                  rowStart += columns
+                ) ...[
+                  if (rowStart > 0) const SizedBox(height: _homeTileSpacing),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var column = 0; column < columns; column++) ...[
+                        if (column > 0) const SizedBox(width: _homeTileSpacing),
+                        SizedBox(
+                          width: tileWidth,
+                          child: rowStart + column < tiles.length
+                              ? tiles[rowStart + column]
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_HomeFeatureVisibility>(
@@ -483,7 +563,8 @@ class _HomeFeatureGrid extends StatelessWidget {
         final visibility = snapshot.data;
         if (visibility == null) return const SizedBox.shrink();
 
-        final tiles = _buildTiles(context, visibility);
+        final generalTiles = _buildGeneralTiles(context, visibility);
+        final tripsTiles = _buildTripsTiles(context, visibility);
 
         return LayoutBuilder(
           builder: (context, constraints) {
@@ -499,41 +580,28 @@ class _HomeFeatureGrid extends StatelessWidget {
 
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Center(
-                child: SizedBox(
-                  width: gridWidth,
-                  child: Column(
-                    children: [
-                      for (
-                        var rowStart = 0;
-                        rowStart < tiles.length;
-                        rowStart += columns
-                      ) ...[
-                        if (rowStart > 0)
-                          const SizedBox(height: _homeTileSpacing),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (
-                              var column = 0;
-                              column < columns;
-                              column++
-                            ) ...[
-                              if (column > 0)
-                                const SizedBox(width: _homeTileSpacing),
-                              SizedBox(
-                                width: tileWidth,
-                                child: rowStart + column < tiles.length
-                                    ? tiles[rowStart + column]
-                                    : const SizedBox.shrink(),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (generalTiles.isNotEmpty)
+                    _buildTileSection(
+                      title: 'General',
+                      tiles: generalTiles,
+                      tileWidth: tileWidth,
+                      columns: columns,
+                      gridWidth: gridWidth,
+                    ),
+                  if (generalTiles.isNotEmpty && tripsTiles.isNotEmpty)
+                    const SizedBox(height: 28),
+                  if (tripsTiles.isNotEmpty)
+                    _buildTileSection(
+                      title: 'Trips',
+                      tiles: tripsTiles,
+                      tileWidth: tileWidth,
+                      columns: columns,
+                      gridWidth: gridWidth,
+                    ),
+                ],
               ),
             );
           },
@@ -551,6 +619,7 @@ class _HomeFeatureVisibility {
     required this.showSettings,
     required this.showNotifications,
     required this.showCustomers,
+    required this.showScan,
   });
 
   final bool showImpersonate;
@@ -559,6 +628,7 @@ class _HomeFeatureVisibility {
   final bool showSettings;
   final bool showNotifications;
   final bool showCustomers;
+  final bool showScan;
 }
 
 class _FeatureTile extends StatelessWidget {

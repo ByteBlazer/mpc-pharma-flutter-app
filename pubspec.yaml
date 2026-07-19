@@ -45,6 +45,9 @@ dependencies:
   audioplayers: ^6.7.1
   path_provider: ^2.1.6
   url_launcher: ^6.3.2
+  mobile_scanner: ^7.3.0
+  wakelock_plus: ^1.5.2
+  permission_handler: ^12.0.3
 
 dev_dependencies:
   flutter_test:
@@ -74,6 +77,8 @@ flutter:
     - env/staging.env
     - env/production.env
     - assets/images/customer_map_marker.png
+    - assets/sounds/scan_success.wav
+    - assets/sounds/scan_error.wav
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
