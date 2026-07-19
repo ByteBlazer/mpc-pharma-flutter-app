@@ -26,8 +26,17 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+		<string>maps</string>
+		<string>http</string>
+		<string>https</string>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record voice messages for ticket and complaint attachments.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan invoice barcodes to add or remove documents from the dispatch queue.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

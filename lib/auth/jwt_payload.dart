@@ -136,4 +136,13 @@ abstract final class JwtPayload {
     if (token == null) return const [];
     return rolesFromToken(token);
   }
+
+  static Future<bool> currentUserCanAccessScan({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final roles = await currentRoles(tokenStore: tokenStore);
+    return roles.hasRole(AppRole.appScanner) ||
+        roles.hasRole(AppRole.appTripCreator) ||
+        roles.hasRole(AppRole.appAdmin);
+  }
 }

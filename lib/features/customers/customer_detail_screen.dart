@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/api_client.dart';
 import '../../app_theme.dart';
+import '../../utils/open_maps_location.dart';
 import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
@@ -44,15 +44,11 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     final longitude = customer.longitude;
     if (latitude == null || longitude == null) return;
 
-    final uri = Uri.https('www.google.com', '/maps/search/', {
-      'api': '1',
-      'query': '$latitude,$longitude',
-    });
-
     try {
-      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        throw Exception('Could not open Google Maps.');
-      }
+      await openCoordinatesInMaps(
+        latitude: latitude,
+        longitude: longitude,
+      );
     } catch (error) {
       if (!mounted) return;
       showAppSnackBar(
