@@ -37,6 +37,17 @@
 	<string>Record voice messages for ticket and complaint attachments.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan invoice barcodes to add or remove documents from the dispatch queue.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MPC Pharma needs your location while you use the app during an active delivery trip so your position can be shared with dispatch.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>To keep sharing your location when the app is closed or not in use, allow location all the time for live trip tracking.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>To keep sharing your location when the app is closed or not in use, allow location all the time for live trip tracking.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

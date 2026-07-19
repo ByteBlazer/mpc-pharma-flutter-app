@@ -43,7 +43,9 @@ class _TripsScreenState extends State<TripsScreen> {
   }
 
   void _refresh() {
-    setState(() => _future = _load());
+    setState(() {
+      _future = _load();
+    });
   }
 
   Future<void> _confirmCancel(ScheduledTrip trip) async {

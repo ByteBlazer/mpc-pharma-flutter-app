@@ -153,4 +153,33 @@ abstract final class JwtPayload {
     return roles.hasRole(AppRole.appTripCreator) ||
         roles.hasRole(AppRole.appAdmin);
   }
+
+  static Future<bool> currentUserCanAccessMyTrips({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final roles = await currentRoles(tokenStore: tokenStore);
+    return roles.hasRole(AppRole.appTripDriver) ||
+        roles.hasRole(AppRole.appAdmin);
+  }
+
+  /// Seconds between location heartbeats. JWT claim, else server-like default 60.
+  static int locationHeartbeatFrequencySeconds(String token) {
+    final json = decode(token);
+    final raw = json?['locationHeartBeatFrequencyInSeconds'];
+    final value = raw is int
+        ? raw
+        : raw is num
+            ? raw.toInt()
+            : int.tryParse(raw?.toString() ?? '');
+    if (value == null || value <= 0) return 60;
+    return value;
+  }
+
+  static Future<int> currentLocationHeartbeatFrequencySeconds({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final token = await (tokenStore ?? AuthTokenStore()).readToken();
+    if (token == null) return 60;
+    return locationHeartbeatFrequencySeconds(token);
+  }
 }

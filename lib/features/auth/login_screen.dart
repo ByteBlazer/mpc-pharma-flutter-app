@@ -7,6 +7,9 @@ import '../../api/api_client.dart';
 import '../../api/auth_token_store.dart';
 import '../../app_environment.dart';
 import '../../auth/jwt_payload.dart';
+import '../../services/trip_heartbeat_service.dart';
+import '../../services/trip_location_gate.dart';
+import '../../utils/platform_device.dart';
 import '../../widgets/app_brand_page_background.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/simulation_mode_banner.dart';
@@ -134,6 +137,30 @@ class _LoginScreenState extends State<LoginScreen> {
       _isCheckingSession = false;
     });
     await _syncNotificationInbox();
+    await _reattachTripHeartbeatIfNeeded();
+  }
+
+  Future<void> _reattachTripHeartbeatIfNeeded() async {
+    if (!_isLoggedIn) return;
+    if (_isSimulationMode) {
+      await TripHeartbeatService.instance.stop();
+      return;
+    }
+    if (!isMobileNativePlatform) return;
+    if (!await TripLocationGate.areAllGranted()) {
+      await TripHeartbeatService.instance.stop();
+      return;
+    }
+    try {
+      await TripHeartbeatService.instance.reattachIfNeeded(
+        hasStartedTrip: () async {
+          final list = await _apiClient.getMyTripsList();
+          return list.startedTrip != null;
+        },
+      );
+    } catch (_) {
+      // List fetch failure should not block login.
+    }
   }
 
   Future<void> _sendOtp() async {
@@ -193,6 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _isSimulationMode = false;
       });
       await _syncNotificationInbox();
+      await _reattachTripHeartbeatIfNeeded();
     } catch (error) {
       if (!mounted) return;
       setState(() => _errorMessage = error.toString());
@@ -208,6 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _sessionVersion++;
       _isSimulationMode = true;
     });
+    unawaited(TripHeartbeatService.instance.stop());
     unawaited(_syncNotificationInbox());
   }
 
@@ -227,9 +256,11 @@ class _LoginScreenState extends State<LoginScreen> {
       _isSimulationMode = false;
     });
     await _syncNotificationInbox();
+    await _reattachTripHeartbeatIfNeeded();
   }
 
   Future<void> _logout() async {
+    await TripHeartbeatService.instance.stop();
     await _tokenStore.clearToken();
     _disposeNotificationInbox();
     if (!mounted) return;

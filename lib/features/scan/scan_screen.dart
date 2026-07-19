@@ -94,6 +94,80 @@ class _ScanScreenState extends State<ScanScreen> {
         );
   }
 
+  bool _isPermissionRelatedError(Object error) {
+    if (error is MobileScannerException) {
+      if (error.errorCode == MobileScannerErrorCode.permissionDenied) {
+        return true;
+      }
+      final message = error.errorDetails?.message?.toLowerCase() ?? '';
+      return message.contains('notallowed') ||
+          message.contains('permission') ||
+          message.contains('denied');
+    }
+    final text = error.toString().toLowerCase();
+    return text.contains('notallowed') ||
+        text.contains('permission') ||
+        text.contains('denied');
+  }
+
+  Future<void> _promptOpenCameraSettings({required String message}) async {
+    if (!mounted) return;
+    if (!kIsWeb) {
+      setState(() => _permissionDeniedForever = true);
+    }
+
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Camera permission needed'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          if (!kIsWeb)
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Open settings'),
+            )
+          else
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('OK'),
+            ),
+        ],
+      ),
+    );
+    if (open == true) await openAppSettings();
+  }
+
+  Future<void> _handleCameraStartFailure(Object error) async {
+    var permissionIssue = _isPermissionRelatedError(error);
+    if (!permissionIssue && !kIsWeb) {
+      final status = await Permission.camera.status;
+      permissionIssue = status.isDenied || status.isPermanentlyDenied;
+    }
+
+    if (permissionIssue) {
+      await _promptOpenCameraSettings(
+        message: kIsWeb
+            ? 'Camera permission was denied. Allow camera access for this '
+                'site in your browser settings, then tap START again.'
+            : 'Camera permission is required to scan barcodes. Open app '
+                'settings to allow camera access?',
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: 'Could not start camera: $error',
+      type: AppSnackBarType.error,
+    );
+  }
+
   Future<bool> _requestCameraPermission() async {
     if (kIsWeb) return true;
 
@@ -104,29 +178,11 @@ class _ScanScreenState extends State<ScanScreen> {
     }
 
     if (status.isPermanentlyDenied) {
-      if (!mounted) return false;
-      setState(() => _permissionDeniedForever = true);
-      final open = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Camera permission needed'),
-          content: const Text(
+      await _promptOpenCameraSettings(
+        message:
             'Camera access is permanently denied. Open app settings to allow '
             'camera so you can scan barcodes.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Open settings'),
-            ),
-          ],
-        ),
       );
-      if (open == true) await openAppSettings();
       return false;
     }
 
@@ -135,16 +191,14 @@ class _ScanScreenState extends State<ScanScreen> {
       setState(() => _permissionDeniedForever = false);
       return true;
     }
-    if (status.isPermanentlyDenied) {
-      setState(() => _permissionDeniedForever = true);
-    }
-    if (mounted) {
-      showAppSnackBar(
-        context,
-        message: 'Camera permission is required to scan barcodes.',
-        type: AppSnackBarType.warning,
-      );
-    }
+
+    await _promptOpenCameraSettings(
+      message: status.isPermanentlyDenied
+          ? 'Camera access was denied and the system will not ask again. '
+              'Open app settings to allow camera so you can scan barcodes.'
+          : 'Camera permission is required to scan barcodes. Open app '
+              'settings to allow camera access?',
+    );
     return false;
   }
 
@@ -179,11 +233,7 @@ class _ScanScreenState extends State<ScanScreen> {
       if (!mounted) return;
       await _stopScanning();
       if (!mounted) return;
-      showAppSnackBar(
-        context,
-        message: 'Could not start camera: $error',
-        type: AppSnackBarType.error,
-      );
+      await _handleCameraStartFailure(error);
     }
   }
 
