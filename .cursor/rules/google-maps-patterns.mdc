@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Google Maps Patterns
 
-Follow `lib/features/customers/customers_map_section.dart` as the canonical map implementation.
+Follow `lib/features/trip_dashboard/trip_dashboard_map_section.dart` as the canonical map implementation.
 
 ## Setup
 
@@ -19,7 +19,7 @@ Follow `lib/features/customers/customers_map_section.dart` as the canonical map 
 - Asset: `assets/images/customer_map_marker.png`
 - Size: **32×32** logical px
 - Load via `BitmapDescriptor.asset` with `ImageConfiguration(size: Size(32, 32), devicePixelRatio: 1.0)`
-- Prefer a shared helper (e.g. `loadMapMarkerIcon()`) so path and size stay in one place
+- Prefer a shared helper (e.g. `loadTripDashboardCustomerMapMarkerIcon()`) so path and size stay in one place
 
 ## Marker selection UI
 
@@ -39,4 +39,4 @@ Follow `lib/features/customers/customers_map_section.dart` as the canonical map 
 
 ## Reuse
 
-When adding a second map screen, extract shared pieces (loader, `loadMapMarkerIcon()`, bottom callout widget) into `lib/widgets/` rather than duplicating.
+When adding a second map screen, extract shared pieces (loader, marker icon helpers, bottom callout widget) into `lib/widgets/` rather than duplicating.

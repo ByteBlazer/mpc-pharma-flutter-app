@@ -249,13 +249,20 @@ class _TripCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                TextButton.icon(
+                FilledButton.icon(
                   onPressed: cancelling ? null : onCancel,
                   icon: const Icon(Icons.close, size: 18),
                   label: const Text('Cancel Trip'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.red.shade700,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: primary.withValues(alpha: 0.5),
+                    disabledForegroundColor: Colors.white70,
                     visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                 ),
               ],

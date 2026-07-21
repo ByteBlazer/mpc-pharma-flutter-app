@@ -8,6 +8,7 @@ import 'package:signature/signature.dart';
 import '../../api/api_client.dart';
 import '../../utils/geo_distance.dart';
 import '../../widgets/app_snack_bar.dart';
+import '../trip_dashboard/trip_dashboard_helpers.dart';
 import 'my_trips_models.dart';
 
 Future<bool> showMarkDeliveredSheet({
@@ -51,6 +52,8 @@ class MarkDeliveredSheet extends StatefulWidget {
 }
 
 class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
+  static const _signatureAreaHeight = 220.0;
+
   final _commentController = TextEditingController();
   final _signatureController = SignatureController(
     penStrokeWidth: 3,
@@ -254,25 +257,51 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               children: [
-                Text(
-                  widget.docs.map((d) => d.id).join(', '),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'monospace',
-                    fontSize: 12.5,
-                  ),
+                ...widget.docs.asMap().entries.map(
+                  (entry) {
+                    final doc = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            child: Text(
+                              '${entry.key + 1}.',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12.5,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              doc.id,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'monospace',
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ),
+                          if (doc.docAmount.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              formatInrAmount(doc.docAmount),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
                 ),
-                if (_proximityWarning != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _proximityWarning!,
-                    style: TextStyle(
-                      color: Colors.orange.shade800,
-                      fontWeight: FontWeight.w600,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 14),
                 const Text(
                   'Customer Signature Below',
@@ -281,10 +310,13 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
                 const SizedBox(height: 8),
                 if (_reusedSignatureBase64 != null &&
                     !_signatureController.isNotEmpty)
-                  _RecentSignaturePreview(base64: _reusedSignatureBase64!)
+                  _RecentSignaturePreview(
+                    base64: _reusedSignatureBase64!,
+                    height: _signatureAreaHeight,
+                  )
                 else
                   Container(
-                    height: 180,
+                    height: _signatureAreaHeight,
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.black26),
                       borderRadius: BorderRadius.circular(12),
@@ -308,10 +340,12 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
                 TextField(
                   controller: _commentController,
                   enabled: !_submitting,
-                  maxLines: 3,
+                  maxLines: 2,
+                  minLines: 2,
                   decoration: const InputDecoration(
                     labelText: 'Comments (optional)',
                     border: OutlineInputBorder(),
+                    isDense: true,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -328,6 +362,18 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
                   title: const Text('Update customer location'),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
+                if (_proximityWarning != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _proximityWarning!,
+                    style: TextStyle(
+                      color: Colors.orange.shade800,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -356,9 +402,13 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
 }
 
 class _RecentSignaturePreview extends StatelessWidget {
-  const _RecentSignaturePreview({required this.base64});
+  const _RecentSignaturePreview({
+    required this.base64,
+    required this.height,
+  });
 
   final String base64;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -367,7 +417,7 @@ class _RecentSignaturePreview extends StatelessWidget {
       bytes = base64Decode(base64);
     } catch (_) {}
     return Container(
-      height: 180,
+      height: height,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black26),
