@@ -80,6 +80,7 @@ flutter:
     - env/staging.env
     - env/production.env
     - assets/images/customer_map_marker.png
+    - assets/images/truck_map_marker.png
     - assets/sounds/scan_success.wav
     - assets/sounds/scan_error.wav
 

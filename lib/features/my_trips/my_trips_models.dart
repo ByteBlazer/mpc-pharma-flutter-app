@@ -128,13 +128,18 @@ class SingleTripDetails {
     required this.createdBy,
     required this.driverName,
     required this.driverId,
+    required this.driverPhoneNumber,
     required this.vehicleNumber,
     required this.status,
     required this.route,
     required this.createdAt,
+    required this.lastUpdatedAt,
+    required this.startedAt,
     required this.deliveryCountStatusMsg,
     required this.dropOffCountStatusMsg,
     required this.docGroups,
+    required this.driverLastKnownLatitude,
+    required this.driverLastKnownLongitude,
   });
 
   factory SingleTripDetails.fromJson(JsonMap json) {
@@ -144,14 +149,21 @@ class SingleTripDetails {
       createdBy: json['createdBy']?.toString() ?? '',
       driverName: json['driverName']?.toString() ?? '',
       driverId: json['driverId']?.toString() ?? '',
+      driverPhoneNumber: json['driverPhoneNumber']?.toString() ?? '',
       vehicleNumber: json['vehicleNumber']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
       route: json['route']?.toString() ?? '',
       createdAt: parseDate(json['createdAt']),
+      lastUpdatedAt: parseDate(json['lastUpdatedAt']),
+      startedAt: parseDate(json['startedAt']),
       deliveryCountStatusMsg:
           json['deliveryCountStatusMsg']?.toString() ?? '',
       dropOffCountStatusMsg: json['dropOffCountStatusMsg']?.toString() ?? '',
       docGroups: groups.whereType<JsonMap>().map(TripDocGroup.fromJson).toList(),
+      driverLastKnownLatitude:
+          json['driverLastKnownLatitude']?.toString() ?? '',
+      driverLastKnownLongitude:
+          json['driverLastKnownLongitude']?.toString() ?? '',
     );
   }
 
@@ -159,13 +171,23 @@ class SingleTripDetails {
   final String createdBy;
   final String driverName;
   final String driverId;
+  final String driverPhoneNumber;
   final String vehicleNumber;
   final String status;
   final String route;
   final DateTime? createdAt;
+  final DateTime? lastUpdatedAt;
+  final DateTime? startedAt;
   final String deliveryCountStatusMsg;
   final String dropOffCountStatusMsg;
   final List<TripDocGroup> docGroups;
+  final String driverLastKnownLatitude;
+  final String driverLastKnownLongitude;
+
+  double? get driverLat => double.tryParse(driverLastKnownLatitude.trim());
+  double? get driverLng => double.tryParse(driverLastKnownLongitude.trim());
+
+  bool get hasDriverGps => driverLat != null && driverLng != null;
 
   String get createdAtFormatted {
     final at = createdAt;

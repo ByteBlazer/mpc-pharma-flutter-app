@@ -16,6 +16,7 @@ import '../features/scan/scan_models.dart' hide JsonMap;
 import '../features/settings/backup_models.dart' hide JsonMap;
 import '../features/settings/setting_models.dart' hide JsonMap;
 import '../features/tickets/ticket_models.dart' hide JsonMap;
+import '../features/trip_dashboard/trip_dashboard_models.dart';
 import '../features/trips/trips_models.dart' hide JsonMap;
 import '../features/users/user_models.dart' hide JsonMap;
 import '../utils/api_message.dart';
@@ -397,6 +398,77 @@ class ApiClient {
       requiresAuth: true,
     );
     return SingleTripDetails.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<AllTripsResponse> getAllTrips({String? token}) async {
+    final response = await _get(
+      'trip/all-trips',
+      token: token,
+      requiresAuth: true,
+    );
+    return AllTripsResponse.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<DocSearchResult> searchTripByDocId({
+    String? token,
+    required String docId,
+  }) async {
+    final response = await _get(
+      'trip/doc-search/${Uri.encodeComponent(docId.trim())}',
+      token: token,
+      requiresAuth: true,
+    );
+    return DocSearchResult.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<DeliveryStatusDetails> getDocDeliveryStatus({
+    String? token,
+    required String docId,
+  }) async {
+    final response = await _get(
+      'doc/delivery-status/${Uri.encodeComponent(docId.trim())}',
+      token: token,
+      requiresAuth: true,
+    );
+    return DeliveryStatusDetails.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<ForceEndTripResult> forceEndTrip({
+    String? token,
+    required int tripId,
+  }) async {
+    try {
+      final response = await _post(
+        'trip/force-end/${Uri.encodeComponent(tripId.toString())}',
+        token: token,
+        requiresAuth: true,
+        body: const <String, dynamic>{},
+      );
+      return ForceEndTripResult.fromHttp(
+        statusCode: response.statusCode,
+        json: _decodeJsonObject(response.body),
+      );
+    } on TimeoutException {
+      return ForceEndTripResult.unreachable();
+    } on MissingAuthTokenException {
+      rethrow;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) rethrow;
+      try {
+        return ForceEndTripResult.fromHttp(
+          statusCode: error.statusCode,
+          json: _decodeJsonObject(error.responseBody),
+        );
+      } catch (_) {
+        return ForceEndTripResult(
+          statusCode: error.statusCode,
+          success: false,
+          message: error.toString(),
+        );
+      }
+    } catch (_) {
+      return ForceEndTripResult.unreachable();
+    }
   }
 
   Future<TripActionResult> dropOffLot({
