@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../api/api_client.dart';
 import '../../utils/doc_tracking_url.dart';
+import '../../utils/open_external_url.dart';
 import '../../utils/signature_image.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_surface.dart';
@@ -68,7 +69,9 @@ class _CustomerDeliveryCalloutState extends State<CustomerDeliveryCallout> {
   Future<void> _loadDeliveryStatus(TripDoc doc) async {
     final existing = _deliveryState[doc.id];
     if (existing != null &&
-        (existing.loading || existing.details != null || existing.error != null)) {
+        (existing.loading ||
+            existing.details != null ||
+            existing.error != null)) {
       return;
     }
 
@@ -94,8 +97,7 @@ class _CustomerDeliveryCalloutState extends State<CustomerDeliveryCallout> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _deliveryState[doc.id] = _DeliveryLoadState()
-          ..error = error.toString();
+        _deliveryState[doc.id] = _DeliveryLoadState()..error = error.toString();
       });
     }
   }
@@ -115,6 +117,10 @@ class _CustomerDeliveryCalloutState extends State<CustomerDeliveryCallout> {
       message: 'Tracking link copied',
       type: AppSnackBarType.success,
     );
+  }
+
+  Future<void> _openTrackingPage(String docId) async {
+    await openUrlInNewTab(buildDocTrackingUrl(docId));
   }
 
   @override
@@ -190,8 +196,9 @@ class _CustomerDeliveryCalloutState extends State<CustomerDeliveryCallout> {
                     Row(
                       children: [
                         IconButton(
-                          onPressed:
-                              _docIndex > 0 ? () => _goToDoc(_docIndex - 1) : null,
+                          onPressed: _docIndex > 0
+                              ? () => _goToDoc(_docIndex - 1)
+                              : null,
                           icon: const Icon(Icons.chevron_left),
                         ),
                         Expanded(
@@ -216,6 +223,7 @@ class _CustomerDeliveryCalloutState extends State<CustomerDeliveryCallout> {
                     loadingDelivery: loadState?.loading ?? false,
                     deliveryError: loadState?.error,
                     onCopyTracking: () => _copyTrackingUrl(doc.id),
+                    onOpenTracking: () => _openTrackingPage(doc.id),
                   ),
                 ],
               ],
@@ -234,6 +242,7 @@ class _DocDetailsSection extends StatelessWidget {
     required this.loadingDelivery,
     required this.deliveryError,
     required this.onCopyTracking,
+    required this.onOpenTracking,
   });
 
   final TripDoc doc;
@@ -241,6 +250,7 @@ class _DocDetailsSection extends StatelessWidget {
   final bool loadingDelivery;
   final String? deliveryError;
   final VoidCallback onCopyTracking;
+  final VoidCallback onOpenTracking;
 
   @override
   Widget build(BuildContext context) {
@@ -280,7 +290,10 @@ class _DocDetailsSection extends StatelessWidget {
         ],
         if (doc.comment.trim().isNotEmpty) ...[
           const SizedBox(height: 6),
-          Text('Note: ${doc.comment.trim()}', style: const TextStyle(fontSize: 13)),
+          Text(
+            'Note: ${doc.comment.trim()}',
+            style: const TextStyle(fontSize: 13),
+          ),
         ],
         if (isTerminal) ...[
           const SizedBox(height: 10),
@@ -297,8 +310,9 @@ class _DocDetailsSection extends StatelessWidget {
           else if (delivery != null) ...[
             Text(
               formatDeliveryStatusTimestamp(
-                statusLabel:
-                    doc.isUndelivered ? 'Delivery failed' : 'Delivered',
+                statusLabel: doc.isUndelivered
+                    ? 'Delivery failed'
+                    : 'Delivered',
                 deliveredAt: delivery!.deliveredAt,
               ),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -338,6 +352,21 @@ class _DocDetailsSection extends StatelessWidget {
               icon: const Icon(Icons.copy, size: 18),
             ),
           ],
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: onOpenTracking,
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('Open tracking page'),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+          ),
         ),
       ],
     );

@@ -132,7 +132,7 @@ class _TripsScreenState extends State<TripsScreen> {
   Widget build(BuildContext context) {
     return AppScreenScaffold(
       appBar: AppBar(
-        title: const Text('Trips'),
+        title: const Text('Scheduled Trips'),
         actions: [
           IconButton(
             tooltip: 'Refresh',

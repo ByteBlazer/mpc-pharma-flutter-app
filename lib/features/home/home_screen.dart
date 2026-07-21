@@ -89,8 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final inbox = widget.notificationInbox;
-    final showAuthError =
-        inbox != null && inbox.isAuthError && inbox.hasError;
+    final showAuthError = inbox != null && inbox.isAuthError && inbox.hasError;
 
     return Stack(
       fit: StackFit.expand,
@@ -528,7 +527,7 @@ class _HomeFeatureGrid extends StatelessWidget {
       if (visibility.showQueueAndTrips)
         _FeatureTile(
           icon: Icons.local_shipping_outlined,
-          label: 'Trips',
+          label: 'Scheduled Trips',
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
@@ -667,7 +666,7 @@ class _HomeFeatureGrid extends StatelessWidget {
                     const SizedBox(height: 28),
                   if (tripsTiles.isNotEmpty)
                     _buildTileSection(
-                      title: 'Trips',
+                      title: 'Scheduled Trips',
                       tiles: tripsTiles,
                       tileWidth: tileWidth,
                       columns: columns,
@@ -783,10 +782,7 @@ class _FeatureTile extends StatelessWidget {
             SizedBox(
               height: labelAreaHeight,
               width: tileWidth,
-              child: _HomeTileLabel(
-                label: label,
-                fontSize: labelFontSize,
-              ),
+              child: _HomeTileLabel(label: label, fontSize: labelFontSize),
             ),
           ],
         ),
@@ -796,10 +792,7 @@ class _FeatureTile extends StatelessWidget {
 }
 
 class _HomeTileLabel extends StatelessWidget {
-  const _HomeTileLabel({
-    required this.label,
-    required this.fontSize,
-  });
+  const _HomeTileLabel({required this.label, required this.fontSize});
 
   final String label;
   final double fontSize;
@@ -814,25 +807,28 @@ class _HomeTileLabel extends StatelessWidget {
     );
     final canWrapAtSpaces = label.trim().contains(RegExp(r'\s'));
 
-    if (canWrapAtSpaces) {
-      return Text(
-        label,
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: style,
-      );
-    }
-
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-        maxLines: 1,
-        softWrap: false,
-        style: style,
-      ),
+    // Reserve two lines for labels like "Trip Dashboard", but center shorter
+    // labels vertically so "My Trips" aligns with "Scan" / "Queue" / "Scheduled Trips".
+    return Align(
+      alignment: Alignment.center,
+      child: canWrapAtSpaces
+          ? Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            )
+          : FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                softWrap: false,
+                style: style,
+              ),
+            ),
     );
   }
 }
