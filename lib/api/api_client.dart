@@ -16,6 +16,7 @@ import '../features/scan/scan_models.dart' hide JsonMap;
 import '../features/settings/backup_models.dart' hide JsonMap;
 import '../features/settings/setting_models.dart' hide JsonMap;
 import '../features/tickets/ticket_models.dart' hide JsonMap;
+import '../features/public_tracking/public_tracking_models.dart';
 import '../features/trip_dashboard/trip_dashboard_models.dart';
 import '../features/trips/trips_models.dart' hide JsonMap;
 import '../features/users/user_models.dart' hide JsonMap;
@@ -129,10 +130,7 @@ class ApiClient {
       'location/register',
       token: token,
       requiresAuth: true,
-      body: {
-        'latitude': latitude,
-        'longitude': longitude,
-      },
+      body: {'latitude': latitude, 'longitude': longitude},
     );
   }
 
@@ -146,10 +144,7 @@ class ApiClient {
         'location/register',
         token: token,
         requiresAuth: true,
-        body: {
-          'latitude': latitude,
-          'longitude': longitude,
-        },
+        body: {'latitude': latitude, 'longitude': longitude},
       );
       return TripActionResult.fromHttp(
         statusCode: response.statusCode,
@@ -433,6 +428,53 @@ class ApiClient {
     return DeliveryStatusDetails.fromJson(_decodeJsonObject(response.body));
   }
 
+  /// Public customer tracking — no auth, never uses stored JWT.
+  Future<DocTrackingResponse> getDocTracking({required String token}) async {
+    final trimmed = token.trim();
+    final uri = _uri('doc/tracking', queryParameters: {'token': trimmed});
+    final response = await _httpClient.get(
+      uri,
+      headers: const {'Accept': 'application/json'},
+    );
+    final json = _decodeJsonObject(response.body);
+    final tracking = DocTrackingResponse.fromJson(json);
+    if (!tracking.success) {
+      throw DocTrackingException(
+        tracking.message.isEmpty
+            ? 'Failed to retrieve tracking information'
+            : tracking.message,
+      );
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiException(
+        method: 'GET',
+        uri: uri,
+        statusCode: response.statusCode,
+        responseBody: response.body,
+      );
+    }
+    return tracking;
+  }
+
+  /// Public delivery proof — no auth. Returns null on any failure (silent).
+  Future<DeliveryStatusDetails?> getDocDeliveryStatusPublic({
+    required String token,
+  }) async {
+    try {
+      final response = await _get(
+        'doc/delivery-status/${Uri.encodeComponent(token.trim())}',
+        requiresAuth: false,
+      );
+      final details = DeliveryStatusDetails.fromJson(
+        _decodeJsonObject(response.body),
+      );
+      if (!details.success) return null;
+      return details;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<ForceEndTripResult> forceEndTrip({
     String? token,
     required int tripId,
@@ -509,10 +551,7 @@ class ApiClient {
     }
   }
 
-  Future<TripActionResult> endTrip({
-    String? token,
-    required int tripId,
-  }) async {
+  Future<TripActionResult> endTrip({String? token, required int tripId}) async {
     try {
       final response = await _post(
         'trip/end/${Uri.encodeComponent(tripId.toString())}',
@@ -807,22 +846,17 @@ class ApiClient {
       requiresAuth: true,
       queryParameters: {'lightweight': 'true'},
     );
-    return _decodeJsonList(response.body).map(CustomerSummary.fromJson).toList();
+    return _decodeJsonList(
+      response.body,
+    ).map(CustomerSummary.fromJson).toList();
   }
 
   Future<List<Customer>> getCustomersFull({String? token}) async {
-    final response = await _get(
-      'customers',
-      token: token,
-      requiresAuth: true,
-    );
+    final response = await _get('customers', token: token, requiresAuth: true);
     return _decodeJsonList(response.body).map(Customer.fromJson).toList();
   }
 
-  Future<Customer> getCustomer({
-    String? token,
-    required String id,
-  }) async {
+  Future<Customer> getCustomer({String? token, required String id}) async {
     final response = await _get(
       'customers/${Uri.encodeComponent(id)}',
       token: token,
@@ -831,15 +865,17 @@ class ApiClient {
     return Customer.fromJson(_decodeJsonObject(response.body));
   }
 
-  Future<List<ComplaintCategory>> getComplaintCategories({String? token}) async {
+  Future<List<ComplaintCategory>> getComplaintCategories({
+    String? token,
+  }) async {
     final response = await _get(
       'ticket/complaint-category',
       token: token,
       requiresAuth: true,
     );
-    return _decodeJsonList(response.body)
-        .map(ComplaintCategory.fromJson)
-        .toList();
+    return _decodeJsonList(
+      response.body,
+    ).map(ComplaintCategory.fromJson).toList();
   }
 
   Future<ComplaintCategory> createComplaintCategory({
@@ -891,9 +927,9 @@ class ApiClient {
       token: token,
       requiresAuth: true,
     );
-    return _decodeJsonList(response.body)
-        .map(InternalCategory.fromJson)
-        .toList();
+    return _decodeJsonList(
+      response.body,
+    ).map(InternalCategory.fromJson).toList();
   }
 
   Future<InternalCategory> createInternalCategory({
@@ -906,11 +942,7 @@ class ApiClient {
       'ticket/internal-category',
       token: token,
       requiresAuth: true,
-      body: {
-        'name': name,
-        'slaHours': slaHours,
-        'isActive': isActive,
-      },
+      body: {'name': name, 'slaHours': slaHours, 'isActive': isActive},
     );
     return InternalCategory.fromJson(_decodeJsonObject(response.body));
   }
@@ -926,11 +958,7 @@ class ApiClient {
       'ticket/internal-category/${Uri.encodeComponent(categoryId)}',
       token: token,
       requiresAuth: true,
-      body: {
-        'name': name,
-        'slaHours': slaHours,
-        'isActive': isActive,
-      },
+      body: {'name': name, 'slaHours': slaHours, 'isActive': isActive},
     );
     return InternalCategory.fromJson(_decodeJsonObject(response.body));
   }
@@ -945,13 +973,11 @@ class ApiClient {
       'ticket/attachment',
       token: token,
       requiresAuth: true,
-      body: {
-        'fileName': fileName,
-        'mimeType': mimeType,
-        'fileSize': fileSize,
-      },
+      body: {'fileName': fileName, 'mimeType': mimeType, 'fileSize': fileSize},
     );
-    return TicketAttachmentInitResponse.fromJson(_decodeJsonObject(response.body));
+    return TicketAttachmentInitResponse.fromJson(
+      _decodeJsonObject(response.body),
+    );
   }
 
   Future<void> markTicketAttachmentUploaded({
@@ -1014,7 +1040,9 @@ class ApiClient {
       token: token,
       requiresAuth: true,
     );
-    return _decodeJsonList(response.body).map(AppNotification.fromJson).toList();
+    return _decodeJsonList(
+      response.body,
+    ).map(AppNotification.fromJson).toList();
   }
 
   Future<void> markNotificationRead({
@@ -1192,10 +1220,7 @@ class ApiClient {
       'ticket/comment/${Uri.encodeComponent(ticketId)}',
       token: token,
       requiresAuth: true,
-      body: {
-        'comment': comment,
-        'attachmentIds': attachmentIds,
-      },
+      body: {'comment': comment, 'attachmentIds': attachmentIds},
     );
     return TicketDetail.fromJson(
       _decodeJsonObject(response.body),
@@ -1213,10 +1238,7 @@ class ApiClient {
       'ticket/comment/${Uri.encodeComponent(commentId)}',
       token: token,
       requiresAuth: true,
-      body: {
-        'comment': comment,
-        'attachmentIds': attachmentIds,
-      },
+      body: {'comment': comment, 'attachmentIds': attachmentIds},
     );
     return TicketDetail.fromJson(
       _decodeJsonObject(response.body),
@@ -1283,10 +1305,7 @@ class ApiClient {
       'setting/restore',
       token: token,
       requiresAuth: true,
-      body: {
-        'filename': filename,
-        'passkey': passkey,
-      },
+      body: {'filename': filename, 'passkey': passkey},
     );
     return RestoreBackupResult.fromJson(_decodeJsonObject(response.body));
   }
@@ -1312,10 +1331,7 @@ class ApiClient {
       'setting',
       token: token,
       requiresAuth: true,
-      body: {
-        'settingName': settingName,
-        'settingValue': settingValue,
-      },
+      body: {'settingName': settingName, 'settingValue': settingValue},
     );
     return UpdateAppSettingResult.fromJson(_decodeJsonObject(response.body));
   }

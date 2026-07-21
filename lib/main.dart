@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'app_environment.dart';
 import 'app_theme.dart';
-import 'features/auth/login_screen.dart';
 import 'navigation/browser_history_sync.dart';
+import 'navigation/initial_app_screen.dart';
 import 'services/trip_heartbeat_service.dart';
 
 Future<void> main() async {
@@ -27,7 +27,7 @@ class MpcPharmaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       navigatorObservers: [_browserHistoryObserver],
-      home: const LoginScreen(),
+      home: buildInitialAppScreen(),
     );
   }
 }

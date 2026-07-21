@@ -125,7 +125,10 @@ class TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
         isLabelVisible: _hasVoice,
         smallSize: 8,
         backgroundColor: primary,
-        child: Icon(Icons.mic_none, color: primary),
+        child: Icon(
+          Icons.mic_none,
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
       ),
     );
   }
@@ -167,7 +170,8 @@ class _TicketVoiceRecordingDialog extends StatefulWidget {
       _TicketVoiceRecordingDialogState();
 }
 
-class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog> {
+class _TicketVoiceRecordingDialogState
+    extends State<_TicketVoiceRecordingDialog> {
   static const List<AudioEncoder> _encoderPreference = [
     AudioEncoder.aacLc,
     AudioEncoder.opus,
@@ -184,8 +188,10 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
 
   Timer? _timer;
   int _elapsedSeconds = 0;
+
   /// Instant mic level (0..1) for the live waveform. 0 = flat / silence.
   double _liveLevel = 0;
+
   /// Rolling peak (dBFS) so quiet mics still fill the waveform.
   double _amplitudePeakDb = -45;
 
@@ -281,8 +287,10 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
     if (linear < minActivity) return 0;
 
     // Remap so only levels above the threshold animate; keep punch above it.
-    final remapped =
-        ((linear - minActivity) / (1.0 - minActivity)).clamp(0.0, 1.0);
+    final remapped = ((linear - minActivity) / (1.0 - minActivity)).clamp(
+      0.0,
+      1.0,
+    );
     return math.pow(remapped, 0.45).toDouble().clamp(0.0, 1.0);
   }
 
@@ -297,10 +305,7 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
 
   String _extensionFor(AudioEncoder encoder) {
     return switch (encoder) {
-      AudioEncoder.aacLc ||
-      AudioEncoder.aacEld ||
-      AudioEncoder.aacHe =>
-        'm4a',
+      AudioEncoder.aacLc || AudioEncoder.aacEld || AudioEncoder.aacHe => 'm4a',
       AudioEncoder.opus => 'webm',
       AudioEncoder.wav || AudioEncoder.pcm16bits => 'wav',
       AudioEncoder.flac => 'flac',
@@ -312,8 +317,7 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
     return switch (encoder) {
       AudioEncoder.aacLc ||
       AudioEncoder.aacEld ||
-      AudioEncoder.aacHe =>
-        'audio/mp4',
+      AudioEncoder.aacHe => 'audio/mp4',
       AudioEncoder.opus => 'audio/webm',
       AudioEncoder.wav || AudioEncoder.pcm16bits => 'audio/wav',
       AudioEncoder.flac => 'audio/flac',
@@ -366,9 +370,9 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
       _amplitudeSub = _recorder
           .onAmplitudeChanged(const Duration(milliseconds: 60))
           .listen((amplitude) {
-        if (!mounted) return;
-        _updateLiveLevel(_normalizeAmplitude(amplitude.current));
-      });
+            if (!mounted) return;
+            _updateLiveLevel(_normalizeAmplitude(amplitude.current));
+          });
 
       if (!mounted) return;
       setState(() {
@@ -611,20 +615,18 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
         title: Row(
           children: [
             Expanded(
-              child: Text(
-                switch (_phase) {
-                  _VoiceModalPhase.recording => 'Recording',
-                  _VoiceModalPhase.uploading => 'Saving…',
-                  _VoiceModalPhase.saved => 'Saved',
-                  _VoiceModalPhase.review => 'Voice message',
-                  _VoiceModalPhase.error => 'Recording',
-                },
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
+              child: Text(switch (_phase) {
+                _VoiceModalPhase.recording => 'Recording',
+                _VoiceModalPhase.uploading => 'Saving…',
+                _VoiceModalPhase.saved => 'Saved',
+                _VoiceModalPhase.review => 'Voice message',
+                _VoiceModalPhase.error => 'Recording',
+              }, style: const TextStyle(fontWeight: FontWeight.w700)),
             ),
             IconButton(
               tooltip: 'Close',
-              onPressed: _phase == _VoiceModalPhase.uploading ||
+              onPressed:
+                  _phase == _VoiceModalPhase.uploading ||
                       _phase == _VoiceModalPhase.saved
                   ? null
                   : () => unawaited(_handleDismissRequest()),
@@ -692,10 +694,7 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
                 const Text(
                   'Voice message saved',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                 ),
               ] else if (_phase == _VoiceModalPhase.review) ...[
                 _VoiceTrackPlayer(
@@ -708,7 +707,11 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
                   formatDuration: _formatDuration,
                 ),
               ] else ...[
-                const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.redAccent,
+                  size: 48,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   _errorMessage ?? 'Something went wrong.',
@@ -735,8 +738,7 @@ class _TicketVoiceRecordingDialogState extends State<_TicketVoiceRecordingDialog
                 minimumSize: const Size(0, 44),
               ),
             ),
-          ]
-          else if (_phase == _VoiceModalPhase.review) ...[
+          ] else if (_phase == _VoiceModalPhase.review) ...[
             TextButton(
               onPressed: () => unawaited(_discard()),
               child: const Text('Discard'),
@@ -792,8 +794,9 @@ class _VoiceTrackPlayer extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final totalMs = math.max(duration.inMilliseconds, 1).toDouble();
-    final positionMs =
-        position.inMilliseconds.clamp(0, totalMs.round()).toDouble();
+    final positionMs = position.inMilliseconds
+        .clamp(0, totalMs.round())
+        .toDouble();
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -809,7 +812,9 @@ class _VoiceTrackPlayer extends StatelessWidget {
               tooltip: isPlaying ? 'Pause' : 'Play',
               onPressed: enabled ? onTogglePlay : null,
               icon: Icon(
-                isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                isPlaying
+                    ? Icons.pause_circle_filled
+                    : Icons.play_circle_filled,
                 size: 40,
                 color: primary,
               ),
@@ -922,8 +927,9 @@ class _RecordingTimerRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress =
-        maxSeconds <= 0 ? 0.0 : (elapsedSeconds / maxSeconds).clamp(0.0, 1.0);
+    final progress = maxSeconds <= 0
+        ? 0.0
+        : (elapsedSeconds / maxSeconds).clamp(0.0, 1.0);
 
     return SizedBox(
       width: _size,
@@ -1068,9 +1074,8 @@ class _LiveWavePainter extends CustomPainter {
         final envelope = (1.0 - (distance * 0.55)).clamp(0.35, 1.0);
 
         // Instant mic level, with light phase motion so bars feel live.
-        final wobble = 0.55 +
-            (0.45 *
-                math.sin(phase * (1.6 + distance) + i * 0.55).abs());
+        final wobble =
+            0.55 + (0.45 * math.sin(phase * (1.6 + distance) + i * 0.55).abs());
         final barLevel = (level * envelope * wobble).clamp(0.08, 1.0);
         barHeight = (maxBarHeight * barLevel).clamp(4.0, maxBarHeight);
       }

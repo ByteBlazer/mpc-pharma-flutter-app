@@ -7,6 +7,9 @@ abstract final class AppTheme {
     brandColor,
   ).withSaturation(0.35).withLightness(0.92).toColor();
 
+  /// Foreground on solid [brandColor] / [ColorScheme.primary] fills.
+  static const Color onBrandBackground = Colors.white;
+
   /// Icon glyphs on pale primary-tinted surfaces — deeper and more saturated
   /// than [brandColor] for readable contrast.
   static Color primaryGlyph(Color primary) {
