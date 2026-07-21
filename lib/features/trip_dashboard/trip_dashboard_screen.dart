@@ -42,7 +42,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
   String? _loadError;
   bool _initialLoading = true;
   bool _refreshing = false;
-  int _refreshCountdown = _refreshIntervalSeconds;
+  late final ValueNotifier<int> _refreshCountdown;
 
   int? _selectedTripId;
   SingleTripDetails? _tripDetail;
@@ -65,6 +65,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
   @override
   void initState() {
     super.initState();
+    _refreshCountdown = ValueNotifier(_refreshIntervalSeconds);
     WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
@@ -93,13 +94,11 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
 
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      setState(() {
-        if (_refreshCountdown <= 1) {
-          _refreshCountdown = _refreshIntervalSeconds;
-        } else {
-          _refreshCountdown--;
-        }
-      });
+      if (_refreshCountdown.value <= 1) {
+        _refreshCountdown.value = _refreshIntervalSeconds;
+      } else {
+        _refreshCountdown.value--;
+      }
     });
   }
 
@@ -121,12 +120,16 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
     _pollTimer?.cancel();
     _countdownTimer?.cancel();
     _durationTimer?.cancel();
+    _refreshCountdown.dispose();
     super.dispose();
   }
 
   void _onTabChanged() {
     if (_tabController.indexIsChanging) return;
-    setState(() => _driverMapPanelOpen = false);
+    setState(() {
+      _driverMapPanelOpen = false;
+      _expandedTripIds.clear();
+    });
     _deselectTrip();
   }
 
@@ -157,10 +160,10 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
     try {
       final response = await widget.apiClient.getAllTrips();
       if (!mounted) return;
+      _refreshCountdown.value = _refreshIntervalSeconds;
       setState(() {
         _allTrips = response.trips;
         _loadError = null;
-        _refreshCountdown = _refreshIntervalSeconds;
       });
 
       if (_selectedTripId != null) {
@@ -565,27 +568,32 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
       appBar: AppBar(
         title: const Text('Trip Dashboard'),
         actions: [
-          TextButton.icon(
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.white,
-              disabledForegroundColor: Colors.white70,
-            ),
-            onPressed: _refreshing ? null : () => _refreshAll(),
-            icon: _refreshing
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.refresh, size: 18),
-            label: Text(
-              _refreshing
-                  ? 'Refreshing…'
-                  : 'Refresh (${_refreshCountdown.toString().padLeft(2, '0')})',
-            ),
+          ValueListenableBuilder<int>(
+            valueListenable: _refreshCountdown,
+            builder: (context, countdown, _) {
+              return TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white70,
+                ),
+                onPressed: _refreshing ? null : () => _refreshAll(),
+                icon: _refreshing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.refresh, size: 18),
+                label: Text(
+                  _refreshing
+                      ? 'Refreshing…'
+                      : 'Refresh (${countdown.toString().padLeft(2, '0')})',
+                ),
+              );
+            },
           ),
           IconButton(
             tooltip: 'Find by doc ID',
@@ -670,7 +678,9 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
                 onHorizontalDragUpdate: (details) {
                   if (details.delta.dx > 8) _closeDriverMapPanel();
                 },
-                child: _buildMobileDriverMapPanel(panelWidth),
+                child: _driverMapPanelOpen
+                    ? _buildMobileDriverMapPanel(panelWidth)
+                    : SizedBox(width: panelWidth),
               ),
             ),
           ),
@@ -751,7 +761,9 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
                           if (_expandedTripIds.contains(trip.tripId)) {
                             _expandedTripIds.remove(trip.tripId);
                           } else {
-                            _expandedTripIds.add(trip.tripId);
+                            _expandedTripIds
+                              ..clear()
+                              ..add(trip.tripId);
                           }
                         });
                       },
@@ -973,7 +985,11 @@ class _TripCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    _StatusChip(style: statusStyle, label: trip.status),
+                    if (trip.isStarted || trip.isScheduled || trip.isEnded)
+                      _StatusChip(
+                        style: statusStyle,
+                        label: _statusLabel(trip.status),
+                      ),
                   ],
                 ),
                 if (!trip.hasDriverGps && trip.isStarted) ...[
@@ -1021,22 +1037,21 @@ class _TripCard extends StatelessWidget {
                   ],
                   if (canForceEnd) ...[
                     const SizedBox(height: 10),
-                    OutlinedButton(
+                    FilledButton(
                       onPressed: onForceEnd,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFC62828),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFC62828),
+                        foregroundColor: Colors.white,
                       ),
                       child: const Text('Force end trip'),
                     ),
                   ],
-                  Row(
-                    children: [
-                      _StatusChip(style: statusStyle, label: trip.status),
-                      TextButton(
-                        onPressed: onToggleExpand,
-                        child: const Text('View less'),
-                      ),
-                    ],
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: onToggleExpand,
+                      child: const Text('View less'),
+                    ),
                   ),
                 ],
               ],
@@ -1047,27 +1062,36 @@ class _TripCard extends StatelessWidget {
     );
   }
 
-  _StatusVisual _statusStyle(String status) {
+  String _statusLabel(String status) {
     switch (status.toUpperCase()) {
       case 'STARTED':
-        return const _StatusVisual(
-          color: Color(0xFF1565C0),
-          icon: Icons.check_circle_outline,
-        );
+        return 'Started';
+      case 'SCHEDULED':
+        return 'Scheduled';
+      case 'ENDED':
+        return 'Ended';
+      default:
+        return status;
+    }
+  }
+
+  _StatusVisual _statusStyle(String status) {
+    switch (status.toUpperCase()) {
       case 'SCHEDULED':
         return const _StatusVisual(
-          color: Color(0xFFEF6C00),
+          color: Color(0xFF1565C0),
           icon: Icons.schedule,
         );
       case 'ENDED':
         return const _StatusVisual(
-          color: Color(0xFF757575),
+          color: Color(0xFF1565C0),
           icon: Icons.cancel_outlined,
         );
+      case 'STARTED':
       default:
         return const _StatusVisual(
-          color: Color(0xFF757575),
-          icon: Icons.help_outline,
+          color: Color(0xFF1565C0),
+          icon: Icons.check_circle_outline,
         );
     }
   }

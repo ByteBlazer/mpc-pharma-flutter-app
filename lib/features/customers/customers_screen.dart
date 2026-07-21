@@ -15,9 +15,6 @@ import '../../widgets/app_search_field.dart';
 import '../../widgets/app_view_details_button.dart';
 import 'customer_detail_screen.dart';
 import 'customer_models.dart';
-import 'customers_map_section.dart';
-
-enum CustomersViewMode { list, map }
 
 class CustomersScreen extends StatefulWidget {
   const CustomersScreen({
@@ -39,7 +36,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
   Timer? _searchDebounce;
   String _searchQuery = '';
   bool _isDownloading = false;
-  CustomersViewMode _viewMode = CustomersViewMode.list;
 
   @override
   void initState() {
@@ -205,25 +201,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         shownCount: filteredCustomers.length,
                         totalCount: data.customers.length,
                         isDownloading: _isDownloading,
-                        viewMode: _viewMode,
-                        onViewModeChanged: (viewMode) {
-                          setState(() => _viewMode = viewMode);
-                        },
                         onDownloadCustomers: _downloadCustomers,
                       ),
                       const SizedBox(height: 12),
                       Expanded(
-                        child: _viewMode == CustomersViewMode.list
-                            ? _CustomersSection(
-                                customers: filteredCustomers,
-                                canViewDetails: data.hasWebAccess,
-                                onViewCustomer: _viewCustomer,
-                              )
-                            : CustomersMapSection(
-                                customers: filteredCustomers,
-                                canViewDetails: data.hasWebAccess,
-                                onViewCustomer: _viewCustomer,
-                              ),
+                        child: _CustomersSection(
+                          customers: filteredCustomers,
+                          canViewDetails: data.hasWebAccess,
+                          onViewCustomer: _viewCustomer,
+                        ),
                       ),
                     ],
                   ),
@@ -243,8 +229,6 @@ class _SearchAndActions extends StatelessWidget {
     required this.shownCount,
     required this.totalCount,
     required this.isDownloading,
-    required this.viewMode,
-    required this.onViewModeChanged,
     required this.onDownloadCustomers,
   });
 
@@ -252,63 +236,38 @@ class _SearchAndActions extends StatelessWidget {
   final int shownCount;
   final int totalCount;
   final bool isDownloading;
-  final CustomersViewMode viewMode;
-  final ValueChanged<CustomersViewMode> onViewModeChanged;
   final VoidCallback onDownloadCustomers;
 
   @override
   Widget build(BuildContext context) {
-    final search = AppSearchField(
-      controller: controller,
-      labelText: 'Search customers',
-      hintText: 'ID, firm name, city...',
-    );
-    final download = OutlinedButton.icon(
-      onPressed: isDownloading ? null : onDownloadCustomers,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, 44),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      ),
-      icon: isDownloading
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.download_outlined),
-      label: const Text('Download'),
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _CustomersCountText(shownCount: shownCount, totalCount: totalCount),
         const SizedBox(height: 8),
-        search,
+        AppSearchField(
+          controller: controller,
+          labelText: 'Search customers',
+          hintText: 'ID, firm name, city...',
+        ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            SegmentedButton<CustomersViewMode>(
-              segments: const [
-                ButtonSegment(
-                  value: CustomersViewMode.list,
-                  icon: Icon(Icons.view_list_outlined),
-                  label: Text('List'),
-                ),
-                ButtonSegment(
-                  value: CustomersViewMode.map,
-                  icon: Icon(Icons.map_outlined),
-                  label: Text('Map'),
-                ),
-              ],
-              selected: {viewMode},
-              onSelectionChanged: (selection) {
-                onViewModeChanged(selection.first);
-              },
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            onPressed: isDownloading ? null : onDownloadCustomers,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
-            const Spacer(),
-            download,
-          ],
+            icon: isDownloading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.download_outlined),
+            label: const Text('Download'),
+          ),
         ),
       ],
     );

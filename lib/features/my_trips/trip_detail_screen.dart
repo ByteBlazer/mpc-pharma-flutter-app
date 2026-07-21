@@ -10,6 +10,7 @@ import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_surface.dart';
+import '../trip_dashboard/trip_dashboard_helpers.dart';
 import 'mark_delivered_sheet.dart';
 import 'my_trips_models.dart';
 import 'report_issue_dialog.dart';
@@ -368,7 +369,12 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
           if (_busy)
             const ColoredBox(
               color: Color(0x66000000),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ),
+              ),
             ),
         ],
       ),
@@ -540,7 +546,6 @@ class _DocGroupSection extends StatelessWidget {
           child: _DocTile(
             doc: doc,
             selected: selectedDocIds.contains(doc.id),
-            showActions: false,
             enabled: enabled,
             onToggle: null,
             onIssue: null,
@@ -669,7 +674,6 @@ class _CustomerClusterCard extends StatelessWidget {
               _DocTile(
                 doc: doc,
                 selected: selectedDocIds.contains(doc.id),
-                showActions: doc.isOnTrip,
                 enabled: enabled,
                 onToggle: doc.isOnTrip
                     ? (value) => onToggleDoc(doc.id, value)
@@ -701,7 +705,6 @@ class _DocTile extends StatelessWidget {
   const _DocTile({
     required this.doc,
     required this.selected,
-    required this.showActions,
     required this.enabled,
     required this.onToggle,
     required this.onIssue,
@@ -711,7 +714,6 @@ class _DocTile extends StatelessWidget {
 
   final TripDoc doc;
   final bool selected;
-  final bool showActions;
   final bool enabled;
   final ValueChanged<bool>? onToggle;
   final VoidCallback? onIssue;
@@ -720,14 +722,72 @@ class _DocTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trailingActions = <Widget>[];
+
+    if (!doc.isOnTrip) {
+      trailingActions.add(
+        Text(
+          doc.statusLabel,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            color: doc.isDelivered
+                ? Colors.green.shade700
+                : doc.isUndelivered
+                    ? Colors.red.shade700
+                    : Colors.black87,
+          ),
+        ),
+      );
+    } else if (onIssue != null) {
+      trailingActions.add(
+        IconButton(
+          tooltip: 'Report Issue',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          onPressed: enabled ? onIssue : null,
+          icon: const Icon(Icons.help_outline, size: 20),
+        ),
+      );
+    }
+
+    if (onDial != null) {
+      trailingActions.add(
+        IconButton(
+          tooltip: 'Call',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          onPressed: enabled ? onDial : null,
+          icon: const Icon(Icons.phone, size: 20),
+        ),
+      );
+    }
+
+    if (onMaps != null) {
+      trailingActions.add(
+        IconButton(
+          tooltip: 'Navigate',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          onPressed: enabled ? onMaps : null,
+          icon: const Icon(Icons.navigation_outlined, size: 20),
+        ),
+      );
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
             if (onToggle != null)
               Checkbox(
                 value: selected,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
                 onChanged: enabled
                     ? (value) => onToggle!(value ?? false)
                     : null,
@@ -735,53 +795,34 @@ class _DocTile extends StatelessWidget {
             Expanded(
               child: Text(
                 doc.id,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontFamily: 'monospace',
                 ),
               ),
             ),
-            Text(
-              doc.statusLabel,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: doc.isDelivered
-                    ? Colors.green.shade700
-                    : doc.isUndelivered
-                        ? Colors.red.shade700
-                        : Colors.black87,
+            if (doc.docAmount.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(
+                formatInrAmount(doc.docAmount),
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
+            ],
+            ...trailingActions,
           ],
         ),
-        if (doc.docAmount.isNotEmpty)
-          Text('Amount: ${doc.docAmount}',
-              style: const TextStyle(color: Colors.black54)),
         if (doc.comment.isNotEmpty)
-          Text(doc.comment, style: const TextStyle(color: Colors.black54)),
-        if (showActions)
-          Row(
-            children: [
-              TextButton(
-                onPressed: enabled ? onIssue : null,
-                child: const Text('Issue'),
-              ),
-            ],
-          ),
-        if (onDial != null || onMaps != null)
-          Row(
-            children: [
-              if (onDial != null)
-                IconButton(
-                  onPressed: enabled ? onDial : null,
-                  icon: const Icon(Icons.phone),
-                ),
-              if (onMaps != null)
-                IconButton(
-                  onPressed: enabled ? onMaps : null,
-                  icon: const Icon(Icons.navigation_outlined),
-                ),
-            ],
+          Padding(
+            padding: EdgeInsets.only(left: onToggle != null ? 40 : 0, top: 2),
+            child: Text(
+              doc.comment,
+              style: const TextStyle(color: Colors.black54, fontSize: 12),
+            ),
           ),
       ],
     );

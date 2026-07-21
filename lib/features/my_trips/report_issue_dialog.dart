@@ -9,12 +9,10 @@ Future<bool> showReportIssueDialog({
   required String docId,
   required Future<void> Function() onLoginAgain,
 }) async {
-  final controller = TextEditingController();
   final submitted = await showDialog<bool>(
     context: context,
     builder: (context) {
       return _ReportIssueDialog(
-        controller: controller,
         onSubmit: (comment) async {
           final result = await apiClient.markAsUnDelivered(
             docId: docId,
@@ -45,17 +43,14 @@ Future<bool> showReportIssueDialog({
       );
     },
   );
-  controller.dispose();
   return submitted == true;
 }
 
 class _ReportIssueDialog extends StatefulWidget {
   const _ReportIssueDialog({
-    required this.controller,
     required this.onSubmit,
   });
 
-  final TextEditingController controller;
   final Future<bool> Function(String comment) onSubmit;
 
   @override
@@ -63,18 +58,25 @@ class _ReportIssueDialog extends StatefulWidget {
 }
 
 class _ReportIssueDialogState extends State<_ReportIssueDialog> {
+  late final TextEditingController _controller = TextEditingController();
   bool _submitting = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.controller,
+      listenable: _controller,
       builder: (context, _) {
-        final comment = widget.controller.text.trim();
+        final comment = _controller.text.trim();
         return AlertDialog(
           title: const Text('Report Issue'),
           content: TextField(
-            controller: widget.controller,
+            controller: _controller,
             enabled: !_submitting,
             autofocus: true,
             maxLines: 4,

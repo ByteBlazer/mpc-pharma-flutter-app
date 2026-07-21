@@ -247,7 +247,12 @@ class _MyTripsScreenState extends State<MyTripsScreen> {
           if (_busy)
             const ColoredBox(
               color: Color(0x66000000),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ),
+              ),
             ),
         ],
       ),

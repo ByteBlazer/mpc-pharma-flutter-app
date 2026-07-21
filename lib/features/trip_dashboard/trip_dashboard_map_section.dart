@@ -52,24 +52,89 @@ class _TripDashboardMapSectionState extends State<TripDashboardMapSection> {
   Timer? _pulseTimer;
   bool _pulseHigh = true;
 
+  bool get _shouldPulseDriverMarkers {
+    if (widget.tripDetail != null) {
+      return widget.tripDetail!.hasDriverGps;
+    }
+    return widget.driverTrips.length == 1;
+  }
+
   @override
   void initState() {
     super.initState();
     _initializeMap();
+    _syncPulseTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant TripDashboardMapSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncPulseTimer();
+    if (_mapDataChanged(oldWidget)) {
+      _fitMapToMarkers();
+    }
+  }
+
+  void _syncPulseTimer() {
+    if (!_shouldPulseDriverMarkers) {
+      _pulseTimer?.cancel();
+      _pulseTimer = null;
+      if (!_pulseHigh && mounted) {
+        setState(() => _pulseHigh = true);
+      }
+      return;
+    }
+
+    if (_pulseTimer != null) return;
+
     _pulseTimer = Timer.periodic(const Duration(milliseconds: 750), (_) {
       if (!mounted) return;
       setState(() => _pulseHigh = !_pulseHigh);
     });
   }
 
-  @override
-  void didUpdateWidget(covariant TripDashboardMapSection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.driverTrips != widget.driverTrips ||
-        oldWidget.tripDetail != widget.tripDetail ||
-        oldWidget.customerClusters != widget.customerClusters) {
-      _fitMapToMarkers();
+  bool _mapDataChanged(TripDashboardMapSection oldWidget) {
+    final oldDetail = oldWidget.tripDetail;
+    final detail = widget.tripDetail;
+    if (oldDetail?.tripId != detail?.tripId) return true;
+    if (oldDetail?.driverLat != detail?.driverLat) return true;
+    if (oldDetail?.driverLng != detail?.driverLng) return true;
+    if (!_sameDriverTrips(oldWidget.driverTrips, widget.driverTrips)) {
+      return true;
     }
+    if (!_sameCustomerClusters(
+      oldWidget.customerClusters,
+      widget.customerClusters,
+    )) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _sameDriverTrips(
+    List<DashboardTripSummary> a,
+    List<DashboardTripSummary> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].tripId != b[i].tripId) return false;
+      if (a[i].driverLat != b[i].driverLat) return false;
+      if (a[i].driverLng != b[i].driverLng) return false;
+    }
+    return true;
+  }
+
+  bool _sameCustomerClusters(
+    List<CustomerMapCluster> a,
+    List<CustomerMapCluster> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].key != b[i].key) return false;
+      if (a[i].latitude != b[i].latitude) return false;
+      if (a[i].longitude != b[i].longitude) return false;
+    }
+    return true;
   }
 
   @override
@@ -112,7 +177,7 @@ class _TripDashboardMapSectionState extends State<TripDashboardMapSection> {
     if (customerIcon == null || driverIcon == null) return const {};
 
     final markers = <Marker>{};
-    final driverAlpha = _pulseHigh ? 1.0 : 0.45;
+    final driverAlpha = _shouldPulseDriverMarkers && !_pulseHigh ? 0.45 : 1.0;
 
     if (widget.tripDetail != null) {
       final detail = widget.tripDetail!;
