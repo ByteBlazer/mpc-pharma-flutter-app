@@ -21,6 +21,7 @@ import '../queue/queue_screen.dart';
 import '../scan/scan_screen.dart';
 import '../settings/settings_screen.dart';
 import '../tickets/tickets_screen.dart';
+import '../trip_dashboard/trip_dashboard_screen.dart';
 import '../trips/trips_screen.dart';
 import '../my_trips/my_trips_screen.dart';
 import '../users/users_screen.dart';
@@ -328,6 +329,8 @@ class _HomeFeatureGrid extends StatelessWidget {
     final showQueueAndTrips =
         await JwtPayload.currentUserCanAccessQueueAndTrips();
     final showMyTrips = await JwtPayload.currentUserCanAccessMyTrips();
+    final showTripDashboard =
+        await JwtPayload.currentUserCanAccessTripDashboard();
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
       showTickets: showTickets,
@@ -338,6 +341,7 @@ class _HomeFeatureGrid extends StatelessWidget {
       showScan: showScan,
       showQueueAndTrips: showQueueAndTrips,
       showMyTrips: showMyTrips,
+      showTripDashboard: showTripDashboard,
     );
   }
 
@@ -551,6 +555,21 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
+      if (visibility.showTripDashboard)
+        _FeatureTile(
+          icon: Icons.dashboard_customize_outlined,
+          label: 'Trip Dashboard',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TripDashboardScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
     ];
   }
 
@@ -675,6 +694,7 @@ class _HomeFeatureVisibility {
     required this.showScan,
     required this.showQueueAndTrips,
     required this.showMyTrips,
+    required this.showTripDashboard,
   });
 
   final bool showImpersonate;
@@ -686,6 +706,7 @@ class _HomeFeatureVisibility {
   final bool showScan;
   final bool showQueueAndTrips;
   final bool showMyTrips;
+  final bool showTripDashboard;
 }
 
 class _FeatureTile extends StatelessWidget {

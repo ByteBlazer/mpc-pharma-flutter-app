@@ -162,6 +162,14 @@ abstract final class JwtPayload {
         roles.hasRole(AppRole.appAdmin);
   }
 
+  static Future<bool> currentUserCanAccessTripDashboard({
+    AuthTokenStore? tokenStore,
+  }) async {
+    final roles = await currentRoles(tokenStore: tokenStore);
+    return roles.hasRole(AppRole.webAccess) ||
+        roles.hasRole(AppRole.appAdmin);
+  }
+
   /// Seconds between location heartbeats. JWT claim, else server-like default 60.
   static int locationHeartbeatFrequencySeconds(String token) {
     final json = decode(token);
