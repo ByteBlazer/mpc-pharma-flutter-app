@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../api/api_client.dart';
 import '../../auth/jwt_payload.dart';
@@ -54,6 +55,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
 
   CustomerMapCluster? _selectedCluster;
   bool _canForceEnd = false;
+  bool _driverMapPanelOpen = false;
 
   Timer? _pollTimer;
   Timer? _countdownTimer;
@@ -124,6 +126,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
 
   void _onTabChanged() {
     if (_tabController.indexIsChanging) return;
+    setState(() => _driverMapPanelOpen = false);
     _deselectTrip();
   }
 
@@ -204,6 +207,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
       _selectedCluster = null;
       _tripDetail = null;
       _detailError = null;
+      _driverMapPanelOpen = false;
     });
     _scrollTripIntoView(tripId);
     _loadTripDetail(tripId);
@@ -230,6 +234,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
       _tripDetail = null;
       _detailError = null;
       _detailLoading = false;
+      _driverMapPanelOpen = false;
     });
     _detailRequestId++;
     _durationTimer?.cancel();
@@ -425,7 +430,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
     );
   }
 
-  Future<void> _openDriverMapModal() async {
+  void _openDriverMapPanel() {
     final tripsWithGps =
         _filteredTrips.where((trip) => trip.hasDriverGps).toList();
     if (tripsWithGps.isEmpty) {
@@ -436,67 +441,119 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
       );
       return;
     }
+    setState(() => _driverMapPanelOpen = true);
+  }
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.92,
-          minChildSize: 0.5,
-          maxChildSize: 0.96,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Driver locations',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      height: MediaQuery.sizeOf(context).height * 0.72,
-                      child: TripDashboardMapSection(
-                        heading: mapHeading(
-                          tabIndex: _tabController.index,
-                          selectedTripId: null,
-                          route: '',
-                          detailLoading: false,
-                        ),
-                        driverTrips: tripsWithGps,
-                        driverMarkersInteractive: true,
-                        onDriverTripTap: (tripId) {
-                          Navigator.of(context).pop();
-                          _toggleTripSelection(tripId);
-                        },
+  void _closeDriverMapPanel() {
+    if (!_driverMapPanelOpen) return;
+    setState(() => _driverMapPanelOpen = false);
+  }
+
+  void _selectTripFromDriverMap(int tripId) {
+    _closeDriverMapPanel();
+    _toggleTripSelection(tripId);
+  }
+
+  Widget _buildMobileDriverMapPanel(double panelWidth) {
+    final tripsWithGps =
+        _filteredTrips.where((trip) => trip.hasDriverGps).toList();
+
+    return Material(
+      elevation: 12,
+      color: Colors.white,
+      child: SafeArea(
+        left: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Driver locations',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: Colors.black,
                       ),
                     ),
                   ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: _closeDriverMapPanel,
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: TripDashboardMapSection(
+                  heading: mapHeading(
+                    tabIndex: _tabController.index,
+                    selectedTripId: null,
+                    route: '',
+                    detailLoading: false,
+                  ),
+                  driverTrips: tripsWithGps,
+                  driverMarkersInteractive: true,
+                  onDriverTripTap: _selectTripFromDriverMap,
                 ),
-              ],
-            );
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDriverMapPullHandle(Color primary) {
+    return Positioned(
+      right: 0,
+      top: 0,
+      bottom: 0,
+      child: Center(
+        child: GestureDetector(
+          onTap: _openDriverMapPanel,
+          onHorizontalDragUpdate: (details) {
+            if (details.delta.dx < -4) _openDriverMapPanel();
           },
-        );
-      },
+          child: Material(
+            elevation: 4,
+            color: primary,
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 14, 6, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.chevron_left, color: Colors.white.withValues(alpha: 0.9)),
+                  const SizedBox(height: 6),
+                  const Icon(Icons.map_outlined, color: Colors.white, size: 20),
+                  const SizedBox(height: 6),
+                  RotatedBox(
+                    quarterTurns: 3,
+                    child: Text(
+                      'Drivers',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -508,12 +565,6 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
       appBar: AppBar(
         title: const Text('Trip Dashboard'),
         actions: [
-          if (!isWide && _selectedTripId == null)
-            IconButton(
-              tooltip: 'Driver map',
-              onPressed: _openDriverMapModal,
-              icon: const Icon(Icons.map_outlined),
-            ),
           TextButton.icon(
             style: TextButton.styleFrom(
               foregroundColor: Colors.white,
@@ -572,15 +623,82 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
   }
 
   Widget _buildNarrowBody() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final primary = Theme.of(context).colorScheme.primary;
+    final panelWidth = MediaQuery.sizeOf(context).width * 0.88;
+    final showPullHandle =
+        _selectedTripId == null && !_driverMapPanelOpen;
+    final mapHeight = MediaQuery.sizeOf(context).height * 0.38;
+
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        Expanded(child: _buildTripListPanel()),
-        if (_selectedTripId != null) ...[
-          const Divider(height: 1),
-          SizedBox(height: 320, child: _buildMapPanel(expanded: false)),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: _buildTripListPanel()),
+            if (_selectedTripId != null) ...[
+              const Divider(height: 1),
+              _buildMobileTripSelectionHeader(),
+              SizedBox(
+                height: mapHeight.clamp(220.0, 420.0),
+                child: _buildMapPanel(expanded: false, compact: true),
+              ),
+            ],
+          ],
+        ),
+        if (_selectedTripId == null) ...[
+          if (showPullHandle) _buildDriverMapPullHandle(primary),
+          if (_driverMapPanelOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _closeDriverMapPanel,
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.35),
+                ),
+              ),
+            ),
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            top: 0,
+            bottom: 0,
+            right: _driverMapPanelOpen ? 0 : -panelWidth,
+            width: panelWidth,
+            child: IgnorePointer(
+              ignoring: !_driverMapPanelOpen,
+              child: GestureDetector(
+                onHorizontalDragUpdate: (details) {
+                  if (details.delta.dx > 8) _closeDriverMapPanel();
+                },
+                child: _buildMobileDriverMapPanel(panelWidth),
+              ),
+            ),
+          ),
         ],
+        if (_selectedTripId != null && _selectedCluster != null)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: _buildCustomerCalloutOverlay(),
+          ),
       ],
+    );
+  }
+
+  Widget _buildCustomerCalloutOverlay() {
+    final cluster = _selectedCluster!;
+    return PointerInterceptor(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {},
+        child: CustomerDeliveryCallout(
+          key: ValueKey(cluster.key),
+          docs: cluster.docs,
+          apiClient: widget.apiClient,
+          onClose: () => setState(() => _selectedCluster = null),
+        ),
+      ),
     );
   }
 
@@ -646,7 +764,52 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
     );
   }
 
-  Widget _buildMapPanel({required bool expanded}) {
+  Widget _buildMobileTripSelectionHeader() {
+    final detail = _tripDetail;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _deselectTrip,
+              icon: const Icon(Icons.grid_view_outlined, size: 18),
+              label: const Text('Show all trips'),
+            ),
+          ),
+          if (_detailError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Text(
+                    'Could not load trip details: $_detailError',
+                    style: const TextStyle(
+                      color: Color(0xFFB71C1C),
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (detail != null)
+            TripSummaryPanel(
+              detail: detail,
+              summary: computeTripProgress(detail: detail, now: DateTime.now()),
+              initiallyExpanded: false,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapPanel({required bool expanded, bool compact = false}) {
     final selectedId = _selectedTripId;
     final summary = selectedId != null ? _tripSummary(selectedId) : null;
     final detail = _tripDetail;
@@ -671,7 +834,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (selectedId != null)
+          if (!compact && selectedId != null)
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
@@ -680,7 +843,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
                 label: const Text('Show all trips'),
               ),
             ),
-          if (_detailError != null)
+          if (!compact && _detailError != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Material(
@@ -695,7 +858,7 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
                 ),
               ),
             ),
-          if (detail != null && selectedId != null)
+          if (!compact && detail != null && selectedId != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: TripSummaryPanel(
@@ -715,23 +878,22 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
                     customerClusters: clusters,
                     selectedTripId: selectedId,
                     driverMarkersInteractive: selectedId == null,
+                    compact: compact,
                     onDriverTripTap: _toggleTripSelection,
                     onCustomerClusterTap: (cluster) {
                       setState(() => _selectedCluster = cluster);
                     },
-                    onMapTap: () => setState(() => _selectedCluster = null),
+                    onMapTap: _selectedCluster == null
+                        ? () => setState(() => _selectedCluster = null)
+                        : null,
                   ),
                 ),
-                if (_selectedCluster != null)
+                if (!compact && _selectedCluster != null)
                   Positioned(
                     left: 12,
                     right: 12,
                     bottom: 12,
-                    child: CustomerDeliveryCallout(
-                      docs: _selectedCluster!.docs,
-                      apiClient: widget.apiClient,
-                      onClose: () => setState(() => _selectedCluster = null),
-                    ),
+                    child: _buildCustomerCalloutOverlay(),
                   ),
               ],
             ),
