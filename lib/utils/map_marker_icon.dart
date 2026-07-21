@@ -15,9 +15,22 @@ const ImageConfiguration _driverMapMarkerImageConfiguration =
   devicePixelRatio: 1.0,
 );
 
+const ImageConfiguration _tripDashboardCustomerMapMarkerImageConfiguration =
+    ImageConfiguration(
+  size: Size(64, 64),
+  devicePixelRatio: 1.0,
+);
+
 Future<BitmapDescriptor> loadMapMarkerIcon() {
   return BitmapDescriptor.asset(
     _mapMarkerImageConfiguration,
+    mapMarkerAssetPath,
+  );
+}
+
+Future<BitmapDescriptor> loadTripDashboardCustomerMapMarkerIcon() {
+  return BitmapDescriptor.asset(
+    _tripDashboardCustomerMapMarkerImageConfiguration,
     mapMarkerAssetPath,
   );
 }

@@ -51,6 +51,7 @@ dependencies:
   geolocator: ^14.0.2
   signature: ^6.3.0
   flutter_foreground_task: ^10.0.0
+  pointer_interceptor: ^0.10.1+2
 
 dev_dependencies:
   flutter_test:

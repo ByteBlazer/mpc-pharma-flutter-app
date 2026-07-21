@@ -48,7 +48,9 @@ class _CustomerDeliveryCalloutState extends State<CustomerDeliveryCallout> {
   @override
   void didUpdateWidget(covariant CustomerDeliveryCallout oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.docs != widget.docs) {
+    final oldIds = oldWidget.docs.map((d) => d.id).join(',');
+    final newIds = widget.docs.map((d) => d.id).join(',');
+    if (oldIds != newIds) {
       _docIndex = 0;
       _deliveryState.clear();
       _preloadDeliveryStatuses();
@@ -245,9 +247,6 @@ class _DocDetailsSection extends StatelessWidget {
     final statusColor = Color(docStatusColor(doc.status));
     final amount = formatInrAmount(doc.docAmount);
     final isTerminal = doc.isDelivered || doc.isUndelivered;
-    final signatureBytes = delivery == null
-        ? null
-        : decodeSignatureBase64(delivery!.signature);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -318,7 +317,7 @@ class _DocDetailsSection extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
               const SizedBox(height: 4),
-              _SignaturePreview(bytes: signatureBytes),
+              SignatureImagePreview(signatureBase64: delivery!.signature),
             ],
           ],
         ],
@@ -341,35 +340,6 @@ class _DocDetailsSection extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-class _SignaturePreview extends StatelessWidget {
-  const _SignaturePreview({required this.bytes});
-
-  final Uint8List? bytes;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 88,
-      width: double.infinity,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.black26),
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.white,
-      ),
-      child: bytes == null
-          ? const Text(
-              'No signature available',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(4),
-              child: Image.memory(bytes!, fit: BoxFit.contain),
-            ),
     );
   }
 }

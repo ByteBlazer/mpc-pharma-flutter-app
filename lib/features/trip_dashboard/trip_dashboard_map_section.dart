@@ -23,6 +23,7 @@ class TripDashboardMapSection extends StatefulWidget {
     this.onDriverTripTap,
     this.onCustomerClusterTap,
     this.onMapTap,
+    this.compact = false,
   });
 
   final String heading;
@@ -35,6 +36,7 @@ class TripDashboardMapSection extends StatefulWidget {
   final ValueChanged<int>? onDriverTripTap;
   final ValueChanged<CustomerMapCluster>? onCustomerClusterTap;
   final VoidCallback? onMapTap;
+  final bool compact;
 
   @override
   State<TripDashboardMapSection> createState() =>
@@ -85,7 +87,7 @@ class _TripDashboardMapSectionState extends State<TripDashboardMapSection> {
     try {
       await ensureGoogleMapsLoaded(AppEnvironment.googleMapApiKey);
       final results = await Future.wait([
-        loadMapMarkerIcon(),
+        loadTripDashboardCustomerMapMarkerIcon(),
         loadDriverMapMarkerIcon(),
       ]);
       if (!mounted) return;
@@ -216,6 +218,13 @@ class _TripDashboardMapSectionState extends State<TripDashboardMapSection> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.compact) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: _buildMapBody(context),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -226,8 +235,6 @@ class _TripDashboardMapSectionState extends State<TripDashboardMapSection> {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 6),
-        const _MapLegend(),
         const SizedBox(height: 8),
         Expanded(
           child: ClipRRect(
@@ -278,50 +285,6 @@ class _TripDashboardMapSectionState extends State<TripDashboardMapSection> {
         await _fitMapToMarkers();
       },
       onTap: (_) => widget.onMapTap?.call(),
-    );
-  }
-}
-
-class _MapLegend extends StatelessWidget {
-  const _MapLegend();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Wrap(
-      spacing: 16,
-      runSpacing: 4,
-      children: [
-        _LegendItem(
-          icon: Icons.local_shipping_outlined,
-          label: 'Driver location',
-        ),
-        _LegendItem(
-          icon: Icons.person_pin_circle_outlined,
-          label: 'Customer stop',
-        ),
-      ],
-    );
-  }
-}
-
-class _LegendItem extends StatelessWidget {
-  const _LegendItem({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: Colors.black87),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.black87, fontSize: 12),
-        ),
-      ],
     );
   }
 }
