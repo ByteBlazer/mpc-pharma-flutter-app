@@ -21,11 +21,41 @@ DateTime leaveEarliestAllowedDate() =>
 DateTime leaveLatestAllowedDate() =>
     istToday().add(Duration(days: leaveMaxForwardDays));
 
-String formatLeaveDate(DateTime date) {
+String formatLeaveDateForApi(DateTime date) {
   final y = date.year.toString().padLeft(4, '0');
   final m = date.month.toString().padLeft(2, '0');
   final d = date.day.toString().padLeft(2, '0');
   return '$y-$m-$d';
+}
+
+/// Display format for leave screens and modals.
+String formatLeaveDate(DateTime date) {
+  final d = date.day.toString().padLeft(2, '0');
+  final m = date.month.toString().padLeft(2, '0');
+  final y = date.year.toString().padLeft(4, '0');
+  return '$d-$m-$y';
+}
+
+String formatLeaveDateString(String apiDate) {
+  final parsed = parseLeaveDate(apiDate);
+  if (parsed == null) return apiDate;
+  return formatLeaveDate(parsed);
+}
+
+String leaveDateRangeLabel(LeaveRequest leave) {
+  final from = formatLeaveDateString(leave.fromDate);
+  final to = formatLeaveDateString(leave.toDate);
+  return leave.isSingleDay ? from : '$from → $to';
+}
+
+String formatLeaveDateTimeDisplay(DateTime dateTime) {
+  final local = dateTime.toLocal();
+  final date = formatLeaveDate(
+    DateTime(local.year, local.month, local.day),
+  );
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$date $hour:$minute';
 }
 
 DateTime? parseLeaveDate(String value) {
@@ -149,15 +179,19 @@ String leavesToCsv(List<LeaveRequest> leaves) {
         leave.requesterName,
         leave.departmentName,
         leave.nominatedApproverName,
-        leave.fromDate,
-        leave.toDate,
+        leave.fromDateDisplay,
+        leave.toDateDisplay,
         leave.leaveSession.label,
         leave.status.label,
         leave.requestComment,
         leave.actedByName ?? '',
         leave.actionComment ?? '',
-        leave.actionAt?.toIso8601String() ?? '',
-        leave.createdAt?.toIso8601String() ?? '',
+        leave.actionAt == null
+            ? ''
+            : formatLeaveDateTimeDisplay(leave.actionAt!),
+        leave.createdAt == null
+            ? ''
+            : formatLeaveDateTimeDisplay(leave.createdAt!),
       ],
     ),
   ];

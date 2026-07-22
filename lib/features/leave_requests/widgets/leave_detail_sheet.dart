@@ -134,40 +134,15 @@ class _LeaveDetailSheetState extends State<LeaveDetailSheet> {
     required String title,
     required bool required,
     String? hint,
-  }) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
+  }) {
+    return showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          maxLines: 4,
-          minLines: 3,
-          maxLength: 500,
-          decoration: InputDecoration(
-            hintText: hint,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final text = controller.text.trim();
-              if (required && text.isEmpty) return;
-              Navigator.of(context).pop(text);
-            },
-            child: const Text('Confirm'),
-          ),
-        ],
+      builder: (context) => _LeaveActionCommentDialog(
+        title: title,
+        required: required,
+        hint: hint,
       ),
     );
-    controller.dispose();
-    return result;
   }
 
   Future<void> _approve() async {
@@ -284,12 +259,15 @@ class _LeaveDetailSheetState extends State<LeaveDetailSheet> {
           if (leave.actionAt != null)
             _DetailRow(
               label: 'Action at',
-              value: leave.actionAt!.toLocal().toString(),
+              value: formatLeaveDateTimeDisplay(leave.actionAt!),
             ),
           const SizedBox(height: 16),
           if (_canWithdraw)
             OutlinedButton(
               onPressed: _isSubmitting ? null : _withdraw,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
               child: const Text('Withdraw request'),
             ),
           if (_canApproveOrReject) ...[
@@ -300,6 +278,8 @@ class _LeaveDetailSheetState extends State<LeaveDetailSheet> {
                     onPressed: _isSubmitting ? null : _reject,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFC62828),
+                      minimumSize: const Size.fromHeight(48),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     child: const Text('Reject'),
                   ),
@@ -308,6 +288,10 @@ class _LeaveDetailSheetState extends State<LeaveDetailSheet> {
                 Expanded(
                   child: FilledButton(
                     onPressed: _isSubmitting ? null : _approve,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                     child: const Text('Approve'),
                   ),
                 ),
@@ -316,6 +300,69 @@ class _LeaveDetailSheetState extends State<LeaveDetailSheet> {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _LeaveActionCommentDialog extends StatefulWidget {
+  const _LeaveActionCommentDialog({
+    required this.title,
+    required this.required,
+    this.hint,
+  });
+
+  final String title;
+  final bool required;
+  final String? hint;
+
+  @override
+  State<_LeaveActionCommentDialog> createState() =>
+      _LeaveActionCommentDialogState();
+}
+
+class _LeaveActionCommentDialogState extends State<_LeaveActionCommentDialog> {
+  late final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) {
+        final comment = _controller.text.trim();
+        final canConfirm = !widget.required || comment.isNotEmpty;
+        return AlertDialog(
+          title: Text(widget.title),
+          content: TextField(
+            controller: _controller,
+            autofocus: true,
+            maxLines: 4,
+            minLines: 3,
+            maxLength: 500,
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: canConfirm
+                  ? () => Navigator.of(context).pop(comment)
+                  : null,
+              child: const Text('Confirm'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -23,7 +23,9 @@ class TicketAudioRecorderButton extends StatefulWidget {
   });
 
   final TicketAttachmentManager attachmentManager;
-  final VoidCallback onChanged;
+
+  /// [voiceSaved] is true when a voice clip was saved, false when discarded.
+  final void Function({required bool voiceSaved}) onChanged;
   final bool enabled;
 
   /// Unused; kept for call-site compatibility.
@@ -102,7 +104,7 @@ class TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
       _activeEncoder = result.encoder;
       _voiceDuration = result.duration;
     });
-    widget.onChanged();
+    widget.onChanged(voiceSaved: result.attachment != null);
   }
 
   @override

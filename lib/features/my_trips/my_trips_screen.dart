@@ -283,26 +283,53 @@ class _MyTripCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(
-                    text: 'Trip ',
-                    style: TextStyle(
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w600,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(
+                          text: 'Trip ',
+                          style: TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        TextSpan(
+                          text: '#${trip.tripId}',
+                          style: TextStyle(
+                            color: primary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  TextSpan(
-                    text: '#${trip.tripId}',
-                    style: TextStyle(
-                      color: primary,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: enabled ? onAction : null,
+                  icon: Icon(
+                    trip.isScheduled ? Icons.play_arrow : Icons.replay,
+                    size: 18,
+                  ),
+                  label: Text(actionLabel),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: primary.withValues(alpha: 0.5),
+                    disabledForegroundColor: Colors.white70,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             _Meta(icon: Icons.route_outlined, text: trip.route),
@@ -331,14 +358,6 @@ class _MyTripCard extends StatelessWidget {
                 ].join(' '),
                 compact: true,
               ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: enabled ? onAction : null,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: Text(actionLabel),
-            ),
           ],
         ),
       ),
