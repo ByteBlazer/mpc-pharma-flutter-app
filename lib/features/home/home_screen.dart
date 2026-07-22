@@ -685,7 +685,7 @@ class _HomeFeatureGrid extends StatelessWidget {
                     const SizedBox(height: 28),
                   if (tripsTiles.isNotEmpty)
                     _buildTileSection(
-                      title: 'Scheduled Trips',
+                      title: 'Trips',
                       tiles: tripsTiles,
                       tileWidth: tileWidth,
                       columns: columns,

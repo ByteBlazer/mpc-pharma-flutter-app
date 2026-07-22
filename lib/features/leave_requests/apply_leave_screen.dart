@@ -179,8 +179,8 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
         body: ApplyLeaveRequest(
           departmentId: departmentId,
           nominatedApproverAppUserId: approverId,
-          fromDate: formatLeaveDate(fromDate),
-          toDate: formatLeaveDate(toDate),
+          fromDate: formatLeaveDateForApi(fromDate),
+          toDate: formatLeaveDateForApi(toDate),
           leaveSession: _leaveSession,
           comment: _commentController.text,
         ),

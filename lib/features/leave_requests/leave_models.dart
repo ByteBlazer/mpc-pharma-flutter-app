@@ -118,8 +118,18 @@ class LeaveRequest {
 
   bool get isSingleDay => fromDate == toDate;
 
+  String get fromDateDisplay => _formatApiDateForDisplay(fromDate);
+
+  String get toDateDisplay => _formatApiDateForDisplay(toDate);
+
   String get dateRangeLabel =>
-      isSingleDay ? fromDate : '$fromDate → $toDate';
+      isSingleDay ? fromDateDisplay : '$fromDateDisplay → $toDateDisplay';
+
+  static String _formatApiDateForDisplay(String apiDate) {
+    final parts = apiDate.trim().split('-');
+    if (parts.length != 3 || parts[0].length != 4) return apiDate;
+    return '${parts[2]}-${parts[1]}-${parts[0]}';
+  }
 
   bool matchesSearch(String query) {
     final normalized = query.trim().toLowerCase();

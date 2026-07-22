@@ -8,6 +8,21 @@ import '../ticket_models.dart';
 import 'ticket_audio_recorder_button.dart';
 import 'ticket_camera_capture.dart';
 
+const kVoiceClipAttachedMarker = '[Voice Clip Attached]';
+
+void applyVoiceClipAttachedMarker(TextEditingController controller) {
+  final text = controller.text;
+  if (text.contains(kVoiceClipAttachedMarker)) return;
+  controller.text = text.isEmpty
+      ? kVoiceClipAttachedMarker
+      : '$kVoiceClipAttachedMarker$text';
+}
+
+void removeVoiceClipAttachedMarker(TextEditingController controller) {
+  if (!controller.text.contains(kVoiceClipAttachedMarker)) return;
+  controller.text = controller.text.replaceAll(kVoiceClipAttachedMarker, '');
+}
+
 class TicketDescriptionField extends StatelessWidget {
   const TicketDescriptionField({
     super.key,
@@ -263,6 +278,23 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
 
   bool get _canEdit => widget.enabled && !widget.isSubmitting;
 
+  TextEditingController? get _textController => widget.controller;
+
+  void _syncVoiceClipMarker({required bool voiceSaved}) {
+    final controller = _textController;
+    if (controller == null) return;
+    if (voiceSaved) {
+      applyVoiceClipAttachedMarker(controller);
+    } else {
+      removeVoiceClipAttachedMarker(controller);
+    }
+  }
+
+  void _handleVoiceRecordingChanged({required bool voiceSaved}) {
+    _syncVoiceClipMarker(voiceSaved: voiceSaved);
+    widget.onAttachmentsChanged();
+  }
+
   Future<void> _pickFiles() async {
     try {
       final result = await FilePicker.pickFiles(
@@ -336,9 +368,14 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
   Future<void> _removeAttachment(PendingTicketAttachment attachment) async {
     if (_removingIds.contains(attachment.attachmentId)) return;
 
+    final wasAudio = attachment.isAudio;
     setState(() => _removingIds.add(attachment.attachmentId));
     try {
       await widget.attachmentManager.removeUnlinked(attachment.attachmentId);
+      if (wasAudio) {
+        final controller = _textController;
+        if (controller != null) removeVoiceClipAttachedMarker(controller);
+      }
       widget.onAttachmentsChanged();
     } catch (error) {
       if (!mounted) return;
@@ -495,7 +532,7 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                   TicketAudioRecorderButton(
                     key: _audioRecorderKey,
                     attachmentManager: widget.attachmentManager,
-                    onChanged: widget.onAttachmentsChanged,
+                    onChanged: _handleVoiceRecordingChanged,
                     enabled: _canEdit && !isBusy,
                     compact: true,
                   ),
