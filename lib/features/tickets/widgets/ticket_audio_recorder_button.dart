@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+import '../../../app_theme.dart';
 import '../ticket_attachment_manager.dart';
 import '../ticket_models.dart';
 
@@ -117,6 +118,7 @@ class TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
     }
 
     final primary = Theme.of(context).colorScheme.primary;
+    final accent = AppTheme.primaryAccentText(primary);
 
     return IconButton(
       tooltip: _hasVoice ? 'Review voice message' : 'Record voice message',
@@ -127,7 +129,7 @@ class TicketAudioRecorderButtonState extends State<TicketAudioRecorderButton> {
         backgroundColor: primary,
         child: Icon(
           Icons.mic_none,
-          color: Theme.of(context).colorScheme.onPrimary,
+          color: accent,
         ),
       ),
     );

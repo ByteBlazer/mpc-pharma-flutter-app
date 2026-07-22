@@ -36,7 +36,7 @@ class AppNotification {
 
   bool get canNavigate {
     if (referenceId.trim().isEmpty) return false;
-    return module == 'TICKET';
+    return module == 'TICKET' || module == 'LEAVE';
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../widgets/app_snack_bar.dart';
+import '../leave_requests/leave_requests_screen.dart';
 import '../tickets/ticket_detail_screen.dart';
 import 'notification_models.dart';
 
@@ -14,33 +15,58 @@ Future<void> openNotificationTarget({
   final module = notification.module.trim().toUpperCase();
   final referenceId = notification.referenceId.trim();
 
-  if (module != 'TICKET' || referenceId.isEmpty) {
-    return;
-  }
+  if (referenceId.isEmpty) return;
 
-  try {
-    await apiClient.getTicket(ticketId: referenceId, isEmployeeView: true);
-  } catch (error) {
+  if (module == 'TICKET') {
+    try {
+      await apiClient.getTicket(ticketId: referenceId, isEmployeeView: true);
+    } catch (error) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Unable to open ticket $referenceId.',
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
+
     if (!context.mounted) return;
-    showAppSnackBar(
-      context,
-      message: 'Unable to open ticket $referenceId.',
-      type: AppSnackBarType.error,
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => TicketDetailScreen(
+          apiClient: apiClient,
+          ticketId: referenceId,
+          isEmployeeView: true,
+          onLoginAgain: onLoginAgain,
+        ),
+      ),
     );
     return;
   }
 
-  if (!context.mounted) return;
-  await Navigator.of(context).push<void>(
-    MaterialPageRoute<void>(
-      builder: (_) => TicketDetailScreen(
-        apiClient: apiClient,
-        ticketId: referenceId,
-        isEmployeeView: true,
-        onLoginAgain: onLoginAgain,
+  if (module == 'LEAVE') {
+    final leaveId = int.tryParse(referenceId);
+    if (leaveId == null) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Unable to open leave request $referenceId.',
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
+
+    if (!context.mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => LeaveRequestsScreen(
+          apiClient: apiClient,
+          onLoginAgain: onLoginAgain,
+          initialLeaveId: leaveId,
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 String formatNotificationTimestamp(DateTime dateTime) {
