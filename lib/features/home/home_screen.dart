@@ -14,6 +14,7 @@ import '../../widgets/simulation_mode_banner.dart';
 import '../auth/impersonate_screen.dart';
 import '../customers/customers_screen.dart';
 import '../departments/departments_screen.dart';
+import '../leave_requests/leave_requests_screen.dart';
 import '../locations/locations_screen.dart';
 import '../notifications/notification_inbox_controller.dart';
 import '../notifications/notifications_screen.dart';
@@ -320,6 +321,8 @@ class _HomeFeatureGrid extends StatelessWidget {
         !isSimulationMode && await JwtPayload.canStartImpersonation();
     final hasWebAccess = await JwtPayload.currentUserHasWebAccess();
     final showTickets = hasWebAccess;
+    final showLeaveRequests =
+        hasWebAccess && !await JwtPayload.currentUserIsCustomer();
     final showComplaints = await JwtPayload.currentUserIsCustomer();
     final showSettings = await JwtPayload.currentUserIsAppAdmin();
     final showNotifications = hasWebAccess;
@@ -333,6 +336,7 @@ class _HomeFeatureGrid extends StatelessWidget {
     return _HomeFeatureVisibility(
       showImpersonate: showImpersonate,
       showTickets: showTickets,
+      showLeaveRequests: showLeaveRequests,
       showComplaints: showComplaints,
       showSettings: showSettings,
       showNotifications: showNotifications,
@@ -373,6 +377,21 @@ class _HomeFeatureGrid extends StatelessWidget {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => TicketsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showLeaveRequests)
+        _FeatureTile(
+          icon: Icons.event_busy_outlined,
+          label: 'Leave Requests',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => LeaveRequestsScreen(
                   apiClient: apiClient,
                   onLoginAgain: onLoginAgain,
                 ),
@@ -686,6 +705,7 @@ class _HomeFeatureVisibility {
   const _HomeFeatureVisibility({
     required this.showImpersonate,
     required this.showTickets,
+    required this.showLeaveRequests,
     required this.showComplaints,
     required this.showSettings,
     required this.showNotifications,
@@ -698,6 +718,7 @@ class _HomeFeatureVisibility {
 
   final bool showImpersonate;
   final bool showTickets;
+  final bool showLeaveRequests;
   final bool showComplaints;
   final bool showSettings;
   final bool showNotifications;

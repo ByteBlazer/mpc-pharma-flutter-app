@@ -6,6 +6,7 @@ import '../../../app_theme.dart';
 import '../ticket_attachment_manager.dart';
 import '../ticket_models.dart';
 import 'ticket_audio_recorder_button.dart';
+import 'ticket_camera_capture.dart';
 
 class TicketDescriptionField extends StatelessWidget {
   const TicketDescriptionField({
@@ -14,7 +15,8 @@ class TicketDescriptionField extends StatelessWidget {
     required this.attachmentManager,
     required this.onAttachmentsChanged,
     this.labelText = 'Description',
-    this.hintText = 'Write a description…',
+    this.hintText =
+        'Write a description or record a voice message by clicking the microphone icon below…..',
     this.minLines = 4,
     this.maxLines = 12,
     this.enabled = true,
@@ -104,9 +106,9 @@ class TicketAttachmentPicker extends StatelessWidget {
       onChanged();
     } catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }
 
@@ -160,7 +162,9 @@ class TicketAttachmentList extends StatelessWidget {
               : IconButton(
                   tooltip: 'Remove attachment',
                   onPressed: () async {
-                    await attachmentManager.removeUnlinked(attachment.attachmentId);
+                    await attachmentManager.removeUnlinked(
+                      attachment.attachmentId,
+                    );
                     onRemove?.call();
                   },
                   icon: const Icon(Icons.close),
@@ -268,33 +272,64 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
       if (result == null) return;
 
       for (final file in result.files) {
-        final placeholder = _ComposerUploadPlaceholder(
-          id: UniqueKey(),
+        await _uploadWithPlaceholder(
           fileName: file.name,
+          upload: () => widget.attachmentManager.uploadPlatformFile(file),
         );
-        setState(() => _uploading.add(placeholder));
-
-        try {
-          await widget.attachmentManager.uploadPlatformFile(file);
-          widget.onAttachmentsChanged();
-        } catch (error) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(error.toString())),
-          );
-        } finally {
-          if (mounted) {
-            setState(() {
-              _uploading.removeWhere((item) => item.id == placeholder.id);
-            });
-          }
-        }
       }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  Future<void> _capturePhoto() async {
+    try {
+      final capture = await captureTicketPhoto();
+      if (capture == null || !mounted) return;
+
+      await _uploadWithPlaceholder(
+        fileName: capture.fileName,
+        upload: () => widget.attachmentManager.uploadBytes(
+          fileName: capture.fileName,
+          mimeType: capture.mimeType,
+          bytes: capture.bytes,
+        ),
       );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  Future<void> _uploadWithPlaceholder({
+    required String fileName,
+    required Future<void> Function() upload,
+  }) async {
+    final placeholder = _ComposerUploadPlaceholder(
+      id: UniqueKey(),
+      fileName: fileName,
+    );
+    setState(() => _uploading.add(placeholder));
+
+    try {
+      await upload();
+      widget.onAttachmentsChanged();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploading.removeWhere((item) => item.id == placeholder.id);
+        });
+      }
     }
   }
 
@@ -307,9 +342,9 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
       widget.onAttachmentsChanged();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     } finally {
       if (mounted) {
         setState(() => _removingIds.remove(attachment.attachmentId));
@@ -318,9 +353,7 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
   }
 
   Future<void> _openDraftAttachment(PendingTicketAttachment attachment) async {
-    if (attachment.isAudio &&
-        widget.showAudioRecorder &&
-        _canEdit) {
+    if (attachment.isAudio && widget.showAudioRecorder && _canEdit) {
       await _audioRecorderKey.currentState?.openForVoiceClip(attachment);
       return;
     }
@@ -334,9 +367,9 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
       }
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }
 
@@ -408,8 +441,9 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                     ),
                   ),
                   ...pending.map((attachment) {
-                    final isRemoving =
-                        _removingIds.contains(attachment.attachmentId);
+                    final isRemoving = _removingIds.contains(
+                      attachment.attachmentId,
+                    );
                     final canOpen = !isBusy && !isRemoving;
                     return _ComposerAttachmentTile(
                       fileName: attachment.fileName,
@@ -437,6 +471,16 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             child: Row(
               children: [
+                IconButton(
+                  tooltip: 'Take photo',
+                  onPressed:
+                      !_canEdit ||
+                          isBusy ||
+                          !widget.attachmentManager.canAddMore
+                      ? null
+                      : _capturePhoto,
+                  icon: Icon(Icons.photo_camera_outlined, color: accent),
+                ),
                 IconButton(
                   tooltip: 'Add attachment',
                   onPressed:
@@ -467,8 +511,7 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                 if (widget.onSubmit != null)
                   IconButton(
                     tooltip: widget.submitTooltip,
-                    onPressed:
-                        widget.isSubmitting || isBusy
+                    onPressed: widget.isSubmitting || isBusy
                         ? null
                         : widget.onSubmit,
                     icon: widget.isSubmitting
@@ -521,7 +564,9 @@ class _ComposerAttachmentTile extends StatelessWidget {
     if (mime.startsWith('audio/')) return Icons.mic;
     if (mime.startsWith('image/')) return Icons.image_outlined;
     if (mime == 'application/pdf') return Icons.picture_as_pdf_outlined;
-    if (mime.contains('sheet') || mime.contains('excel') || mime.contains('csv')) {
+    if (mime.contains('sheet') ||
+        mime.contains('excel') ||
+        mime.contains('csv')) {
       return Icons.table_chart_outlined;
     }
     if (mime.contains('word') || mime.contains('document')) {
@@ -540,8 +585,8 @@ class _ComposerAttachmentTile extends StatelessWidget {
       message: isBusy
           ? (busyTooltip ?? fileName)
           : canOpen
-              ? (openTooltip ?? fileName)
-              : fileName,
+          ? (openTooltip ?? fileName)
+          : fileName,
       child: SizedBox(
         width: 64,
         height: 64,
@@ -558,7 +603,9 @@ class _ComposerAttachmentTile extends StatelessWidget {
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: primary.withValues(alpha: 0.22)),
+                      border: Border.all(
+                        color: primary.withValues(alpha: 0.22),
+                      ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(6, 10, 6, 6),
@@ -610,7 +657,11 @@ class _ComposerAttachmentTile extends StatelessWidget {
                     onTap: () => onRemove!(),
                     child: const Padding(
                       padding: EdgeInsets.all(2),
-                      child: Icon(Icons.cancel, size: 18, color: Colors.black54),
+                      child: Icon(
+                        Icons.cancel,
+                        size: 18,
+                        color: Colors.black54,
+                      ),
                     ),
                   ),
                 ),

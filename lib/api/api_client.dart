@@ -7,6 +7,7 @@ import '../app_environment.dart';
 import 'auth_models.dart';
 import 'auth_token_store.dart';
 import '../features/customers/customer_models.dart' hide JsonMap;
+import '../features/leave_requests/leave_models.dart' hide JsonMap;
 import '../features/departments/department_models.dart' hide JsonMap;
 import '../features/my_trips/my_trips_models.dart' hide JsonMap;
 import '../features/notifications/notification_models.dart' hide JsonMap;
@@ -1257,6 +1258,95 @@ class ApiClient {
       requiresAuth: true,
     );
     return Department.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<LeaveRequest> applyLeave({
+    String? token,
+    required ApplyLeaveRequest body,
+  }) async {
+    final response = await _post(
+      'leave',
+      token: token,
+      requiresAuth: true,
+      body: body.toJson(),
+    );
+    return LeaveRequest.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<LeaveListResponse> getMyLeaveRequests({String? token}) async {
+    final response = await _get(
+      'leave/my-requests',
+      token: token,
+      requiresAuth: true,
+    );
+    return LeaveListResponse.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<LeaveListResponse> getLeaveApprovalQueue({String? token}) async {
+    final response = await _get(
+      'leave/approval-queue',
+      token: token,
+      requiresAuth: true,
+    );
+    return LeaveListResponse.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<LeaveListResponse> getLeaveReport({
+    String? token,
+    String? departmentId,
+  }) async {
+    final trimmedDepartmentId = departmentId?.trim();
+    final response = await _get(
+      'leave/report',
+      token: token,
+      requiresAuth: true,
+      queryParameters:
+          trimmedDepartmentId == null || trimmedDepartmentId.isEmpty
+          ? null
+          : {'departmentId': trimmedDepartmentId},
+    );
+    return LeaveListResponse.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<LeaveRequest> approveLeave({
+    String? token,
+    required int leaveId,
+    String? comment,
+  }) async {
+    final trimmedComment = comment?.trim() ?? '';
+    final response = await _put(
+      'leave/$leaveId/approve',
+      token: token,
+      requiresAuth: true,
+      body: trimmedComment.isEmpty ? null : {'comment': trimmedComment},
+    );
+    return LeaveRequest.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<LeaveRequest> rejectLeave({
+    String? token,
+    required int leaveId,
+    required String comment,
+  }) async {
+    final response = await _put(
+      'leave/$leaveId/reject',
+      token: token,
+      requiresAuth: true,
+      body: {'comment': comment.trim()},
+    );
+    return LeaveRequest.fromJson(_decodeJsonObject(response.body));
+  }
+
+  Future<LeaveRequest> withdrawLeave({
+    String? token,
+    required int leaveId,
+  }) async {
+    final response = await _put(
+      'leave/$leaveId/withdraw',
+      token: token,
+      requiresAuth: true,
+    );
+    return LeaveRequest.fromJson(_decodeJsonObject(response.body));
   }
 
   Future<List<BackupFile>> listDatabaseBackups({String? token}) async {
