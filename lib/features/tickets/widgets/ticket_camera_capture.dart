@@ -3,6 +3,18 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'ticket_camera_availability_stub.dart'
+    if (dart.library.html) 'ticket_camera_availability_web.dart';
+
+final ImagePicker _ticketImagePicker = ImagePicker();
+Future<bool>? _ticketCameraAvailableFuture;
+
+/// Whether this device/platform can capture photos via [captureTicketPhoto].
+Future<bool> checkTicketCameraAvailable() {
+  return _ticketCameraAvailableFuture ??=
+      probeTicketCameraAvailable(_ticketImagePicker);
+}
+
 class TicketCameraCaptureResult {
   const TicketCameraCaptureResult({
     required this.bytes,

@@ -263,41 +263,44 @@ class _LeaveDetailSheetState extends State<LeaveDetailSheet> {
             ),
           const SizedBox(height: 16),
           if (_canWithdraw)
-            OutlinedButton(
+            OutlinedButton.icon(
               onPressed: _isSubmitting ? null : _withdraw,
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
               ),
-              child: const Text('Withdraw request'),
+              icon: const Icon(Icons.undo, size: 18),
+              label: const Text('Withdraw request'),
             ),
-          if (_canApproveOrReject) ...[
+          if (_canWithdraw && _canApproveOrReject) const SizedBox(height: 12),
+          if (_canApproveOrReject)
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
+                  child: OutlinedButton.icon(
                     onPressed: _isSubmitting ? null : _reject,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFC62828),
                       minimumSize: const Size.fromHeight(48),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('Reject'),
+                    icon: const Icon(Icons.close, size: 18),
+                    label: const Text('Reject'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: FilledButton(
+                  child: FilledButton.icon(
                     onPressed: _isSubmitting ? null : _approve,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(48),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('Approve'),
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Approve'),
                   ),
                 ),
               ],
             ),
-          ],
         ],
       ),
     );

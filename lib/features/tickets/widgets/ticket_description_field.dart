@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -275,10 +277,22 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
   final Set<String> _removingIds = {};
   final GlobalKey<TicketAudioRecorderButtonState> _audioRecorderKey =
       GlobalKey<TicketAudioRecorderButtonState>();
+  bool _showCameraButton = false;
 
   bool get _canEdit => widget.enabled && !widget.isSubmitting;
 
   TextEditingController? get _textController => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadCameraAvailability());
+  }
+
+  Future<void> _loadCameraAvailability() async {
+    final available = await checkTicketCameraAvailable();
+    if (mounted) setState(() => _showCameraButton = available);
+  }
 
   void _syncVoiceClipMarker({required bool voiceSaved}) {
     final controller = _textController;
@@ -508,16 +522,17 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             child: Row(
               children: [
-                IconButton(
-                  tooltip: 'Take photo',
-                  onPressed:
-                      !_canEdit ||
-                          isBusy ||
-                          !widget.attachmentManager.canAddMore
-                      ? null
-                      : _capturePhoto,
-                  icon: Icon(Icons.photo_camera_outlined, color: accent),
-                ),
+                if (_showCameraButton)
+                  IconButton(
+                    tooltip: 'Take photo',
+                    onPressed:
+                        !_canEdit ||
+                            isBusy ||
+                            !widget.attachmentManager.canAddMore
+                        ? null
+                        : _capturePhoto,
+                    icon: Icon(Icons.photo_camera_outlined, color: accent),
+                  ),
                 IconButton(
                   tooltip: 'Add attachment',
                   onPressed:
