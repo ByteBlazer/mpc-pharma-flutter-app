@@ -329,25 +329,43 @@ class _LeaveRequestsScreenState extends State<LeaveRequestsScreen>
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (tabs.length > 1)
-                        _LeaveTabBar(
-                          controller: _tabController!,
-                          labels: tabs.map(_tabLabel).toList(),
-                          primary: primary,
-                        ),
-                      if (tabs.length > 1) const SizedBox(height: 16),
                       AppSearchField(
                         controller: _searchController,
                         labelText: 'Search leave requests',
                         hintText: 'Requester, department, dates, status…',
                       ),
+                      if (tabs.length > 1) ...[
+                        const SizedBox(height: 16),
+                        _LeaveTabBar(
+                          controller: _tabController!,
+                          labels: tabs.map(_tabLabel).toList(),
+                          primary: primary,
+                        ),
+                      ],
                       if (currentTab == _LeaveTab.approvals) ...[
-                        const SizedBox(height: 8),
-                        FilterChip(
-                          label: const Text('Pending only'),
-                          selected: _pendingOnly,
-                          onSelected: (value) =>
-                              setState(() => _pendingOnly = value),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _LeaveApprovalFilterChip(
+                                label: 'Pending only',
+                                selected: _pendingOnly,
+                                primary: primary,
+                                onTap: () =>
+                                    setState(() => _pendingOnly = true),
+                              ),
+                              _LeaveApprovalFilterChip(
+                                label: 'All Requests',
+                                selected: !_pendingOnly,
+                                primary: primary,
+                                onTap: () =>
+                                    setState(() => _pendingOnly = false),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                       if (currentTab == _LeaveTab.report) ...[
@@ -544,6 +562,60 @@ class _LeaveRequestCard extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LeaveApprovalFilterChip extends StatelessWidget {
+  const _LeaveApprovalFilterChip({
+    required this.label,
+    required this.selected,
+    required this.primary,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Color primary;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: selected ? primary : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? primary : primary.withValues(alpha: 0.45),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                const Icon(Icons.check, size: 16, color: Colors.white),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : Colors.black87,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ),
         ),
       ),
