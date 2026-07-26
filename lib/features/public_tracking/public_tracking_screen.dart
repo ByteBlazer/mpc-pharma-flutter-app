@@ -237,10 +237,7 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                     ),
                     if (showTripDocuments) ...[
                       const SizedBox(height: 8),
-                      PublicTrackingTripDocuments(
-                        documents: tripDocuments,
-                        primaryDocId: tracking.docId,
-                      ),
+                      PublicTrackingTripDocuments(documents: tripDocuments),
                     ] else if (tracking.docId.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Text.rich(
@@ -370,7 +367,7 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                               TextSpan(
                                 text: tracking.numEnrouteCustomers == 1
                                     ? ' delivery to make before reaching you. The actual delivery time may be longer than estimated.'
-                                    : ' deliveries to make before reaching you. The actual delivery time may be longer than estimated.',
+                                    : ' other deliveries to make before reaching you. The actual delivery time may be longer than estimated.',
                               ),
                             ],
                           ),
