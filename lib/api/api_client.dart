@@ -18,6 +18,8 @@ import '../features/settings/backup_models.dart' hide JsonMap;
 import '../features/settings/setting_models.dart' hide JsonMap;
 import '../features/tickets/ticket_models.dart' hide JsonMap;
 import '../features/public_tracking/public_tracking_models.dart';
+import '../features/reports/delivery_report/delivery_report_models.dart'
+    hide JsonMap;
 import '../features/trip_dashboard/trip_dashboard_models.dart';
 import '../features/trips/trips_models.dart' hide JsonMap;
 import '../features/users/user_models.dart' hide JsonMap;
@@ -1291,6 +1293,116 @@ class ApiClient {
     return LeaveListResponse.fromJson(_decodeJsonObject(response.body));
   }
 
+  Future<List<String>> getRoutes({String? token}) async {
+    final response = await _get('routes', token: token, requiresAuth: true);
+    return _decodeJsonStringList(response.body);
+  }
+
+  Future<List<String>> getOriginWarehouses({String? token}) async {
+    final response = await _get(
+      'origin-warehouses',
+      token: token,
+      requiresAuth: true,
+    );
+    return _decodeJsonStringList(response.body);
+  }
+
+  Future<DeliveryReportCountResponse> getDeliveryReportCount({
+    String? token,
+    Map<String, String>? queryParameters,
+  }) async {
+    final response = await _get(
+      'report/delivery-report-data-count',
+      token: token,
+      requiresAuth: true,
+      queryParameters: queryParameters,
+    );
+    return DeliveryReportCountResponse.fromJson(
+      _decodeJsonObject(response.body),
+    );
+  }
+
+  Future<DeliveryReportDataResponse> getDeliveryReportData({
+    String? token,
+    Map<String, String>? queryParameters,
+  }) async {
+    final response = await _get(
+      'report/delivery-report-data',
+      token: token,
+      requiresAuth: true,
+      queryParameters: queryParameters,
+    );
+    return DeliveryReportDataResponse.fromJson(
+      _decodeJsonObject(response.body),
+    );
+  }
+
+  Future<DeliveryReportExcelDownload> downloadDeliveryReportExcel({
+    String? token,
+    Map<String, String>? queryParameters,
+  }) async {
+    final uri = _uri(
+      'report/delivery-report-data-excel',
+      queryParameters: queryParameters,
+    );
+    final authToken = await _resolveToken(token, requiresAuth: true);
+    final headers = <String, String>{
+      'Accept': '*/*',
+      if (authToken != null) 'Authorization': _authorizationValue(authToken),
+    };
+    final response = await _httpClient.get(uri, headers: headers);
+    final contentType = (response.headers['content-type'] ?? '').toLowerCase();
+
+    if (contentType.contains('spreadsheetml') ||
+        contentType.contains('octet-stream')) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw ApiException(
+          method: 'GET',
+          uri: uri,
+          statusCode: response.statusCode,
+          responseBody: response.body,
+        );
+      }
+      return DeliveryReportExcelDownload(
+        bytes: response.bodyBytes,
+        fileName: _extractDownloadFileName(response.headers['content-disposition']) ??
+            'delivery-report-${DateTime.now().millisecondsSinceEpoch}.xlsx',
+      );
+    }
+
+    throw ApiException(
+      method: 'GET',
+      uri: uri,
+      statusCode: response.statusCode,
+      responseBody: response.body,
+    );
+  }
+
+  Future<DocSignatureResult> getDocSignature({
+    String? token,
+    required String docId,
+  }) async {
+    try {
+      final response = await _get(
+        'doc/signature/${Uri.encodeComponent(docId.trim())}',
+        token: token,
+        requiresAuth: true,
+      );
+      final json = _decodeJsonObject(response.body);
+      return DocSignatureResult.found(
+        signature: json['signature']?.toString() ?? '',
+        lastUpdatedAt: DateTime.tryParse(
+          json['lastUpdatedAt']?.toString() ?? '',
+        ),
+      );
+    } on ApiException catch (error) {
+      if (error.statusCode == 404) {
+        return DocSignatureResult.notFound(error.toString());
+      }
+      rethrow;
+    }
+  }
+
   Future<LeaveListResponse> getLeaveReport({
     String? token,
     String? departmentId,
@@ -1577,6 +1689,37 @@ class ApiClient {
       return decoded.whereType<JsonMap>().toList();
     }
     throw FormatException('Expected JSON array response', body);
+  }
+
+  static List<String> _decodeJsonStringList(String body) {
+    if (body.trim().isEmpty) return const [];
+    final decoded = jsonDecode(body);
+    if (decoded is! List) {
+      throw FormatException('Expected JSON string array response', body);
+    }
+    return decoded
+        .map((value) => value?.toString() ?? '')
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  static String? _extractDownloadFileName(String? contentDisposition) {
+    final value = contentDisposition?.trim() ?? '';
+    if (value.isEmpty) return null;
+
+    final filenameStar = RegExp(
+      r"filename\*=UTF-8''([^;]+)",
+      caseSensitive: false,
+    ).firstMatch(value);
+    if (filenameStar != null) {
+      return Uri.decodeComponent(filenameStar.group(1)!.trim());
+    }
+
+    final filename = RegExp(
+      r'filename="?([^";]+)"?',
+      caseSensitive: false,
+    ).firstMatch(value);
+    return filename?.group(1)?.trim();
   }
 }
 

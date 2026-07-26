@@ -19,6 +19,7 @@ import '../locations/locations_screen.dart';
 import '../notifications/notification_inbox_controller.dart';
 import '../notifications/notifications_screen.dart';
 import '../queue/queue_screen.dart';
+import '../reports/reports_screen.dart';
 import '../scan/scan_screen.dart';
 import '../settings/settings_screen.dart';
 import '../tickets/tickets_screen.dart';
@@ -320,10 +321,12 @@ class _HomeFeatureGrid extends StatelessWidget {
     final showImpersonate =
         !isSimulationMode && await JwtPayload.canStartImpersonation();
     final hasWebAccess = await JwtPayload.currentUserHasWebAccess();
+    final isAppAdmin = await JwtPayload.currentUserIsAppAdmin();
+    final isCustomer = await JwtPayload.currentUserIsCustomer();
     final showTickets = hasWebAccess;
-    final showLeaveRequests =
-        hasWebAccess && !await JwtPayload.currentUserIsCustomer();
-    final showComplaints = await JwtPayload.currentUserIsCustomer();
+    final showLeaveRequests = hasWebAccess && !isCustomer;
+    final showReports = (hasWebAccess || isAppAdmin) && !isCustomer;
+    final showComplaints = isCustomer;
     final showSettings = await JwtPayload.currentUserIsAppAdmin();
     final showNotifications = hasWebAccess;
     final showCustomers = hasWebAccess;
@@ -337,6 +340,7 @@ class _HomeFeatureGrid extends StatelessWidget {
       showImpersonate: showImpersonate,
       showTickets: showTickets,
       showLeaveRequests: showLeaveRequests,
+      showReports: showReports,
       showComplaints: showComplaints,
       showSettings: showSettings,
       showNotifications: showNotifications,
@@ -392,6 +396,21 @@ class _HomeFeatureGrid extends StatelessWidget {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => LeaveRequestsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showReports)
+        _FeatureTile(
+          icon: Icons.assessment_outlined,
+          label: 'Reports',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ReportsScreen(
                   apiClient: apiClient,
                   onLoginAgain: onLoginAgain,
                 ),
@@ -706,6 +725,7 @@ class _HomeFeatureVisibility {
     required this.showImpersonate,
     required this.showTickets,
     required this.showLeaveRequests,
+    required this.showReports,
     required this.showComplaints,
     required this.showSettings,
     required this.showNotifications,
@@ -719,6 +739,7 @@ class _HomeFeatureVisibility {
   final bool showImpersonate;
   final bool showTickets;
   final bool showLeaveRequests;
+  final bool showReports;
   final bool showComplaints;
   final bool showSettings;
   final bool showNotifications;
