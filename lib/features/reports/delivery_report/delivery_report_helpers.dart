@@ -6,6 +6,26 @@ const deliveryReportMaxOnScreenRows = 10000;
 const deliveryReportLargeExportWarningThreshold = 5000;
 const deliveryReportCommentLinkMinLength = 60;
 const deliveryReportCommentPreviewMaxLines = 2;
+const deliveryReportStatusPillWidth = 128.0;
+
+String formatDeliveryReportCount(int value) {
+  final negative = value < 0;
+  final digits = value.abs().toString();
+  if (digits.length <= 3) {
+    return negative ? '-$digits' : digits;
+  }
+
+  final buffer = StringBuffer();
+  for (var index = 0; index < digits.length; index++) {
+    if (index > 0 && (digits.length - index) % 3 == 0) {
+      buffer.write(',');
+    }
+    buffer.write(digits[index]);
+  }
+
+  final formatted = buffer.toString();
+  return negative ? '-$formatted' : formatted;
+}
 
 /// Rolling one-calendar-month window ending today (IST calendar day).
 (DateTime fromDate, DateTime toDate) defaultDeliveryReportDateRange() {
@@ -48,8 +68,6 @@ String deliveryReportStatusLabel(String status) {
 
 int deliveryReportStatusColor(String status) {
   switch (status.toUpperCase()) {
-    case 'DELIVERED':
-      return 0xFF4CAF50;
     case 'UNDELIVERED':
       return 0xFFF44336;
     default:
@@ -59,12 +77,11 @@ int deliveryReportStatusColor(String status) {
 
 bool shouldShowDeliveryReportCommentLink({
   required DeliveryReportRow row,
-  required bool isTruncated,
 }) {
   if (!row.isUndelivered) return false;
   final comment = row.comment.trim();
   if (comment.isEmpty) return false;
-  return isTruncated || comment.length > deliveryReportCommentLinkMinLength;
+  return comment.length > deliveryReportCommentLinkMinLength;
 }
 
 String? validateDeliveryReportDateRange({
@@ -73,16 +90,74 @@ String? validateDeliveryReportDateRange({
 }) {
   if (fromDate == null && toDate == null) return null;
   if (fromDate == null || toDate == null) {
-    return 'Select both document dates together, or clear both to use defaults.';
+    return 'Select both from and to dates together, or clear both.';
   }
   if (fromDate.isAfter(toDate)) {
     return 'From date cannot be after to date.';
   }
   final inclusiveDays = toDate.difference(fromDate).inDays + 1;
   if (inclusiveDays > deliveryReportMaxDateRangeDays) {
-    return 'Document date range cannot exceed $deliveryReportMaxDateRangeDays days.';
+    return 'Document date range cannot exceed 1 month.';
   }
   return null;
+}
+
+bool hasDeliveryReportNonDateFilter({
+  String? customerId,
+  String? docId,
+  String? route,
+  String? originWarehouse,
+  String? tripStartLocation,
+  String? driverUserId,
+  Iterable<String> customerCities = const [],
+  String? tripId,
+}) {
+  bool hasValue(String? value) => value?.trim().isNotEmpty ?? false;
+
+  return hasValue(customerId) ||
+      hasValue(docId) ||
+      hasValue(route) ||
+      hasValue(originWarehouse) ||
+      hasValue(tripStartLocation) ||
+      hasValue(driverUserId) ||
+      hasValue(tripId) ||
+      customerCities.any((city) => city.trim().isNotEmpty);
+}
+
+String? validateDeliveryReportFilters({
+  required DateTime? fromDate,
+  required DateTime? toDate,
+  String? customerId,
+  String? docId,
+  String? route,
+  String? originWarehouse,
+  String? tripStartLocation,
+  String? driverUserId,
+  Iterable<String> customerCities = const [],
+  String? tripId,
+}) {
+  final dateError = validateDeliveryReportDateRange(
+    fromDate: fromDate,
+    toDate: toDate,
+  );
+  if (dateError != null) return dateError;
+
+  if (fromDate != null && toDate != null) return null;
+
+  if (hasDeliveryReportNonDateFilter(
+    customerId: customerId,
+    docId: docId,
+    route: route,
+    originWarehouse: originWarehouse,
+    tripStartLocation: tripStartLocation,
+    driverUserId: driverUserId,
+    customerCities: customerCities,
+    tripId: tripId,
+  )) {
+    return null;
+  }
+
+  return 'Select both document dates, or choose at least one other filter.';
 }
 
 Map<String, String> buildDeliveryReportQueryParameters({
