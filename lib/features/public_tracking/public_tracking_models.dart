@@ -26,6 +26,35 @@ class TrackingLocation {
   bool get hasCoordinates => lat != null && lng != null;
 }
 
+/// Another invoice on the same trip as the tracked document.
+///
+/// Returned by API#1 as optional `otherTripDocuments` — omitted on older backends.
+class TripTrackingDocument {
+  const TripTrackingDocument({
+    required this.docId,
+    required this.docAmountRaw,
+    required this.status,
+    this.comment = '',
+  });
+
+  factory TripTrackingDocument.fromJson(JsonMap json) {
+    return TripTrackingDocument(
+      docId: json['docId']?.toString() ?? '',
+      docAmountRaw: DocTrackingResponse.readAmount(json['docAmount']),
+      status: json['status']?.toString() ?? '',
+      comment: json['comment']?.toString() ?? '',
+    );
+  }
+
+  final String docId;
+  final String docAmountRaw;
+  final String status;
+  final String comment;
+
+  bool get isDelivered => status.toUpperCase() == 'DELIVERED';
+  bool get isUndelivered => status.toUpperCase() == 'UNDELIVERED';
+}
+
 class DocTrackingResponse {
   const DocTrackingResponse({
     required this.success,
@@ -44,6 +73,7 @@ class DocTrackingResponse {
     this.eta = -1,
     this.numEnrouteCustomers = -1,
     this.enrouteCustomersServiceTime,
+    this.otherTripDocuments = const [],
   });
 
   factory DocTrackingResponse.fromJson(JsonMap json) {
@@ -51,7 +81,7 @@ class DocTrackingResponse {
       success: json['success'] == true,
       message: formatApiMessage(json['message'], fallback: ''),
       docId: json['docId']?.toString() ?? '',
-      docAmountRaw: _readAmount(json['docAmount']),
+      docAmountRaw: DocTrackingResponse.readAmount(json['docAmount']),
       status: json['status']?.toString() ?? '',
       comment: json['comment']?.toString() ?? '',
       deliveryTimestamp: parseDate(json['deliveryTimestamp']),
@@ -70,6 +100,7 @@ class DocTrackingResponse {
       eta: asInt(json['eta']) ?? -1,
       numEnrouteCustomers: asInt(json['numEnrouteCustomers']) ?? -1,
       enrouteCustomersServiceTime: asInt(json['enrouteCustomersServiceTime']),
+      otherTripDocuments: _readOtherTripDocuments(json['otherTripDocuments']),
     );
   }
 
@@ -89,10 +120,32 @@ class DocTrackingResponse {
   final int eta;
   final int numEnrouteCustomers;
   final int? enrouteCustomersServiceTime;
+  final List<TripTrackingDocument> otherTripDocuments;
 
   bool get isDelivered => status.toUpperCase() == 'DELIVERED';
   bool get isUndelivered => status.toUpperCase() == 'UNDELIVERED';
   bool get isTerminal => isDelivered || isUndelivered;
+
+  /// True when API#1 includes sibling invoices on the same trip.
+  bool get hasOtherTripDocuments => otherTripDocuments.isNotEmpty;
+
+  /// Primary tracked invoice plus any siblings from [otherTripDocuments].
+  List<TripTrackingDocument> get allTripDocuments {
+    final primaryId = docId.trim();
+    final siblings = otherTripDocuments
+        .where((doc) => doc.docId.trim().isNotEmpty && doc.docId != primaryId)
+        .toList(growable: false);
+    if (primaryId.isEmpty) return siblings;
+    return [
+      TripTrackingDocument(
+        docId: docId,
+        docAmountRaw: docAmountRaw,
+        status: status,
+        comment: comment,
+      ),
+      ...siblings,
+    ];
+  }
 
   bool get hasMap =>
       (customerLocation?.hasCoordinates ?? false) ||
@@ -107,10 +160,22 @@ class DocTrackingResponse {
     ].where((part) => part.trim().isNotEmpty).join(' ');
   }
 
-  static String _readAmount(Object? value) {
+  static String readAmount(Object? value) {
     if (value == null) return '';
     if (value is num) return value.toString();
     return value.toString().trim();
+  }
+
+  static List<TripTrackingDocument> _readOtherTripDocuments(Object? value) {
+    if (value is! List) return const [];
+    final documents = <TripTrackingDocument>[];
+    for (final item in value) {
+      if (item is! JsonMap) continue;
+      final doc = TripTrackingDocument.fromJson(item);
+      if (doc.docId.trim().isEmpty) continue;
+      documents.add(doc);
+    }
+    return List<TripTrackingDocument>.unmodifiable(documents);
   }
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app_theme.dart';
 import '../leave_models.dart';
 
 class LeaveStatusChip extends StatelessWidget {
@@ -10,7 +11,7 @@ class LeaveStatusChip extends StatelessWidget {
   Color _color(BuildContext context) {
     return switch (status) {
       LeaveStatus.pending => const Color(0xFF1565C0),
-      LeaveStatus.approved => const Color(0xFF2E7D32),
+      LeaveStatus.approved => Theme.of(context).colorScheme.primary,
       LeaveStatus.rejected => const Color(0xFFC62828),
       LeaveStatus.withdrawn => Colors.black54,
     };
@@ -19,18 +20,20 @@ class LeaveStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _color(context);
+    final isApproved = status == LeaveStatus.approved;
+
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: isApproved ? color : color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color, width: 1.5),
+        border: isApproved ? null : Border.all(color: color, width: 1.5),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         child: Text(
           status.label,
           style: TextStyle(
-            color: color,
+            color: isApproved ? AppTheme.onBrandBackground : color,
             fontWeight: FontWeight.w700,
             fontSize: 13,
           ),

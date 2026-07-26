@@ -11,6 +11,7 @@ import '../trip_dashboard/trip_dashboard_models.dart';
 import 'public_tracking_helpers.dart';
 import 'public_tracking_map.dart';
 import 'public_tracking_models.dart';
+import 'public_tracking_trip_documents.dart';
 
 class PublicTrackingScreen extends StatefulWidget {
   const PublicTrackingScreen({super.key, this.token, ApiClient? apiClient})
@@ -184,7 +185,10 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
     final status = publicTrackingStatusDisplay(tracking.status);
     final amount = formatPublicTrackingAmount(tracking.docAmountRaw);
     final deliveringTo = tracking.deliveringTo;
+    final tripDocuments = tracking.allTripDocuments;
+    final showTripDocuments = tracking.hasOtherTripDocuments;
     final showTrackingComment =
+        !showTripDocuments &&
         tracking.comment.trim().isNotEmpty &&
         !(tracking.isTerminal && _deliveryStatus != null);
     final mapMessage = publicTrackingMapMessage(
@@ -231,7 +235,13 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                         ),
                       ],
                     ),
-                    if (tracking.docId.isNotEmpty) ...[
+                    if (showTripDocuments) ...[
+                      const SizedBox(height: 8),
+                      PublicTrackingTripDocuments(
+                        documents: tripDocuments,
+                        primaryDocId: tracking.docId,
+                      ),
+                    ] else if (tracking.docId.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Text.rich(
                         TextSpan(
