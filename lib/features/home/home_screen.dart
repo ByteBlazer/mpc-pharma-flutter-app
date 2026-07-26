@@ -357,17 +357,17 @@ class _HomeFeatureGrid extends StatelessWidget {
     _HomeFeatureVisibility visibility,
   ) {
     return [
-      if (visibility.showImpersonate)
+      if (visibility.showNotifications)
         _FeatureTile(
-          icon: Icons.manage_accounts_outlined,
-          label: 'Simulate Other User',
+          icon: Icons.notifications_outlined,
+          label: 'Notifications',
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => ImpersonateScreen(
+                builder: (_) => NotificationsScreen(
                   apiClient: apiClient,
                   onLoginAgain: onLoginAgain,
-                  onSessionReplaced: onSessionReplaced,
+                  inboxController: notificationInbox,
                 ),
               ),
             );
@@ -418,22 +418,6 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
-      if (visibility.showNotifications)
-        _FeatureTile(
-          icon: Icons.notifications_outlined,
-          label: 'Notifications',
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => NotificationsScreen(
-                  apiClient: apiClient,
-                  onLoginAgain: onLoginAgain,
-                  inboxController: notificationInbox,
-                ),
-              ),
-            );
-          },
-        ),
       if (visibility.showComplaints)
         _FeatureTile(
           icon: Icons.support_agent_outlined,
@@ -449,7 +433,7 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
-      if (visibility.showSettings) ...[
+      if (visibility.showSettings)
         _FeatureTile(
           icon: Icons.people_alt_outlined,
           label: 'Users',
@@ -464,6 +448,7 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
+      if (visibility.showSettings)
         _FeatureTile(
           icon: Icons.business_outlined,
           label: 'Departments',
@@ -478,7 +463,6 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
-      ],
       if (visibility.showCustomers)
         _FeatureTile(
           icon: Icons.storefront_outlined,
@@ -494,7 +478,7 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
-      if (visibility.showSettings) ...[
+      if (visibility.showSettings)
         _FeatureTile(
           icon: Icons.map_outlined,
           label: 'Locations',
@@ -509,6 +493,7 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
+      if (visibility.showSettings)
         _FeatureTile(
           icon: Icons.settings_outlined,
           label: 'Settings',
@@ -523,7 +508,22 @@ class _HomeFeatureGrid extends StatelessWidget {
             );
           },
         ),
-      ],
+      if (visibility.showImpersonate)
+        _FeatureTile(
+          icon: Icons.manage_accounts_outlined,
+          label: 'Simulate Other User',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ImpersonateScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                  onSessionReplaced: onSessionReplaced,
+                ),
+              ),
+            );
+          },
+        ),
     ];
   }
 

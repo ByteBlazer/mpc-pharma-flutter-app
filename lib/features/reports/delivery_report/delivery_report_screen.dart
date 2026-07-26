@@ -7,9 +7,11 @@ import '../../customers/customer_models.dart';
 import '../../leave_requests/leave_helpers.dart';
 import '../../users/user_models.dart';
 import '../../../utils/download_file.dart';
+import '../../../widgets/app_date_picker.dart';
 import '../../../widgets/app_load_error_state.dart';
 import '../../../widgets/app_multi_select_field.dart';
 import '../../../widgets/app_screen_scaffold.dart';
+import '../../../widgets/app_scrollbar.dart';
 import '../../../widgets/app_snack_bar.dart';
 import '../../../widgets/app_surface.dart';
 import 'delivery_report_helpers.dart';
@@ -52,6 +54,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
   bool _loadingCount = false;
   bool _loadingData = false;
   bool _downloadingExcel = false;
+  final _narrowFormScrollController = ScrollController();
 
   @override
   void initState() {
@@ -62,6 +65,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
 
   @override
   void dispose() {
+    _narrowFormScrollController.dispose();
     _docIdController.dispose();
     _tripIdController.dispose();
     super.dispose();
@@ -323,7 +327,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
 
   Future<void> _pickFromDate() async {
     final initial = _fromDate ?? istToday();
-    final picked = await showDatePicker(
+    final picked = await showAppDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
@@ -341,7 +345,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
 
   Future<void> _pickToDate() async {
     final initialFrom = _fromDate ?? istToday();
-    final picked = await showDatePicker(
+    final picked = await showAppDatePicker(
       context: context,
       initialDate: _toDate ?? initialFrom,
       firstDate: initialFrom,
@@ -393,53 +397,135 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
             final showTable = isWide && _rows.isNotEmpty && !_loadingData;
             final showTableLoading = isWide && _loadingData;
 
+            final filtersCard = _FiltersCard(
+              formData: formData,
+              fromDate: _fromDate,
+              toDate: _toDate,
+              customerId: _customerId,
+              route: _route,
+              originWarehouse: _originWarehouse,
+              tripStartLocation: _tripStartLocation,
+              driverUserId: _driverUserId,
+              selectedCities: _selectedCities,
+              docIdController: _docIdController,
+              tripIdController: _tripIdController,
+              isWide: isWide,
+              enabled: !isBusy,
+              onPickFromDate: _pickFromDate,
+              onPickToDate: _pickToDate,
+              onClearDates: _clearDates,
+              onCustomerChanged: (value) =>
+                  _onFiltersChanged(() => _customerId = value),
+              onRouteChanged: (value) =>
+                  _onFiltersChanged(() => _route = value),
+              onOriginWarehouseChanged: (value) =>
+                  _onFiltersChanged(() => _originWarehouse = value),
+              onTripStartLocationChanged: (value) =>
+                  _onFiltersChanged(() => _tripStartLocation = value),
+              onDriverChanged: (value) =>
+                  _onFiltersChanged(() => _driverUserId = value),
+              onCitiesChanged: (values) => _onFiltersChanged(() {
+                _selectedCities
+                  ..clear()
+                  ..addAll(values);
+              }),
+              onFilterEdited: () => _onFiltersChanged(() {}),
+            );
+
+            final actionsRow = _ActionsRow(
+              isBusy: isBusy,
+              loadingCount: _loadingCount,
+              loadingData: _loadingData,
+              downloadingExcel: _downloadingExcel,
+              showViewReport: isWide,
+              onViewReport: () => _viewReport(allowGrid: isWide),
+              onDownloadExcel: _downloadExcel,
+              onReset: _resetFilters,
+            );
+
+            if (!isWide) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          AppScrollbar(
+                            controller: _narrowFormScrollController,
+                            child: SingleChildScrollView(
+                              controller: _narrowFormScrollController,
+                              padding: const EdgeInsets.only(bottom: 8, right: 18),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 1200),
+                                  child: filtersCard,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            height: 20,
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Theme.of(context)
+                                          .scaffoldBackgroundColor
+                                          .withValues(alpha: 0),
+                                      Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.05),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 12, 0, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_resultStatus != null) ...[
+                              _DeliveryReportStatusBanner(
+                                status: _resultStatus!,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            const _DeliveryReportNarrowHint(),
+                            const SizedBox(height: 12),
+                            actionsRow,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
             final filtersAndActions = Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _FiltersCard(
-                  formData: formData,
-                  fromDate: _fromDate,
-                  toDate: _toDate,
-                  customerId: _customerId,
-                  route: _route,
-                  originWarehouse: _originWarehouse,
-                  tripStartLocation: _tripStartLocation,
-                  driverUserId: _driverUserId,
-                  selectedCities: _selectedCities,
-                  docIdController: _docIdController,
-                  tripIdController: _tripIdController,
-                  isWide: isWide,
-                  enabled: !isBusy,
-                  onPickFromDate: _pickFromDate,
-                  onPickToDate: _pickToDate,
-                  onClearDates: _clearDates,
-                  onCustomerChanged: (value) =>
-                      _onFiltersChanged(() => _customerId = value),
-                  onRouteChanged: (value) =>
-                      _onFiltersChanged(() => _route = value),
-                  onOriginWarehouseChanged: (value) =>
-                      _onFiltersChanged(() => _originWarehouse = value),
-                  onTripStartLocationChanged: (value) =>
-                      _onFiltersChanged(() => _tripStartLocation = value),
-                  onDriverChanged: (value) =>
-                      _onFiltersChanged(() => _driverUserId = value),
-                  onCitiesChanged: (values) => _onFiltersChanged(() {
-                    _selectedCities
-                      ..clear()
-                      ..addAll(values);
-                  }),
-                  onFilterEdited: () => _onFiltersChanged(() {}),
-                ),
+                filtersCard,
                 const SizedBox(height: 16),
-                _ActionsRow(
-                  isBusy: isBusy,
-                  loadingCount: _loadingCount,
-                  loadingData: _loadingData,
-                  downloadingExcel: _downloadingExcel,
-                  onViewReport: () => _viewReport(allowGrid: isWide),
-                  onDownloadExcel: _downloadExcel,
-                  onReset: _resetFilters,
-                ),
+                actionsRow,
                 if (_resultStatus != null) ...[
                   const SizedBox(height: 16),
                   _DeliveryReportStatusBanner(status: _resultStatus!),
@@ -928,6 +1014,7 @@ class _ActionsRow extends StatelessWidget {
     required this.loadingCount,
     required this.loadingData,
     required this.downloadingExcel,
+    required this.showViewReport,
     required this.onViewReport,
     required this.onDownloadExcel,
     required this.onReset,
@@ -937,6 +1024,7 @@ class _ActionsRow extends StatelessWidget {
   final bool loadingCount;
   final bool loadingData;
   final bool downloadingExcel;
+  final bool showViewReport;
   final VoidCallback onViewReport;
   final VoidCallback onDownloadExcel;
   final VoidCallback onReset;
@@ -947,6 +1035,35 @@ class _ActionsRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
       textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
     );
+
+    final downloadButton = FilledButton.icon(
+      onPressed: isBusy ? null : onDownloadExcel,
+      style: actionButtonStyle,
+      icon: downloadingExcel
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.download_outlined, size: 20),
+      label: Text(downloadingExcel ? 'Downloading...' : 'Download Excel'),
+    );
+
+    final resetButton = TextButton(
+      onPressed: isBusy ? null : onReset,
+      child: const Text('Reset filters'),
+    );
+
+    if (!showViewReport) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(width: double.infinity, child: downloadButton),
+          Align(alignment: Alignment.centerLeft, child: resetButton),
+        ],
+      );
+    }
 
     return Wrap(
       spacing: 12,
@@ -971,27 +1088,27 @@ class _ActionsRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            FilledButton.icon(
-              onPressed: isBusy ? null : onDownloadExcel,
-              style: actionButtonStyle,
-              icon: downloadingExcel
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.download_outlined, size: 20),
-              label: Text(
-                downloadingExcel ? 'Downloading...' : 'Download Excel',
-              ),
-            ),
+            downloadButton,
           ],
         ),
-        TextButton(
-          onPressed: isBusy ? null : onReset,
-          child: const Text('Reset filters'),
-        ),
+        resetButton,
       ],
+    );
+  }
+}
+
+class _DeliveryReportNarrowHint extends StatelessWidget {
+  const _DeliveryReportNarrowHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      deliveryReportNarrowScreenHint,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Colors.black54,
+        fontWeight: FontWeight.w400,
+        height: 1.4,
+      ),
     );
   }
 }
@@ -1037,8 +1154,7 @@ class _DeliveryReportStatusBanner extends StatelessWidget {
       _DeliveryReportStatusKind.mobileOnly => (
         icon: Icons.phone_android_outlined,
         title: '${formatDeliveryReportCount(matchedCount ?? 0)} records match.',
-        subtitle:
-            'Click Download Excel button above to view results on this device.',
+        subtitle: 'Click Download Excel above to export results on this device.',
       ),
       _DeliveryReportStatusKind.loaded => (
         icon: Icons.check_circle_outline,

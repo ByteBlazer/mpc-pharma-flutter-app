@@ -160,6 +160,14 @@ class DocTrackingResponse {
     ].where((part) => part.trim().isNotEmpty).join(' ');
   }
 
+  String get customerAddressLine {
+    return [
+      customerAddress,
+      customerCity,
+      customerPincode,
+    ].where((part) => part.trim().isNotEmpty).join(' ');
+  }
+
   static String readAmount(Object? value) {
     if (value == null) return '';
     if (value is num) return value.toString();

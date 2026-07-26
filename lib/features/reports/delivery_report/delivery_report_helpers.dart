@@ -8,6 +8,12 @@ const deliveryReportCommentLinkMinLength = 60;
 const deliveryReportCommentPreviewMaxLines = 2;
 const deliveryReportStatusPillWidth = 128.0;
 
+/// Shown on narrow screens where the on-screen grid / View report is hidden.
+const deliveryReportNarrowScreenHint =
+    'The report grid cannot be viewed on mobile or narrow screens. '
+    'Use Download Excel to export results, or open this page on a wider-screen '
+    'device to view the report online.';
+
 String formatDeliveryReportCount(int value) {
   final negative = value < 0;
   final digits = value.abs().toString();
