@@ -32,6 +32,14 @@ class ReportsScreen extends StatelessWidget {
                 constraints: const BoxConstraints(maxWidth: 720),
                 child: ListView(
                   children: [
+                    Text(
+                      'The following reports are available.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.black54,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     _ReportsMenuTile(
                       icon: Icons.local_shipping_outlined,
                       title: 'Delivery Report',

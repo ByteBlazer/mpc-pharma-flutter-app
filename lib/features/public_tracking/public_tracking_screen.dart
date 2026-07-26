@@ -184,7 +184,9 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
     final tracking = _tracking!;
     final status = publicTrackingStatusDisplay(tracking.status);
     final amount = formatPublicTrackingAmount(tracking.docAmountRaw);
-    final deliveringTo = tracking.deliveringTo;
+    final customerName = tracking.customerFirmName.trim();
+    final customerAddressLine = tracking.customerAddressLine;
+    final showDeliveringTo = customerName.isNotEmpty || customerAddressLine.isNotEmpty;
     final tripDocuments = tracking.allTripDocuments;
     final showTripDocuments = tracking.hasOtherTripDocuments;
     final showTrackingComment =
@@ -263,7 +265,7 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                         ),
                       ),
                     ],
-                    if (deliveringTo.isNotEmpty) ...[
+                    if (showDeliveringTo) ...[
                       const SizedBox(height: 8),
                       Text.rich(
                         TextSpan(
@@ -274,7 +276,16 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                               text: 'Delivering To: ',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
-                            TextSpan(text: deliveringTo),
+                            if (customerName.isNotEmpty)
+                              TextSpan(text: customerName),
+                            if (customerAddressLine.isNotEmpty)
+                              TextSpan(
+                                text: customerName.isNotEmpty
+                                    ? ' $customerAddressLine'
+                                    : customerAddressLine,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: Colors.black54),
+                              ),
                           ],
                         ),
                       ),
@@ -349,28 +360,21 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                     ],
                     if (tracking.numEnrouteCustomers > 0) ...[
                       const SizedBox(height: 12),
-                      AppBrandPanel(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              const TextSpan(
-                                text: 'Note: ',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                      Text.rich(
+                        TextSpan(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w400,
+                                height: 1.4,
                               ),
-                              const TextSpan(text: 'The delivery agent has '),
-                              TextSpan(
-                                text: '${tracking.numEnrouteCustomers}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              TextSpan(
-                                text: tracking.numEnrouteCustomers == 1
-                                    ? ' delivery to make before reaching you. The actual delivery time may be longer than estimated.'
-                                    : ' other deliveries to make before reaching you. The actual delivery time may be longer than estimated.',
-                              ),
-                            ],
-                          ),
+                          children: [
+                            TextSpan(
+                              text: tracking.numEnrouteCustomers == 1
+                                  ? 'The driver has 1 delivery before reaching you. Actual time may be longer than estimated.'
+                                  : 'The driver has ${tracking.numEnrouteCustomers} other deliveries before reaching you. Actual time may be longer than estimated.',
+                            ),
+                          ],
                         ),
                       ),
                     ],
