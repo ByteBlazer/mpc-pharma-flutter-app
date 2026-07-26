@@ -20,10 +20,12 @@ class DeliveryReportTable extends StatefulWidget {
 }
 
 class _DeliveryReportTableState extends State<DeliveryReportTable> {
-  final _headerScrollController = ScrollController();
+  final _headerHorizontalScrollController = ScrollController();
   final _bodyHorizontalScrollController = ScrollController();
   final _bodyVerticalScrollController = ScrollController();
-  bool _syncingScroll = false;
+  bool _syncingHorizontalScroll = false;
+
+  static const _scrollBarThickness = 10.0;
 
   static const _columns = <_DeliveryReportColumn>[
     _DeliveryReportColumn('Doc ID', 160),
@@ -43,32 +45,39 @@ class _DeliveryReportTableState extends State<DeliveryReportTable> {
   @override
   void initState() {
     super.initState();
-    _headerScrollController.addListener(_syncHeaderToBody);
-    _bodyHorizontalScrollController.addListener(_syncBodyToHeader);
+    _headerHorizontalScrollController.addListener(_syncHeaderScrollToBody);
+    _bodyHorizontalScrollController.addListener(_syncBodyScrollToHeader);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
-    _headerScrollController.removeListener(_syncHeaderToBody);
-    _bodyHorizontalScrollController.removeListener(_syncBodyToHeader);
-    _headerScrollController.dispose();
+    _headerHorizontalScrollController.removeListener(_syncHeaderScrollToBody);
+    _bodyHorizontalScrollController.removeListener(_syncBodyScrollToHeader);
+    _headerHorizontalScrollController.dispose();
     _bodyHorizontalScrollController.dispose();
     _bodyVerticalScrollController.dispose();
     super.dispose();
   }
 
-  void _syncHeaderToBody() {
-    if (_syncingScroll) return;
-    _syncingScroll = true;
-    _bodyHorizontalScrollController.jumpTo(_headerScrollController.offset);
-    _syncingScroll = false;
+  void _syncHeaderScrollToBody() {
+    if (_syncingHorizontalScroll || !_bodyHorizontalScrollController.hasClients) {
+      return;
+    }
+    _syncingHorizontalScroll = true;
+    _bodyHorizontalScrollController.jumpTo(_headerHorizontalScrollController.offset);
+    _syncingHorizontalScroll = false;
   }
 
-  void _syncBodyToHeader() {
-    if (_syncingScroll) return;
-    _syncingScroll = true;
-    _headerScrollController.jumpTo(_bodyHorizontalScrollController.offset);
-    _syncingScroll = false;
+  void _syncBodyScrollToHeader() {
+    if (_syncingHorizontalScroll || !_headerHorizontalScrollController.hasClients) {
+      return;
+    }
+    _syncingHorizontalScroll = true;
+    _headerHorizontalScrollController.jumpTo(_bodyHorizontalScrollController.offset);
+    _syncingHorizontalScroll = false;
   }
 
   double get _tableWidth =>
@@ -110,7 +119,8 @@ class _DeliveryReportTableState extends State<DeliveryReportTable> {
               color: const Color(0xFFF5F5F5),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                controller: _headerScrollController,
+                controller: _headerHorizontalScrollController,
+                physics: const NeverScrollableScrollPhysics(),
                 child: SizedBox(
                   width: _tableWidth,
                   child: Row(
@@ -124,35 +134,61 @@ class _DeliveryReportTableState extends State<DeliveryReportTable> {
             ),
             const Divider(height: 1),
             Expanded(
-              child: Scrollbar(
-                controller: _bodyVerticalScrollController,
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  controller: _bodyVerticalScrollController,
-                  child: Scrollbar(
-                    controller: _bodyHorizontalScrollController,
-                    thumbVisibility: true,
-                    notificationPredicate: (_) => true,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      controller: _bodyHorizontalScrollController,
-                      child: SizedBox(
-                        width: _tableWidth,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final listHeight = (constraints.maxHeight - _scrollBarThickness)
+                      .clamp(0.0, double.infinity);
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
                         child: Column(
                           children: [
-                            for (var index = 0; index < widget.rows.length; index++)
-                              _DeliveryReportDataRow(
-                                row: widget.rows[index],
-                                columns: _columns,
-                                shaded: index.isOdd,
-                                onViewSignature: _viewSignature,
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                controller: _bodyHorizontalScrollController,
+                                child: SizedBox(
+                                  width: _tableWidth,
+                                  height: listHeight,
+                                  child: ListView.builder(
+                                    controller: _bodyVerticalScrollController,
+                                    itemCount: widget.rows.length,
+                                    itemBuilder: (context, index) {
+                                      return SizedBox(
+                                        width: _tableWidth,
+                                        child: _DeliveryReportDataRow(
+                                          row: widget.rows[index],
+                                          columns: _columns,
+                                          shaded: index.isOdd,
+                                          onViewSignature: _viewSignature,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
                               ),
+                            ),
+                            _ScrollBarTrack(
+                              controller: _bodyHorizontalScrollController,
+                              axis: Axis.horizontal,
+                              thickness: _scrollBarThickness,
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
-                ),
+                      SizedBox(
+                        height: listHeight,
+                        child: _ScrollBarTrack(
+                          controller: _bodyVerticalScrollController,
+                          axis: Axis.vertical,
+                          thickness: _scrollBarThickness,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
@@ -213,17 +249,7 @@ class _DeliveryReportDataRow extends StatelessWidget {
       fontSize: 13,
       color: comment.isEmpty ? Colors.black38 : Colors.black87,
     );
-    final commentColumnWidth = columns[5].width - 24;
-    final commentPainter = TextPainter(
-      text: TextSpan(text: commentPreview, style: commentStyle),
-      maxLines: deliveryReportCommentPreviewMaxLines,
-      textDirection: Directionality.of(context),
-    )..layout(maxWidth: commentColumnWidth);
-    final commentTruncated = commentPainter.didExceedMaxLines;
-    final showCommentLink = shouldShowDeliveryReportCommentLink(
-      row: row,
-      isTruncated: commentTruncated,
-    );
+    final showCommentLink = shouldShowDeliveryReportCommentLink(row: row);
 
     return Material(
       color: shaded ? const Color(0xFFFAFAFA) : Colors.white,
@@ -232,7 +258,7 @@ class _DeliveryReportDataRow extends StatelessWidget {
         children: [
           _BodyCell(
             width: columns[0].width,
-            child: SelectableText(row.docId, style: _cellTextStyle()),
+            child: Text(row.docId, style: _cellTextStyle()),
           ),
           _BodyCell(
             width: columns[1].width,
@@ -254,6 +280,8 @@ class _DeliveryReportDataRow extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     row.address.trim(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 12,
                       color: Colors.black54,
@@ -380,26 +408,34 @@ class _StatusCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = deliveryReportStatusLabel(row.status);
-    final color = Color(deliveryReportStatusColor(row.status));
+    final color = row.isDelivered
+        ? Theme.of(context).colorScheme.primary
+        : Color(deliveryReportStatusColor(row.status));
+
+    final pill = Container(
+      width: deliveryReportStatusPillWidth,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+        ),
+      ),
+    );
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 11,
-            ),
-          ),
-        ),
+        pill,
         if (row.isDelivered) ...[
           const SizedBox(height: 6),
           _ReportLinkButton(
@@ -439,6 +475,8 @@ class _ReportLinkButton extends StatelessWidget {
       onTap: onPressed,
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: color,
           fontSize: 12,
@@ -447,5 +485,132 @@ class _ReportLinkButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ScrollBarTrack extends StatelessWidget {
+  const _ScrollBarTrack({
+    required this.controller,
+    required this.axis,
+    required this.thickness,
+  });
+
+  final ScrollController controller;
+  final Axis axis;
+  final double thickness;
+
+  static const _trackColor = Color(0xFFE4E7EB);
+  static const _thumbColor = Color(0xFF98A2B3);
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final isHorizontal = axis == Axis.horizontal;
+
+        return SizedBox(
+          height: isHorizontal ? thickness : double.infinity,
+          width: isHorizontal ? double.infinity : thickness,
+          child: _buildTrack(isHorizontal),
+        );
+      },
+    );
+  }
+
+  Widget _buildTrack(bool isHorizontal) {
+    if (!_isScrollReady) {
+      return const ColoredBox(color: _trackColor);
+    }
+
+    final position = controller.position;
+    final viewport = position.viewportDimension;
+    if (viewport <= 0) {
+      return const ColoredBox(color: _trackColor);
+    }
+
+    final maxScroll = position.maxScrollExtent;
+    final scrollable = maxScroll > 0;
+    final contentSize = viewport + maxScroll;
+    final thumbMainSize = scrollable
+        ? (viewport / contentSize * viewport).clamp(thickness * 2, viewport)
+        : 0.0;
+    final thumbTravel = viewport - thumbMainSize;
+    final thumbOffset = scrollable && thumbTravel > 0
+        ? (position.pixels / maxScroll * thumbTravel).clamp(0.0, thumbTravel)
+        : 0.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanUpdate: scrollable
+              ? (details) {
+                  final delta =
+                      isHorizontal ? details.delta.dx : details.delta.dy;
+                  controller.jumpTo(
+                    (controller.offset + delta * contentSize / viewport)
+                        .clamp(0.0, maxScroll),
+                  );
+                }
+              : null,
+          onTapDown: scrollable && thumbTravel > 0
+              ? (details) {
+                  final local = details.localPosition;
+                  final trackMainSize = isHorizontal
+                      ? constraints.maxWidth
+                      : constraints.maxHeight;
+                  final availableTrack = trackMainSize - thumbMainSize;
+                  if (availableTrack <= 0) return;
+
+                  final targetOffset =
+                      (isHorizontal ? local.dx : local.dy) - thumbMainSize / 2;
+                  final scrollFraction =
+                      (targetOffset / availableTrack).clamp(0.0, 1.0);
+                  controller.jumpTo(scrollFraction * maxScroll);
+                }
+              : null,
+          child: Stack(
+            children: [
+              const ColoredBox(color: _trackColor),
+              if (scrollable && thumbMainSize > 0)
+                if (isHorizontal)
+                  Positioned(
+                    left: thumbOffset,
+                    top: 1,
+                    bottom: 1,
+                    width: thumbMainSize,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: _thumbColor,
+                        borderRadius: BorderRadius.circular(thickness),
+                      ),
+                    ),
+                  )
+                else
+                  Positioned(
+                    top: thumbOffset,
+                    left: 1,
+                    right: 1,
+                    height: thumbMainSize,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: _thumbColor,
+                        borderRadius: BorderRadius.circular(thickness),
+                      ),
+                    ),
+                  ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  bool get _isScrollReady {
+    if (!controller.hasClients) return false;
+
+    final position = controller.position;
+    return position.hasViewportDimension && position.hasContentDimensions;
   }
 }

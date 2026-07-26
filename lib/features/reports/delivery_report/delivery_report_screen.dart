@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app_theme.dart';
 import '../../../api/api_client.dart';
 import '../../../auth/app_role.dart';
 import '../../customers/customer_models.dart';
@@ -16,6 +17,7 @@ import 'delivery_report_models.dart';
 import 'widgets/delivery_report_table.dart';
 
 const _mobileLayoutBreakpoint = 768.0;
+const _noDateSelectedLabel = 'No date selected';
 
 class DeliveryReportScreen extends StatefulWidget {
   const DeliveryReportScreen({
@@ -46,7 +48,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
   Future<_DeliveryReportFormData>? _formDataFuture;
   int? _matchedCount;
   List<DeliveryReportRow> _rows = const [];
-  String? _resultMessage;
+  _DeliveryReportStatus? _resultStatus;
   bool _loadingCount = false;
   bool _loadingData = false;
   bool _downloadingExcel = false;
@@ -63,6 +65,23 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
     _docIdController.dispose();
     _tripIdController.dispose();
     super.dispose();
+  }
+
+  bool get _hasReportFeedback => _resultStatus != null;
+
+  void _dismissReportFeedback() {
+    _resultStatus = null;
+    _rows = const [];
+    _matchedCount = null;
+  }
+
+  void _onFiltersChanged(VoidCallback update) {
+    setState(() {
+      update();
+      if (_hasReportFeedback || _rows.isNotEmpty || _matchedCount != null) {
+        _dismissReportFeedback();
+      }
+    });
   }
 
   void _resetDatesToDefault() {
@@ -86,12 +105,13 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
     final baseLocations = results[3] as List<BaseLocation>;
     final users = results[4] as List<UserAccount>;
 
-    final cities = customers
-        .map((customer) => customer.city.trim())
-        .where((city) => city.isNotEmpty)
-        .toSet()
-        .toList(growable: false)
-      ..sort();
+    final cities =
+        customers
+            .map((customer) => customer.city.trim())
+            .where((city) => city.isNotEmpty)
+            .toSet()
+            .toList(growable: false)
+          ..sort();
 
     final drivers = users
         .where(
@@ -125,9 +145,17 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
   }
 
   String? _validateFilters() {
-    return validateDeliveryReportDateRange(
+    return validateDeliveryReportFilters(
       fromDate: _fromDate,
       toDate: _toDate,
+      customerId: _customerId,
+      docId: _docIdController.text,
+      route: _route,
+      originWarehouse: _originWarehouse,
+      tripStartLocation: _tripStartLocation,
+      driverUserId: _driverUserId,
+      customerCities: _selectedCities,
+      tripId: _tripIdController.text,
     );
   }
 
@@ -153,7 +181,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
 
     setState(() {
       _loadingCount = true;
-      _resultMessage = null;
+      _resultStatus = null;
       _rows = const [];
       _matchedCount = null;
     });
@@ -173,25 +201,29 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
 
       if (count == 0) {
         setState(() {
-          _resultMessage = 'No records found for the selected filters.';
+          _resultStatus = const _DeliveryReportStatus(
+            kind: _DeliveryReportStatusKind.noResults,
+          );
         });
         return;
       }
 
       if (!allowGrid) {
         setState(() {
-          _resultMessage =
-              '$count records match. Download the Excel report to view results on this device.';
+          _resultStatus = _DeliveryReportStatus(
+            kind: _DeliveryReportStatusKind.mobileOnly,
+            matchedCount: count,
+          );
         });
         return;
       }
 
       if (count > deliveryReportMaxOnScreenRows) {
         setState(() {
-          _resultMessage =
-              '$count records match. Too many to display on screen (limit '
-              '$deliveryReportMaxOnScreenRows). Add filters to narrow the result, '
-              'or download the full Excel report.';
+          _resultStatus = _DeliveryReportStatus(
+            kind: _DeliveryReportStatusKind.tooManyForGrid,
+            matchedCount: count,
+          );
         });
         return;
       }
@@ -205,7 +237,10 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
       setState(() {
         _rows = dataResponse.rows;
         _loadingData = false;
-        _resultMessage = '${dataResponse.totalRecords} records loaded.';
+        _resultStatus = _DeliveryReportStatus(
+          kind: _DeliveryReportStatusKind.loaded,
+          matchedCount: dataResponse.totalRecords,
+        );
       });
     } catch (error) {
       if (!mounted) return;
@@ -235,7 +270,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
         builder: (context) => AlertDialog(
           title: const Text('Large export'),
           content: Text(
-            'This export may include $_matchedCount records and could take a '
+            'This export may include ${formatDeliveryReportCount(_matchedCount!)} records and could take a '
             'while to download. Continue?',
           ),
           actions: [
@@ -282,9 +317,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
       _selectedCities.clear();
       _docIdController.clear();
       _tripIdController.clear();
-      _matchedCount = null;
-      _rows = const [];
-      _resultMessage = null;
+      _dismissReportFeedback();
     });
   }
 
@@ -298,7 +331,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
       helpText: 'Document date from',
     );
     if (picked == null || !mounted) return;
-    setState(() {
+    _onFiltersChanged(() {
       _fromDate = picked;
       if (_toDate == null || _toDate!.isBefore(picked)) {
         _toDate = picked;
@@ -316,7 +349,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
       helpText: 'Document date to',
     );
     if (picked == null || !mounted) return;
-    setState(() {
+    _onFiltersChanged(() {
       _toDate = picked;
       if (_fromDate == null || _fromDate!.isAfter(picked)) {
         _fromDate = picked;
@@ -325,7 +358,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
   }
 
   void _clearDates() {
-    setState(() {
+    _onFiltersChanged(() {
       _fromDate = null;
       _toDate = null;
     });
@@ -349,104 +382,118 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
               return AppLoadErrorState(
                 title: 'Failed to load report filters',
                 message: snapshot.error.toString(),
-                onRetry: () => setState(() => _formDataFuture = _loadFormData()),
+                onRetry: () =>
+                    setState(() => _formDataFuture = _loadFormData()),
                 onLoginAgain: widget.onLoginAgain,
               );
             }
 
-            final formData = snapshot.data ?? const _DeliveryReportFormData.empty();
+            final formData =
+                snapshot.data ?? const _DeliveryReportFormData.empty();
+            final showTable = isWide && _rows.isNotEmpty && !_loadingData;
+            final showTableLoading = isWide && _loadingData;
+
+            final filtersAndActions = Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _FiltersCard(
+                  formData: formData,
+                  fromDate: _fromDate,
+                  toDate: _toDate,
+                  customerId: _customerId,
+                  route: _route,
+                  originWarehouse: _originWarehouse,
+                  tripStartLocation: _tripStartLocation,
+                  driverUserId: _driverUserId,
+                  selectedCities: _selectedCities,
+                  docIdController: _docIdController,
+                  tripIdController: _tripIdController,
+                  isWide: isWide,
+                  enabled: !isBusy,
+                  onPickFromDate: _pickFromDate,
+                  onPickToDate: _pickToDate,
+                  onClearDates: _clearDates,
+                  onCustomerChanged: (value) =>
+                      _onFiltersChanged(() => _customerId = value),
+                  onRouteChanged: (value) =>
+                      _onFiltersChanged(() => _route = value),
+                  onOriginWarehouseChanged: (value) =>
+                      _onFiltersChanged(() => _originWarehouse = value),
+                  onTripStartLocationChanged: (value) =>
+                      _onFiltersChanged(() => _tripStartLocation = value),
+                  onDriverChanged: (value) =>
+                      _onFiltersChanged(() => _driverUserId = value),
+                  onCitiesChanged: (values) => _onFiltersChanged(() {
+                    _selectedCities
+                      ..clear()
+                      ..addAll(values);
+                  }),
+                  onFilterEdited: () => _onFiltersChanged(() {}),
+                ),
+                const SizedBox(height: 16),
+                _ActionsRow(
+                  isBusy: isBusy,
+                  loadingCount: _loadingCount,
+                  loadingData: _loadingData,
+                  downloadingExcel: _downloadingExcel,
+                  onViewReport: () => _viewReport(allowGrid: isWide),
+                  onDownloadExcel: _downloadExcel,
+                  onReset: _resetFilters,
+                ),
+                if (_resultStatus != null) ...[
+                  const SizedBox(height: 16),
+                  _DeliveryReportStatusBanner(status: _resultStatus!),
+                ],
+              ],
+            );
+
             return Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1200),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _FiltersCard(
-                                formData: formData,
-                                fromDate: _fromDate,
-                                toDate: _toDate,
-                                customerId: _customerId,
-                                route: _route,
-                                originWarehouse: _originWarehouse,
-                                tripStartLocation: _tripStartLocation,
-                                driverUserId: _driverUserId,
-                                selectedCities: _selectedCities,
-                                docIdController: _docIdController,
-                                tripIdController: _tripIdController,
-                                isWide: isWide,
-                                enabled: !isBusy,
-                                onPickFromDate: _pickFromDate,
-                                onPickToDate: _pickToDate,
-                                onClearDates: _clearDates,
-                                onCustomerChanged: (value) =>
-                                    setState(() => _customerId = value),
-                                onRouteChanged: (value) =>
-                                    setState(() => _route = value),
-                                onOriginWarehouseChanged: (value) =>
-                                    setState(() => _originWarehouse = value),
-                                onTripStartLocationChanged: (value) => setState(
-                                  () => _tripStartLocation = value,
-                                ),
-                                onDriverChanged: (value) =>
-                                    setState(() => _driverUserId = value),
-                                onCitiesChanged: (values) => setState(() {
-                                  _selectedCities
-                                    ..clear()
-                                    ..addAll(values);
-                                }),
-                              ),
-                              const SizedBox(height: 16),
-                              _ActionsRow(
-                                isBusy: isBusy,
-                                loadingCount: _loadingCount,
-                                loadingData: _loadingData,
-                                downloadingExcel: _downloadingExcel,
-                                onViewReport: () =>
-                                    _viewReport(allowGrid: isWide),
-                                onDownloadExcel: _downloadExcel,
-                                onReset: _resetFilters,
-                              ),
-                              if (_resultMessage != null) ...[
-                                const SizedBox(height: 16),
-                                AppSurface(
-                                  child: Text(
-                                    _resultMessage!,
-                                    style: const TextStyle(
-                                      color: Colors.black87,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              if (isWide &&
-                                  _rows.isNotEmpty &&
-                                  !_loadingData) ...[
-                                const SizedBox(height: 16),
-                                SizedBox(
-                                  height: 520,
-                                  child: DeliveryReportTable(
-                                    rows: _rows,
-                                    apiClient: widget.apiClient,
-                                  ),
-                                ),
-                              ],
-                              if (_loadingData) ...[
-                                const SizedBox(height: 24),
-                                const Center(child: CircularProgressIndicator()),
-                              ],
-                            ],
+                  if (showTable || showTableLoading)
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1200),
+                            child: filtersAndActions,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1200),
+                            child: filtersAndActions,
                           ),
                         ),
                       ),
                     ),
-                  ),
+                  if (showTable) ...[
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1200),
+                          child: DeliveryReportTable(
+                            rows: _rows,
+                            apiClient: widget.apiClient,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (showTableLoading) ...[
+                    const SizedBox(height: 16),
+                    const Expanded(
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -507,6 +554,7 @@ class _FiltersCard extends StatelessWidget {
     required this.onTripStartLocationChanged,
     required this.onDriverChanged,
     required this.onCitiesChanged,
+    required this.onFilterEdited,
   });
 
   final _DeliveryReportFormData formData;
@@ -531,6 +579,7 @@ class _FiltersCard extends StatelessWidget {
   final ValueChanged<String?> onTripStartLocationChanged;
   final ValueChanged<String?> onDriverChanged;
   final ValueChanged<Set<String>> onCitiesChanged;
+  final VoidCallback onFilterEdited;
 
   @override
   Widget build(BuildContext context) {
@@ -544,261 +593,300 @@ class _FiltersCard extends StatelessWidget {
     }
 
     return AppSurface(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Filters',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-          ),
-          const SizedBox(height: 16),
-          _SectionTitle(title: 'Document date'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              field(
-                _DateField(
-                  label: 'From date',
-                  value: fromDate == null
-                      ? 'Use server default'
-                      : formatDeliveryReportDocDate(fromDate),
-                  enabled: enabled,
-                  onTap: onPickFromDate,
-                ),
-              ),
-              field(
-                _DateField(
-                  label: 'To date',
-                  value: toDate == null
-                      ? 'Use server default'
-                      : formatDeliveryReportDocDate(toDate),
-                  enabled: enabled,
-                  onTap: onPickToDate,
-                ),
-              ),
-              TextButton(
-                onPressed: enabled ? onClearDates : null,
-                child: const Text('Clear dates'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Filters document date, not delivery timestamp. Maximum range is '
-            '$deliveryReportMaxDateRangeDays days when both dates are set.',
-            style: TextStyle(color: Colors.black54, fontSize: 12),
-          ),
-          const SizedBox(height: 20),
-          _SectionTitle(title: 'Location & routing'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              field(
-                AppMultiSelectField<String>(
-                  fieldLabel: 'Trip start location',
-                  dialogTitle: 'Trip start location',
-                  enabled: enabled,
-                  singleSelect: true,
-                  emptySelectionText: 'All locations',
-                  items: formData.baseLocations
-                      .map(
-                        (location) => AppMultiSelectItem<String>(
-                          value: location.id,
-                          label: location.name,
-                          searchText: '${location.name} ${location.id}',
-                        ),
-                      )
-                      .toList(),
-                  selectedValues: tripStartLocation == null
-                      ? const {}
-                      : {tripStartLocation!},
-                  onChanged: (values) => onTripStartLocationChanged(
-                    values.isEmpty ? null : values.first,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Filters',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Filters by document date, not delivery timestamp. Maximum allowed date range is 1 month.',
+              style: TextStyle(color: Colors.black54, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            _DateFilterRow(
+              isWide: isWide,
+              fieldWidth: fieldWidth,
+              fromDate: fromDate,
+              toDate: toDate,
+              enabled: enabled,
+              onPickFromDate: onPickFromDate,
+              onPickToDate: onPickToDate,
+              onClearDates: onClearDates,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                field(
+                  AppMultiSelectField<String>(
+                    fieldLabel: 'Customer',
+                    dialogTitle: 'Customer',
+                    enabled: enabled,
+                    singleSelect: true,
+                    emptySelectionText: 'All customers',
+                    items: formData.customers
+                        .map(
+                          (customer) => AppMultiSelectItem<String>(
+                            value: customer.id,
+                            label: customer.firmName,
+                            subtitle: customer.id,
+                            searchText:
+                                '${customer.firmName} ${customer.id} ${customer.city}',
+                          ),
+                        )
+                        .toList(),
+                    selectedValues: customerId == null
+                        ? const {}
+                        : {customerId!},
+                    onChanged: (values) =>
+                        onCustomerChanged(values.isEmpty ? null : values.first),
                   ),
                 ),
-              ),
-              field(
-                AppMultiSelectField<String>(
-                  fieldLabel: 'Route',
-                  dialogTitle: 'Route',
-                  enabled: enabled,
-                  singleSelect: true,
-                  emptySelectionText: 'All routes',
-                  items: formData.routes
-                      .map(
-                        (value) => AppMultiSelectItem<String>(
-                          value: value,
-                          label: value,
-                          searchText: value,
-                        ),
-                      )
-                      .toList(),
-                  selectedValues: route == null ? const {} : {route!},
-                  onChanged: (values) =>
-                      onRouteChanged(values.isEmpty ? null : values.first),
-                ),
-              ),
-              field(
-                AppMultiSelectField<String>(
-                  fieldLabel: 'Origin warehouse',
-                  dialogTitle: 'Origin warehouse',
-                  enabled: enabled,
-                  singleSelect: true,
-                  emptySelectionText: 'All warehouses',
-                  items: formData.warehouses
-                      .map(
-                        (value) => AppMultiSelectItem<String>(
-                          value: value,
-                          label: value,
-                          searchText: value,
-                        ),
-                      )
-                      .toList(),
-                  selectedValues:
-                      originWarehouse == null ? const {} : {originWarehouse!},
-                  onChanged: (values) => onOriginWarehouseChanged(
-                    values.isEmpty ? null : values.first,
+                field(
+                  AppMultiSelectField<String>(
+                    fieldLabel: 'Customer city',
+                    dialogTitle: 'Customer city',
+                    enabled: enabled,
+                    emptySelectionText: 'All cities',
+                    countSummary: const AppMultiSelectCountSummary(
+                      singular: 'city',
+                      plural: 'cities',
+                    ),
+                    countLabel: 'cities',
+                    items: formData.cities
+                        .map(
+                          (city) => AppMultiSelectItem<String>(
+                            value: city,
+                            label: city,
+                            searchText: city,
+                          ),
+                        )
+                        .toList(),
+                    selectedValues: selectedCities,
+                    onChanged: onCitiesChanged,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _SectionTitle(title: 'People & customer'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              field(
-                AppMultiSelectField<String>(
-                  fieldLabel: 'Customer',
-                  dialogTitle: 'Customer',
-                  enabled: enabled,
-                  singleSelect: true,
-                  emptySelectionText: 'All customers',
-                  items: formData.customers
-                      .map(
-                        (customer) => AppMultiSelectItem<String>(
-                          value: customer.id,
-                          label: customer.firmName,
-                          subtitle: customer.id,
-                          searchText:
-                              '${customer.firmName} ${customer.id} ${customer.city}',
-                        ),
-                      )
-                      .toList(),
-                  selectedValues:
-                      customerId == null ? const {} : {customerId!},
-                  onChanged: (values) =>
-                      onCustomerChanged(values.isEmpty ? null : values.first),
-                ),
-              ),
-              field(
-                AppMultiSelectField<String>(
-                  fieldLabel: 'Customer city',
-                  dialogTitle: 'Customer city',
-                  enabled: enabled,
-                  emptySelectionText: 'All cities',
-                  countSummary: const AppMultiSelectCountSummary(
-                    singular: 'city',
-                    plural: 'cities',
-                  ),
-                  countLabel: 'cities',
-                  items: formData.cities
-                      .map(
-                        (city) => AppMultiSelectItem<String>(
-                          value: city,
-                          label: city,
-                          searchText: city,
-                        ),
-                      )
-                      .toList(),
-                  selectedValues: selectedCities,
-                  onChanged: onCitiesChanged,
-                ),
-              ),
-              field(
-                AppMultiSelectField<String>(
-                  fieldLabel: 'Driver',
-                  dialogTitle: 'Driver',
-                  enabled: enabled,
-                  singleSelect: true,
-                  emptySelectionText: 'All drivers',
-                  items: formData.drivers
-                      .map(
-                        (driver) => AppMultiSelectItem<String>(
-                          value: driver.id,
-                          label: driver.personName,
-                          subtitle: driver.id,
-                          searchText:
-                              '${driver.personName} ${driver.id} ${driver.baseLocationName}',
-                        ),
-                      )
-                      .toList(),
-                  selectedValues:
-                      driverUserId == null ? const {} : {driverUserId!},
-                  onChanged: (values) =>
-                      onDriverChanged(values.isEmpty ? null : values.first),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _SectionTitle(title: 'Document / trip'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              field(
-                TextField(
-                  controller: docIdController,
-                  enabled: enabled,
-                  decoration: const InputDecoration(
-                    labelText: 'Doc ID (partial search)',
-                    hintText: 'Doc ID (partial search)',
-                    helperText:
-                        'Partial search. Without dates, use at least 3 characters for a wider lookup window.',
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                field(
+                  AppMultiSelectField<String>(
+                    fieldLabel: 'Parent Trip start location',
+                    dialogTitle: 'Parent Trip start location',
+                    enabled: enabled,
+                    singleSelect: true,
+                    emptySelectionText: 'All locations',
+                    items: formData.baseLocations
+                        .map(
+                          (location) => AppMultiSelectItem<String>(
+                            value: location.id,
+                            label: location.name,
+                            searchText: '${location.name} ${location.id}',
+                          ),
+                        )
+                        .toList(),
+                    selectedValues: tripStartLocation == null
+                        ? const {}
+                        : {tripStartLocation!},
+                    onChanged: (values) => onTripStartLocationChanged(
+                      values.isEmpty ? null : values.first,
+                    ),
                   ),
                 ),
-              ),
-              field(
-                TextField(
-                  controller: tripIdController,
-                  enabled: enabled,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Trip ID',
-                    hintText: 'Trip ID',
+                field(
+                  AppMultiSelectField<String>(
+                    fieldLabel: 'Route',
+                    dialogTitle: 'Route',
+                    enabled: enabled,
+                    singleSelect: true,
+                    emptySelectionText: 'All routes',
+                    items: formData.routes
+                        .map(
+                          (value) => AppMultiSelectItem<String>(
+                            value: value,
+                            label: value,
+                            searchText: value,
+                          ),
+                        )
+                        .toList(),
+                    selectedValues: route == null ? const {} : {route!},
+                    onChanged: (values) =>
+                        onRouteChanged(values.isEmpty ? null : values.first),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                field(
+                  AppMultiSelectField<String>(
+                    fieldLabel: 'Origin warehouse',
+                    dialogTitle: 'Origin warehouse',
+                    enabled: enabled,
+                    singleSelect: true,
+                    emptySelectionText: 'All warehouses',
+                    items: formData.warehouses
+                        .map(
+                          (value) => AppMultiSelectItem<String>(
+                            value: value,
+                            label: value,
+                            searchText: value,
+                          ),
+                        )
+                        .toList(),
+                    selectedValues: originWarehouse == null
+                        ? const {}
+                        : {originWarehouse!},
+                    onChanged: (values) => onOriginWarehouseChanged(
+                      values.isEmpty ? null : values.first,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                field(
+                  AppMultiSelectField<String>(
+                    fieldLabel: 'Driver',
+                    dialogTitle: 'Driver',
+                    enabled: enabled,
+                    singleSelect: true,
+                    emptySelectionText: 'All drivers',
+                    items: formData.drivers
+                        .map(
+                          (driver) => AppMultiSelectItem<String>(
+                            value: driver.id,
+                            label: driver.personName,
+                            subtitle: driver.id,
+                            searchText:
+                                '${driver.personName} ${driver.id} ${driver.baseLocationName}',
+                          ),
+                        )
+                        .toList(),
+                    selectedValues: driverUserId == null
+                        ? const {}
+                        : {driverUserId!},
+                    onChanged: (values) =>
+                        onDriverChanged(values.isEmpty ? null : values.first),
+                  ),
+                ),
+                field(
+                  TextField(
+                    controller: tripIdController,
+                    enabled: enabled,
+                    onChanged: (_) => onFilterEdited(),
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Trip ID',
+                      hintText: 'Trip ID',
+                    ),
+                  ),
+                ),
+                field(
+                  TextField(
+                    controller: docIdController,
+                    enabled: enabled,
+                    onChanged: (_) => onFilterEdited(),
+                    decoration: const InputDecoration(
+                      labelText: 'Doc ID (Last 3 or more digits)',
+                      hintText: 'Last 3 or more digits',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title});
+class _DateFilterRow extends StatelessWidget {
+  const _DateFilterRow({
+    required this.isWide,
+    required this.fieldWidth,
+    required this.fromDate,
+    required this.toDate,
+    required this.enabled,
+    required this.onPickFromDate,
+    required this.onPickToDate,
+    required this.onClearDates,
+  });
 
-  final String title;
+  final bool isWide;
+  final double fieldWidth;
+  final DateTime? fromDate;
+  final DateTime? toDate;
+  final bool enabled;
+  final VoidCallback onPickFromDate;
+  final VoidCallback onPickToDate;
+  final VoidCallback onClearDates;
+
+  Widget _clearDatesButton({required bool alignWithField}) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: alignWithField ? 16 : 0),
+      child: TextButton(
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        onPressed: enabled ? onClearDates : null,
+        child: const Text('Clear dates'),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontWeight: FontWeight.w600,
-        color: Colors.black87,
-      ),
+    final fromField = _DateField(
+      label: 'From date',
+      date: fromDate,
+      enabled: enabled,
+      onTap: onPickFromDate,
+    );
+    final toField = _DateField(
+      label: 'To date',
+      date: toDate,
+      enabled: enabled,
+      onTap: onPickToDate,
+    );
+
+    if (isWide) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          SizedBox(width: fieldWidth, child: fromField),
+          const SizedBox(width: 12),
+          SizedBox(width: fieldWidth, child: toField),
+          const SizedBox(width: 4),
+          _clearDatesButton(alignWithField: true),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        fromField,
+        const SizedBox(height: 12),
+        toField,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _clearDatesButton(alignWithField: false),
+        ),
+      ],
     );
   }
 }
@@ -806,28 +894,28 @@ class _SectionTitle extends StatelessWidget {
 class _DateField extends StatelessWidget {
   const _DateField({
     required this.label,
-    required this.value,
+    required this.date,
     required this.enabled,
     required this.onTap,
   });
 
   final String label;
-  final String value;
+  final DateTime? date;
   final bool enabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final hasDate = date != null;
+
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: enabled ? onTap : null,
       child: InputDecorator(
         decoration: InputDecoration(labelText: label),
         child: Text(
-          value,
-          style: TextStyle(
-            color: value.contains('default') ? Colors.black54 : Colors.black,
-          ),
+          hasDate ? formatDeliveryReportDocDate(date) : _noDateSelectedLabel,
+          style: TextStyle(color: hasDate ? Colors.black : Colors.black54),
         ),
       ),
     );
@@ -855,35 +943,171 @@ class _ActionsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actionButtonStyle = FilledButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+      textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+    );
+
     return Wrap(
       spacing: 12,
       runSpacing: 12,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        FilledButton.icon(
-          onPressed: isBusy ? null : onViewReport,
-          icon: loadingCount || loadingData
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.table_chart_outlined),
-          label: Text(loadingCount || loadingData ? 'Loading...' : 'View report'),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FilledButton.icon(
+              onPressed: isBusy ? null : onViewReport,
+              style: actionButtonStyle,
+              icon: loadingCount || loadingData
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.table_chart_outlined, size: 20),
+              label: Text(
+                loadingCount || loadingData ? 'Loading...' : 'View report',
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: isBusy ? null : onDownloadExcel,
+              style: actionButtonStyle,
+              icon: downloadingExcel
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_outlined, size: 20),
+              label: Text(
+                downloadingExcel ? 'Downloading...' : 'Download Excel',
+              ),
+            ),
+          ],
         ),
-        OutlinedButton.icon(
-          onPressed: isBusy ? null : onDownloadExcel,
-          icon: downloadingExcel
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.download_outlined),
-          label: Text(downloadingExcel ? 'Downloading...' : 'Download Excel'),
+        TextButton(
+          onPressed: isBusy ? null : onReset,
+          child: const Text('Reset filters'),
         ),
-        TextButton(onPressed: isBusy ? null : onReset, child: const Text('Reset filters')),
       ],
+    );
+  }
+}
+
+enum _DeliveryReportStatusKind { noResults, tooManyForGrid, mobileOnly, loaded }
+
+class _DeliveryReportStatus {
+  const _DeliveryReportStatus({required this.kind, this.matchedCount});
+
+  final _DeliveryReportStatusKind kind;
+  final int? matchedCount;
+}
+
+class _DeliveryReportStatusBanner extends StatelessWidget {
+  const _DeliveryReportStatusBanner({required this.status});
+
+  final _DeliveryReportStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final accent = AppTheme.primaryGlyph(primary);
+    final background = primary.withValues(alpha: 0.08);
+    final matchedCount = status.matchedCount;
+
+    final ({IconData icon, String title, String? subtitle})
+    presentation = switch (status.kind) {
+      _DeliveryReportStatusKind.noResults => (
+        icon: Icons.search_off_outlined,
+        title: 'No records found for the selected filters.',
+        subtitle: null,
+      ),
+      _DeliveryReportStatusKind.tooManyForGrid => (
+        icon: Icons.table_rows_outlined,
+        title:
+            '${formatDeliveryReportCount(matchedCount ?? 0)} records match. '
+            'Too many to display on screen (limit '
+            '${formatDeliveryReportCount(deliveryReportMaxOnScreenRows)}).',
+        subtitle:
+            'Add filters to narrow the result, or click Download Excel button above '
+            'to export all matching records.',
+      ),
+      _DeliveryReportStatusKind.mobileOnly => (
+        icon: Icons.phone_android_outlined,
+        title: '${formatDeliveryReportCount(matchedCount ?? 0)} records match.',
+        subtitle:
+            'Click Download Excel button above to view results on this device.',
+      ),
+      _DeliveryReportStatusKind.loaded => (
+        icon: Icons.check_circle_outline,
+        title:
+            '${formatDeliveryReportCount(matchedCount ?? 0)} records loaded.',
+        subtitle: null,
+      ),
+    };
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppTheme.gradientPageSurfaceBorder(primary),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
+        child: Row(
+          crossAxisAlignment: presentation.subtitle == null
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                presentation.icon,
+                color: accent,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    presentation.title,
+                    style: const TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w700,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (presentation.subtitle != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      presentation.subtitle!,
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

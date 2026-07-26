@@ -52,7 +52,8 @@ Future<void> showDeliveryReportSignatureDialog({
             children: [
               SignatureImagePreview(
                 signatureBase64: signatureBase64,
-                height: 220,
+                maxWidth: 560,
+                adaptToImageSize: true,
               ),
               if (timestamp.isNotEmpty) ...[
                 const SizedBox(height: 12),

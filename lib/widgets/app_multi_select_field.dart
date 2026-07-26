@@ -55,6 +55,7 @@ class AppMultiSelectField<T> extends StatelessWidget {
     this.singleSelect = false,
     this.showSearch = true,
     this.itemExtent,
+    this.showClearButton = true,
   });
 
   final String fieldLabel;
@@ -81,6 +82,9 @@ class AppMultiSelectField<T> extends StatelessWidget {
   /// defaults to null so rows can grow when labels wrap on narrow screens.
   final double? itemExtent;
 
+  /// When true, shows a clear control when [selectedValues] is not empty.
+  final bool showClearButton;
+
   double? get _resolvedItemExtent =>
       itemExtent ?? (singleSelect ? null : 72);
 
@@ -103,6 +107,29 @@ class AppMultiSelectField<T> extends StatelessWidget {
   }
 
   Future<void> _openPicker(BuildContext context) async {
+    if (singleSelect) {
+      final result = await showDialog<Set<T>>(
+        context: context,
+        builder: (context) => _AppMultiSelectDialog<T>(
+          dialogTitle: dialogTitle,
+          items: items,
+          initialSelection: selectedValues,
+          searchLabel: searchLabel,
+          searchHint: searchHint,
+          emptyItemsMessage: emptyItemsMessage,
+          emptySearchMessage: emptySearchMessage,
+          countLabel: countLabel,
+          itemExtent: _resolvedItemExtent,
+          showSearch: showSearch,
+          singleSelect: singleSelect,
+        ),
+      );
+      if (result != null) {
+        onChanged(result);
+      }
+      return;
+    }
+
     await showDialog<void>(
       context: context,
       builder: (context) => _AppMultiSelectDialog<T>(
@@ -122,20 +149,45 @@ class AppMultiSelectField<T> extends StatelessWidget {
     );
   }
 
+  void _clearSelection() {
+    onChanged({});
+  }
+
+  Widget? _buildSuffixIcon() {
+    const dropdown = Icon(Icons.arrow_drop_down);
+    if (!showClearButton || selectedValues.isEmpty || !enabled) {
+      return dropdown;
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.clear, size: 20),
+          tooltip: 'Clear selection',
+          onPressed: _clearSelection,
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        ),
+        dropdown,
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: enabled ? () => _openPicker(context) : null,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: fieldLabel,
-          enabled: enabled,
-          suffixIcon: const Icon(Icons.arrow_drop_down),
-        ),
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: fieldLabel,
+        enabled: enabled,
+        suffixIcon: _buildSuffixIcon(),
+      ),
+      child: InkWell(
+        onTap: enabled ? () => _openPicker(context) : null,
         child: Text(
           _fieldSummary,
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: selectedValues.isEmpty ? Colors.black54 : Colors.black,
@@ -159,7 +211,7 @@ class _AppMultiSelectDialog<T> extends StatefulWidget {
     required this.itemExtent,
     required this.showSearch,
     required this.singleSelect,
-    required this.onSelectionChanged,
+    this.onSelectionChanged,
   });
 
   final String dialogTitle;
@@ -173,7 +225,7 @@ class _AppMultiSelectDialog<T> extends StatefulWidget {
   final double? itemExtent;
   final bool showSearch;
   final bool singleSelect;
-  final ValueChanged<Set<T>> onSelectionChanged;
+  final ValueChanged<Set<T>>? onSelectionChanged;
 
   @override
   State<_AppMultiSelectDialog<T>> createState() =>
@@ -261,8 +313,8 @@ class _AppMultiSelectDialogState<T> extends State<_AppMultiSelectDialog<T>> {
 
   void _toggleItem(T value) {
     if (widget.singleSelect) {
-      widget.onSelectionChanged({value});
-      Navigator.of(context).pop();
+      _searchDebounce?.cancel();
+      Navigator.of(context).pop({value});
       return;
     }
     if (_selection.contains(value)) {
@@ -271,7 +323,7 @@ class _AppMultiSelectDialogState<T> extends State<_AppMultiSelectDialog<T>> {
       _selection.add(value);
     }
     _selectionCount.value = _selection.length;
-    widget.onSelectionChanged({..._selection});
+    widget.onSelectionChanged?.call({..._selection});
     setState(() {});
   }
 
