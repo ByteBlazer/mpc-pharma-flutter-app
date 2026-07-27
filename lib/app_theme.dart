@@ -190,6 +190,10 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
+        hintStyle: TextStyle(
+          color: Colors.black.withValues(alpha: 0.35),
+          fontWeight: FontWeight.w400,
+        ),
         floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
           if (states.contains(WidgetState.focused)) {
             return TextStyle(

@@ -17,6 +17,7 @@ import '../features/scan/scan_models.dart' hide JsonMap;
 import '../features/settings/backup_models.dart' hide JsonMap;
 import '../features/settings/setting_models.dart' hide JsonMap;
 import '../features/tickets/ticket_models.dart' hide JsonMap;
+import '../features/force_update/app_config_models.dart';
 import '../features/public_tracking/public_tracking_models.dart';
 import '../features/reports/delivery_report/delivery_report_models.dart'
     hide JsonMap;
@@ -86,6 +87,12 @@ class ApiClient {
       'Expected buildTimestampEpoch in response',
       response.body,
     );
+  }
+
+  /// Unauthenticated. Minimum app versions and store URLs for forced updates.
+  Future<AppConfig> getAppConfig() async {
+    final response = await _get('app-config', requiresAuth: false);
+    return AppConfig.fromJson(_decodeJsonObject(response.body));
   }
 
   Future<OtpVerificationResponse> impersonate({

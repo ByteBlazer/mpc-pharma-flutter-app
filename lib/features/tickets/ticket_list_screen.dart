@@ -369,7 +369,7 @@ class _TicketListScreenState extends State<TicketListScreen>
                       labelText: widget.isEmployeeView
                           ? 'Search tickets'
                           : 'Search complaints',
-                      hintText: 'Ticket #, subject, status...',
+                      hintText: 'Ticket Id, subject, status...',
                     ),
                     if (widget.isEmployeeView && _tabController != null) ...[
                       const SizedBox(height: 12),
@@ -805,8 +805,9 @@ class _TicketSummaryCard extends StatelessWidget {
                               WidgetSpan(
                                 alignment: PlaceholderAlignment.middle,
                                 child: Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 2,
+                                  ),
                                   child: Tooltip(
                                     message: 'High priority',
                                     child: Icon(

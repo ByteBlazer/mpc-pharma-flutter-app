@@ -153,10 +153,19 @@ class AppMultiSelectField<T> extends StatelessWidget {
     onChanged({});
   }
 
-  Widget? _buildSuffixIcon() {
-    const dropdown = Icon(Icons.arrow_drop_down);
+  Widget? _buildSuffixIcon(BuildContext context) {
+    final openPicker = enabled ? () => _openPicker(context) : null;
+    final dropdownButton = IconButton(
+      icon: const Icon(Icons.arrow_drop_down),
+      tooltip: 'Open',
+      onPressed: openPicker,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+    );
+
     if (!showClearButton || selectedValues.isEmpty || !enabled) {
-      return dropdown;
+      return dropdownButton;
     }
 
     return Row(
@@ -170,18 +179,23 @@ class AppMultiSelectField<T> extends StatelessWidget {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
         ),
-        dropdown,
+        dropdownButton,
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final textColor = enabled
+        ? onSurface
+        : onSurface.withValues(alpha: 0.38);
+
     return InputDecorator(
       decoration: InputDecoration(
         labelText: fieldLabel,
         enabled: enabled,
-        suffixIcon: _buildSuffixIcon(),
+        suffixIcon: _buildSuffixIcon(context),
       ),
       child: InkWell(
         onTap: enabled ? () => _openPicker(context) : null,
@@ -189,9 +203,7 @@ class AppMultiSelectField<T> extends StatelessWidget {
           _fieldSummary,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: selectedValues.isEmpty ? Colors.black54 : Colors.black,
-          ),
+          style: TextStyle(color: textColor),
         ),
       ),
     );
@@ -408,6 +420,14 @@ class _AppMultiSelectDialogState<T> extends State<_AppMultiSelectDialog<T>> {
                 ],
               ),
       ),
+      actions: widget.singleSelect
+          ? null
+          : [
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
     );
   }
 }
