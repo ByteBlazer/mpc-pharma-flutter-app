@@ -4,21 +4,32 @@ abstract final class AppEnvironment {
   static const local = 'local';
   static const staging = 'staging';
   static const production = 'production';
-  static const selected = String.fromEnvironment('APP_ENV', defaultValue: local);
+  static const selected = String.fromEnvironment(
+    'APP_ENV',
+    defaultValue: local,
+  );
 
   static String? _loadedName;
   static String? _loadedApiBaseUrl;
+  static String? _loadedAppCode;
+  static String? _loadedGoogleMapApiKey;
 
   static Future<void> load() async {
     await dotenv.load(fileName: _fileNameForSelectedEnvironment());
     _loadedName = dotenv.env['APP_ENV'];
     _loadedApiBaseUrl = dotenv.env['API_BASE_URL'];
+    _loadedAppCode = dotenv.env['APP_CODE'];
+    _loadedGoogleMapApiKey = dotenv.env['GOOGLE_MAP_API_KEY'];
   }
 
   static String get name => _loadedName ?? _selectedOrLocal();
 
   static String get apiBaseUrl =>
       _loadedApiBaseUrl ?? 'REST API URL not configured yet';
+
+  static String get appCode => _loadedAppCode ?? '';
+
+  static String get googleMapApiKey => _loadedGoogleMapApiKey ?? '';
 
   static String _fileNameForSelectedEnvironment() {
     switch (_selectedOrLocal()) {

@@ -30,12 +30,31 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
+  # Use with the Cupertino Icons class for iOS style icons.
   cupertino_icons: ^1.0.8
   flutter_dotenv: ^6.0.1
   http: ^1.6.0
+  shared_preferences: ^2.5.5
+  google_maps_flutter: ^2.17.1
+  file_picker: ^11.0.2
+  record: ^6.2.1
+  audioplayers: ^6.7.1
+  path_provider: ^2.1.6
+  url_launcher: ^6.3.2
+  mobile_scanner: ^7.3.0
+  wakelock_plus: ^1.5.2
+  permission_handler: ^12.0.3
+  geolocator: ^14.0.2
+  signature: ^6.3.0
+  flutter_foreground_task: ^10.0.0
+  pointer_interceptor: ^0.10.1+2
+  image_picker: ^1.2.3
+  package_info_plus: ^9.0.1
+  in_app_update: ^4.2.5
 
 dev_dependencies:
   flutter_test:
@@ -60,9 +79,14 @@ flutter:
   uses-material-design: true
 
   assets:
+    - BUILD_TIMESTAMP
     - env/local.env
     - env/staging.env
     - env/production.env
+    - assets/images/customer_map_marker.png
+    - assets/images/truck_map_marker.png
+    - assets/sounds/scan_success.wav
+    - assets/sounds/scan_error.wav
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

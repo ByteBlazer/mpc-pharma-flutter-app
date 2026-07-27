@@ -1,0 +1,42 @@
+---
+description: Google Maps UI and lifecycle conventions for all map screens
+alwaysApply: true
+---
+
+# Google Maps Patterns
+
+Follow `lib/features/trip_dashboard/trip_dashboard_map_section.dart` as the canonical map implementation.
+
+## Setup
+
+- API key: `AppEnvironment.googleMapApiKey` from `GOOGLE_MAP_API_KEY` in env files
+- Web script load: `ensureGoogleMapsLoaded()` from `lib/utils/google_maps_loader.dart`
+
+## Marker icon (required)
+
+**Always** use the project map marker — never default Google pins or other assets.
+
+- Asset: `assets/images/customer_map_marker.png`
+- Size: **32×32** logical px
+- Load via `BitmapDescriptor.asset` with `ImageConfiguration(size: Size(32, 32), devicePixelRatio: 1.0)`
+- Prefer a shared helper (e.g. `loadTripDashboardCustomerMapMarkerIcon()`) so path and size stay in one place
+
+## Marker selection UI
+
+- **Do not** use native `InfoWindow` for actions or multi-line content — rendering is inconsistent on web
+- On marker tap, show a **bottom callout** in a `Stack` over the map (`Positioned(left: 12, right: 12, bottom: 12, ...)`)
+- Dismiss callout on map tap or close icon
+- Callout layout (always this order):
+  1. Title (bold, max 2 lines, ellipsis)
+  2. Subtitle e.g. city on its **own line** (if present)
+  3. **View Details** as a compact `FilledButton` on the **next line** (only when user has access)
+- Style: white card, `BorderRadius.circular(16)`, primary-color border, `elevation: 6`
+
+## Controller lifecycle
+
+- **Never** call `GoogleMapController.dispose()` manually — `GoogleMap` owns disposal
+- Clear the controller reference in `dispose()`; guard async callbacks with `mounted`
+
+## Reuse
+
+When adding a second map screen, extract shared pieces (loader, marker icon helpers, bottom callout widget) into `lib/widgets/` rather than duplicating.

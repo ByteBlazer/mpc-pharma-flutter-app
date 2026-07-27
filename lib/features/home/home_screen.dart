@@ -1,0 +1,876 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+
+import '../../api/api_client.dart';
+import '../../api/auth_token_store.dart';
+import '../../app_theme.dart';
+import '../../auth/jwt_payload.dart';
+import '../../utils/build_timestamp.dart';
+import '../../widgets/app_brand_page_background.dart';
+import '../../widgets/app_load_error_state.dart';
+import '../../widgets/app_surface.dart';
+import '../../widgets/simulation_mode_banner.dart';
+import '../auth/impersonate_screen.dart';
+import '../customers/customers_screen.dart';
+import '../departments/departments_screen.dart';
+import '../leave_requests/leave_requests_screen.dart';
+import '../locations/locations_screen.dart';
+import '../notifications/notification_inbox_controller.dart';
+import '../notifications/notifications_screen.dart';
+import '../queue/queue_screen.dart';
+import '../reports/reports_screen.dart';
+import '../scan/scan_screen.dart';
+import '../settings/settings_screen.dart';
+import '../tickets/tickets_screen.dart';
+import '../trip_dashboard/trip_dashboard_screen.dart';
+import '../trips/trips_screen.dart';
+import '../my_trips/my_trips_screen.dart';
+import '../users/users_screen.dart';
+
+const _homeTileSpacing = 20.0;
+
+bool _isWideHomeLayout(double width) => width > 500;
+
+double _homeTileWidth(double width) => _isWideHomeLayout(width) ? 88.0 : 68.0;
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({
+    super.key,
+    required this.apiClient,
+    required this.onLoginAgain,
+    required this.onSessionReplaced,
+    required this.onExitSimulation,
+    required this.isSimulationMode,
+    this.notificationInbox,
+  });
+
+  final ApiClient apiClient;
+  final Future<void> Function() onLoginAgain;
+  final VoidCallback onSessionReplaced;
+  final Future<void> Function() onExitSimulation;
+  final bool isSimulationMode;
+  final NotificationInboxController? notificationInbox;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    widget.notificationInbox?.addListener(_onInboxChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.notificationInbox != widget.notificationInbox) {
+      oldWidget.notificationInbox?.removeListener(_onInboxChanged);
+      widget.notificationInbox?.addListener(_onInboxChanged);
+    }
+  }
+
+  void _onInboxChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.notificationInbox?.removeListener(_onInboxChanged);
+    super.dispose();
+  }
+
+  Future<void> _loginAgain() async {
+    await widget.onLoginAgain();
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final inbox = widget.notificationInbox;
+    final showAuthError = inbox != null && inbox.isAuthError && inbox.hasError;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const Positioned.fill(
+          child: AppBrandPageBackground(showDecorCircles: true),
+        ),
+        SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: showAuthError
+                    ? AppLoadErrorState(
+                        title: 'Session expired',
+                        message: inbox.error.toString(),
+                        onRetry: () => inbox.refresh(),
+                        onLoginAgain: _loginAgain,
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 960),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const _HomeWelcomeCard(),
+                                  const SizedBox(height: 28),
+                                  _HomeFeatureGrid(
+                                    isSimulationMode: widget.isSimulationMode,
+                                    apiClient: widget.apiClient,
+                                    onLoginAgain: widget.onLoginAgain,
+                                    onSessionReplaced: widget.onSessionReplaced,
+                                    notificationInbox: inbox,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+              if (widget.isSimulationMode)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 960),
+                      child: SimulationModeBanner(
+                        isVisible: true,
+                        onExitSimulation: widget.onExitSimulation,
+                      ),
+                    ),
+                  ),
+                ),
+              _HomeBuildTimestamp(apiClient: widget.apiClient),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HomeBuildTimestamp extends StatelessWidget {
+  const _HomeBuildTimestamp({required this.apiClient});
+
+  final ApiClient apiClient;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: loadBuildTimestamp(apiClient: apiClient),
+      builder: (context, snapshot) {
+        final stamp = snapshot.data;
+        if (stamp == null || stamp.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+          child: Text(
+            'Build $stamp',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.black45,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HomeWelcomeCard extends StatelessWidget {
+  const _HomeWelcomeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_HomeUser?>(
+      future: _HomeUser.load(),
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        if (user == null) return const SizedBox.shrink();
+
+        final primary = Theme.of(context).colorScheme.primary;
+        final accentText = AppTheme.primaryAccentText(primary);
+
+        return AppSurface(
+          borderRadius: 20,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.11),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: primary.withValues(alpha: 0.20)),
+                  ),
+                  child: Icon(
+                    Icons.person_outline,
+                    color: accentText,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.username.trim().isEmpty
+                            ? 'Welcome'
+                            : 'Welcome, ${user.username}',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      if (user.baseLocationName.trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.place_outlined,
+                              size: 16,
+                              color: accentText,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                user.baseLocationName,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Colors.black87,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HomeUser {
+  const _HomeUser({required this.username, required this.baseLocationName});
+
+  final String username;
+  final String baseLocationName;
+
+  static Future<_HomeUser?> load() async {
+    final token = await AuthTokenStore().readToken();
+    if (token == null) return null;
+
+    final parts = token.split('.');
+    if (parts.length < 2) return null;
+
+    final payload = utf8.decode(
+      base64Url.decode(base64Url.normalize(parts[1])),
+    );
+    final json = jsonDecode(payload);
+    if (json is! Map<String, dynamic>) return null;
+
+    return _HomeUser(
+      username: json['username']?.toString() ?? '',
+      baseLocationName: json['baseLocationName']?.toString() ?? '',
+    );
+  }
+}
+
+class _HomeFeatureGrid extends StatelessWidget {
+  const _HomeFeatureGrid({
+    required this.isSimulationMode,
+    required this.apiClient,
+    required this.onLoginAgain,
+    required this.onSessionReplaced,
+    this.notificationInbox,
+  });
+
+  final bool isSimulationMode;
+  final ApiClient apiClient;
+  final Future<void> Function() onLoginAgain;
+  final VoidCallback onSessionReplaced;
+  final NotificationInboxController? notificationInbox;
+
+  Future<_HomeFeatureVisibility> _loadVisibility() async {
+    final showImpersonate =
+        !isSimulationMode && await JwtPayload.canStartImpersonation();
+    final hasWebAccess = await JwtPayload.currentUserHasWebAccess();
+    final isAppAdmin = await JwtPayload.currentUserIsAppAdmin();
+    final isCustomer = await JwtPayload.currentUserIsCustomer();
+    final showTickets = hasWebAccess;
+    final showLeaveRequests = hasWebAccess && !isCustomer;
+    final showReports = (hasWebAccess || isAppAdmin) && !isCustomer;
+    final showComplaints = isCustomer;
+    final showSettings = await JwtPayload.currentUserIsAppAdmin();
+    final showNotifications = hasWebAccess;
+    final showCustomers = hasWebAccess;
+    final showScan = await JwtPayload.currentUserCanAccessScan();
+    final showQueueAndTrips =
+        await JwtPayload.currentUserCanAccessQueueAndTrips();
+    final showMyTrips = await JwtPayload.currentUserCanAccessMyTrips();
+    final showTripDashboard =
+        await JwtPayload.currentUserCanAccessTripDashboard();
+    return _HomeFeatureVisibility(
+      showImpersonate: showImpersonate,
+      showTickets: showTickets,
+      showLeaveRequests: showLeaveRequests,
+      showReports: showReports,
+      showComplaints: showComplaints,
+      showSettings: showSettings,
+      showNotifications: showNotifications,
+      showCustomers: showCustomers,
+      showScan: showScan,
+      showQueueAndTrips: showQueueAndTrips,
+      showMyTrips: showMyTrips,
+      showTripDashboard: showTripDashboard,
+    );
+  }
+
+  List<Widget> _buildGeneralTiles(
+    BuildContext context,
+    _HomeFeatureVisibility visibility,
+  ) {
+    return [
+      if (visibility.showNotifications)
+        _FeatureTile(
+          icon: Icons.notifications_outlined,
+          label: 'Notifications',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => NotificationsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                  inboxController: notificationInbox,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showTickets)
+        _FeatureTile(
+          icon: Icons.confirmation_number_outlined,
+          label: 'Tickets',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TicketsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showLeaveRequests)
+        _FeatureTile(
+          icon: Icons.event_busy_outlined,
+          label: 'Leave Requests',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => LeaveRequestsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showReports)
+        _FeatureTile(
+          icon: Icons.assessment_outlined,
+          label: 'Reports',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ReportsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showComplaints)
+        _FeatureTile(
+          icon: Icons.support_agent_outlined,
+          label: 'Complaints',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ComplaintsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showSettings)
+        _FeatureTile(
+          icon: Icons.people_alt_outlined,
+          label: 'Users',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => UsersScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showSettings)
+        _FeatureTile(
+          icon: Icons.business_outlined,
+          label: 'Departments',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => DepartmentsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showCustomers)
+        _FeatureTile(
+          icon: Icons.storefront_outlined,
+          label: 'Customers',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => CustomersScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showSettings)
+        _FeatureTile(
+          icon: Icons.map_outlined,
+          label: 'Locations',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => LocationsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showSettings)
+        _FeatureTile(
+          icon: Icons.settings_outlined,
+          label: 'Settings',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => SettingsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showImpersonate)
+        _FeatureTile(
+          icon: Icons.manage_accounts_outlined,
+          label: 'Simulate Other User',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ImpersonateScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                  onSessionReplaced: onSessionReplaced,
+                ),
+              ),
+            );
+          },
+        ),
+    ];
+  }
+
+  List<Widget> _buildTripsTiles(
+    BuildContext context,
+    _HomeFeatureVisibility visibility,
+  ) {
+    return [
+      if (visibility.showScan)
+        _FeatureTile(
+          icon: Icons.qr_code_scanner,
+          label: 'Scan',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ScanScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showQueueAndTrips)
+        _FeatureTile(
+          icon: Icons.queue_outlined,
+          label: 'Queue',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => QueueScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showQueueAndTrips)
+        _FeatureTile(
+          icon: Icons.local_shipping_outlined,
+          label: 'Scheduled Trips',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TripsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showMyTrips)
+        _FeatureTile(
+          icon: Icons.route_outlined,
+          label: 'My Trips',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => MyTripsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showTripDashboard)
+        _FeatureTile(
+          icon: Icons.dashboard_customize_outlined,
+          label: 'Trip Dashboard',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => TripDashboardScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+    ];
+  }
+
+  Widget _buildTileSection({
+    required String title,
+    required List<Widget> tiles,
+    required double tileWidth,
+    required int columns,
+    required double gridWidth,
+  }) {
+    if (tiles.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Center(
+          child: SizedBox(
+            width: gridWidth,
+            child: Column(
+              children: [
+                for (
+                  var rowStart = 0;
+                  rowStart < tiles.length;
+                  rowStart += columns
+                ) ...[
+                  if (rowStart > 0) const SizedBox(height: _homeTileSpacing),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var column = 0; column < columns; column++) ...[
+                        if (column > 0) const SizedBox(width: _homeTileSpacing),
+                        SizedBox(
+                          width: tileWidth,
+                          child: rowStart + column < tiles.length
+                              ? tiles[rowStart + column]
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_HomeFeatureVisibility>(
+      future: _loadVisibility(),
+      builder: (context, snapshot) {
+        final visibility = snapshot.data;
+        if (visibility == null) return const SizedBox.shrink();
+
+        final generalTiles = _buildGeneralTiles(context, visibility);
+        final tripsTiles = _buildTripsTiles(context, visibility);
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final screenWidth = MediaQuery.sizeOf(context).width;
+            final tileWidth = _homeTileWidth(screenWidth);
+            final columns =
+                ((constraints.maxWidth + _homeTileSpacing) /
+                        (tileWidth + _homeTileSpacing))
+                    .floor()
+                    .clamp(1, 8);
+            final gridWidth =
+                tileWidth * columns + _homeTileSpacing * (columns - 1);
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (generalTiles.isNotEmpty)
+                    _buildTileSection(
+                      title: 'General',
+                      tiles: generalTiles,
+                      tileWidth: tileWidth,
+                      columns: columns,
+                      gridWidth: gridWidth,
+                    ),
+                  if (generalTiles.isNotEmpty && tripsTiles.isNotEmpty)
+                    const SizedBox(height: 28),
+                  if (tripsTiles.isNotEmpty)
+                    _buildTileSection(
+                      title: 'Trips',
+                      tiles: tripsTiles,
+                      tileWidth: tileWidth,
+                      columns: columns,
+                      gridWidth: gridWidth,
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _HomeFeatureVisibility {
+  const _HomeFeatureVisibility({
+    required this.showImpersonate,
+    required this.showTickets,
+    required this.showLeaveRequests,
+    required this.showReports,
+    required this.showComplaints,
+    required this.showSettings,
+    required this.showNotifications,
+    required this.showCustomers,
+    required this.showScan,
+    required this.showQueueAndTrips,
+    required this.showMyTrips,
+    required this.showTripDashboard,
+  });
+
+  final bool showImpersonate;
+  final bool showTickets;
+  final bool showLeaveRequests;
+  final bool showReports;
+  final bool showComplaints;
+  final bool showSettings;
+  final bool showNotifications;
+  final bool showCustomers;
+  final bool showScan;
+  final bool showQueueAndTrips;
+  final bool showMyTrips;
+  final bool showTripDashboard;
+}
+
+class _FeatureTile extends StatelessWidget {
+  const _FeatureTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isWide = _isWideHomeLayout(screenWidth);
+    final tileWidth = _homeTileWidth(screenWidth);
+    final iconBoxSize = isWide ? 72.0 : 52.0;
+    final iconSize = isWide ? 32.0 : 24.0;
+    final borderRadius = isWide ? 16.0 : 14.0;
+    final labelSpacing = isWide ? 8.0 : 6.0;
+    final labelFontSize = isWide ? 13.0 : 11.0;
+    final labelLineHeight = labelFontSize * 1.15;
+    final labelAreaHeight = labelLineHeight * 2;
+
+    const borderWidth = 1.0;
+    const tileInset = 2.0;
+    final innerRadius = borderRadius > borderWidth
+        ? borderRadius - borderWidth
+        : 0.0;
+
+    return SizedBox(
+      width: tileWidth,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(tileInset),
+              child: Container(
+                padding: const EdgeInsets.all(borderWidth),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(borderRadius),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Container(
+                  width: iconBoxSize,
+                  height: iconBoxSize,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(innerRadius),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: iconSize,
+                    color: AppTheme.primaryGlyph(colorScheme.primary),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: labelSpacing),
+            SizedBox(
+              height: labelAreaHeight,
+              width: tileWidth,
+              child: _HomeTileLabel(label: label, fontSize: labelFontSize),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeTileLabel extends StatelessWidget {
+  const _HomeTileLabel({required this.label, required this.fontSize});
+
+  final String label;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: Colors.black,
+      fontWeight: FontWeight.w600,
+      fontSize: fontSize,
+      height: 1.15,
+    );
+    final canWrapAtSpaces = label.trim().contains(RegExp(r'\s'));
+
+    // Reserve two lines for labels like "Trip Dashboard", but center shorter
+    // labels vertically so "My Trips" aligns with "Scan" / "Queue" / "Scheduled Trips".
+    return Align(
+      alignment: Alignment.center,
+      child: canWrapAtSpaces
+          ? Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            )
+          : FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                softWrap: false,
+                style: style,
+              ),
+            ),
+    );
+  }
+}

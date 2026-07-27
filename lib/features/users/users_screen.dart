@@ -1,0 +1,627 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+
+import '../../api/api_client.dart';
+import '../../utils/download_file.dart';
+import '../../widgets/app_async_list_loader.dart';
+import '../../widgets/app_list_controls_row.dart';
+import '../../widgets/app_load_error_state.dart';
+import '../../widgets/app_screen_scaffold.dart';
+import '../../widgets/app_scrollbar.dart';
+import '../../widgets/app_search_field.dart';
+import '../../widgets/app_snack_bar.dart';
+import '../../widgets/app_sort_controls.dart';
+import '../../widgets/app_surface.dart';
+import 'user_form_screen.dart';
+import 'user_models.dart';
+
+class UsersScreen extends StatefulWidget {
+  const UsersScreen({
+    super.key,
+    required this.apiClient,
+    required this.onLoginAgain,
+  });
+
+  final ApiClient apiClient;
+  final Future<void> Function() onLoginAgain;
+
+  @override
+  State<UsersScreen> createState() => _UsersScreenState();
+}
+
+class _UsersScreenState extends State<UsersScreen> {
+  final _searchController = TextEditingController();
+  final _loader = AppAsyncListLoader<_UsersData>();
+  String _searchQuery = '';
+  AppSortField _sortField = AppSortField.id;
+  AppSortDirection _sortDirection = AppSortDirection.descending;
+  bool _showInactive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loader.initialize(_loadData);
+    _searchController.addListener(_handleSearchChange);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_handleSearchChange);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _handleSearchChange() {
+    setState(() => _searchQuery = _searchController.text);
+  }
+
+  void _changeSort(AppSortField field) {
+    setState(() {
+      if (_sortField == field) {
+        _sortDirection = _sortDirection == AppSortDirection.ascending
+            ? AppSortDirection.descending
+            : AppSortDirection.ascending;
+      } else {
+        _sortField = field;
+        _sortDirection = AppSortDirection.ascending;
+      }
+    });
+  }
+
+  Future<_UsersData> _loadData() async {
+    final results = await Future.wait([
+      widget.apiClient.getUsers(),
+      widget.apiClient.getUserRoles(),
+      widget.apiClient.getBaseLocations(),
+    ]);
+
+    return _UsersData(
+      users: results[0] as List<UserAccount>,
+      roles: results[1] as List<UserRoleOption>,
+      baseLocations: results[2] as List<BaseLocation>,
+    );
+  }
+
+  Future<void> _refresh() {
+    return _loader.reload(load: _loadData, setState: setState);
+  }
+
+  Future<void> _addUser(_UsersData data) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => UserFormScreen(
+          apiClient: widget.apiClient,
+          availableRoles: data.roles,
+          baseLocations: data.baseLocations,
+        ),
+      ),
+    );
+    if (!mounted || saved != true) return;
+    _showSuccessMessage('User added successfully.');
+    await _refresh();
+  }
+
+  Future<void> _editUser(_UsersData data, UserAccount user) async {
+    try {
+      final latestUser = await widget.apiClient.getUser(userId: user.id);
+      if (!mounted) return;
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => UserFormScreen(
+            apiClient: widget.apiClient,
+            availableRoles: data.roles,
+            baseLocations: data.baseLocations,
+            user: latestUser,
+          ),
+        ),
+      );
+      if (!mounted || saved != true) return;
+      _showSuccessMessage('User updated successfully.');
+      await _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Failed to load user: $error',
+        type: AppSnackBarType.error,
+      );
+    }
+  }
+
+  void _showSuccessMessage(String message) {
+    if (!mounted) return;
+    showAppSnackBar(context, message: message, type: AppSnackBarType.success);
+  }
+
+  Future<void> _downloadUsers(List<UserAccount> users) async {
+    try {
+      final fileName =
+          'mpc-pharma-users-${DateTime.now().millisecondsSinceEpoch}.csv';
+      await downloadFile(
+        fileName: fileName,
+        bytes: utf8.encode(_usersToCsv(users)),
+        mimeType: 'text/csv;charset=utf-8',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
+    }
+  }
+
+  String _usersToCsv(List<UserAccount> users) {
+    final rows = <List<String>>[
+      [
+        'ID',
+        'Name',
+        'Mobile',
+        'Base Location ID',
+        'Base Location',
+        'Vehicle Number',
+        'Active',
+        'Roles',
+        'Created At',
+      ],
+      ...users.map(
+        (user) => [
+          user.id,
+          user.personName,
+          user.mobile,
+          user.baseLocationId,
+          user.baseLocationName,
+          user.vehicleNbr,
+          user.isActive ? 'Active' : 'Inactive',
+          user.roles.map((role) => role.tokenValue).join('; '),
+          user.createdAt?.toLocal().toString() ?? '',
+        ],
+      ),
+    ];
+
+    return rows.map((row) => row.map(_csvCell).join(',')).join('\n');
+  }
+
+  String _csvCell(String value) {
+    final escaped = value.replaceAll('"', '""');
+    return '"$escaped"';
+  }
+
+  int _compareUsers(UserAccount first, UserAccount second) {
+    final activeCompare = second.isActive == first.isActive
+        ? 0
+        : (first.isActive ? -1 : 1);
+    if (activeCompare != 0) return activeCompare;
+
+    final result = switch (_sortField) {
+      AppSortField.name => first.personName.toLowerCase().compareTo(
+        second.personName.toLowerCase(),
+      ),
+      AppSortField.id => _numericId(first.id).compareTo(_numericId(second.id)),
+    };
+    return _sortDirection == AppSortDirection.ascending ? result : -result;
+  }
+
+  int _numericId(String id) => int.tryParse(id) ?? 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppScreenScaffold(
+      appBar: AppBar(
+        title: const Text('Users'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: FutureBuilder<_UsersData>(
+          key: ValueKey(_loader.refreshToken),
+          future: _loader.future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError) {
+              return AppLoadErrorState(
+                title: 'Failed to load Users',
+                message: snapshot.error.toString(),
+                onRetry: _refresh,
+                onLoginAgain: widget.onLoginAgain,
+              );
+            }
+
+            final data = snapshot.data ?? _UsersData.empty();
+            final visibleUsers = _showInactive
+                ? data.users
+                : data.users.where((user) => user.isActive).toList();
+            final filteredUsers = visibleUsers
+                .where((user) => user.matchesSearch(_searchQuery))
+                .toList();
+            filteredUsers.sort(_compareUsers);
+
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 960),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _SearchAndActions(
+                        controller: _searchController,
+                        shownCount: filteredUsers.length,
+                        totalCount: visibleUsers.length,
+                        sortField: _sortField,
+                        sortDirection: _sortDirection,
+                        showInactive: _showInactive,
+                        onShowInactiveChanged: (value) {
+                          setState(() => _showInactive = value);
+                        },
+                        onSortChanged: _changeSort,
+                        onAddUser: () => _addUser(data),
+                        onDownloadUsers: () => _downloadUsers(data.users),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: _UsersSection(
+                          users: filteredUsers,
+                          sortField: _sortField,
+                          sortDirection: _sortDirection,
+                          onEditUser: (user) => _editUser(data, user),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchAndActions extends StatelessWidget {
+  const _SearchAndActions({
+    required this.controller,
+    required this.shownCount,
+    required this.totalCount,
+    required this.sortField,
+    required this.sortDirection,
+    required this.showInactive,
+    required this.onShowInactiveChanged,
+    required this.onSortChanged,
+    required this.onAddUser,
+    required this.onDownloadUsers,
+  });
+
+  final TextEditingController controller;
+  final int shownCount;
+  final int totalCount;
+  final AppSortField sortField;
+  final AppSortDirection sortDirection;
+  final bool showInactive;
+  final ValueChanged<bool> onShowInactiveChanged;
+  final ValueChanged<AppSortField> onSortChanged;
+  final VoidCallback onAddUser;
+  final VoidCallback onDownloadUsers;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 720;
+        final search = AppSearchField(
+          controller: controller,
+          labelText: 'Search users',
+          hintText: 'Name, mobile, location, vehicle, role...',
+        );
+        final addUser = ElevatedButton.icon(
+          onPressed: onAddUser,
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          icon: const Icon(Icons.person_add_alt),
+          label: const Text('Add New User'),
+        );
+        final download = OutlinedButton.icon(
+          onPressed: onDownloadUsers,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          icon: const Icon(Icons.download_outlined),
+          label: const Text('Download'),
+        );
+
+        if (narrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _UsersCountText(shownCount: shownCount, totalCount: totalCount),
+              const SizedBox(height: 8),
+              search,
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: download),
+                  const SizedBox(width: 12),
+                  Expanded(child: addUser),
+                ],
+              ),
+              const SizedBox(height: 8),
+              AppListControlsRow(
+                sortField: sortField,
+                sortDirection: sortDirection,
+                showInactive: showInactive,
+                onShowInactiveChanged: onShowInactiveChanged,
+                onSortChanged: onSortChanged,
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _UsersCountText(shownCount: shownCount, totalCount: totalCount),
+            const SizedBox(height: 8),
+            search,
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [download, addUser],
+              ),
+            ),
+            const SizedBox(height: 8),
+            AppListControlsRow(
+              sortField: sortField,
+              sortDirection: sortDirection,
+              showInactive: showInactive,
+              onShowInactiveChanged: onShowInactiveChanged,
+              onSortChanged: onSortChanged,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _UsersCountText extends StatelessWidget {
+  const _UsersCountText({required this.shownCount, required this.totalCount});
+
+  final int shownCount;
+  final int totalCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '$shownCount of $totalCount users',
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Colors.black,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+}
+
+class _UsersSection extends StatefulWidget {
+  const _UsersSection({
+    required this.users,
+    required this.sortField,
+    required this.sortDirection,
+    required this.onEditUser,
+  });
+
+  final List<UserAccount> users;
+  final AppSortField sortField;
+  final AppSortDirection sortDirection;
+  final ValueChanged<UserAccount> onEditUser;
+
+  @override
+  State<_UsersSection> createState() => _UsersSectionState();
+}
+
+class _UsersSectionState extends State<_UsersSection> {
+  final _scrollController = ScrollController();
+
+  @override
+  void didUpdateWidget(_UsersSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sortField != widget.sortField ||
+        oldWidget.sortDirection != widget.sortDirection) {
+      _scrollToTop();
+    }
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.users.isEmpty) {
+      return const _EmptyState(message: 'No users match the search.');
+    }
+
+    return AppScrollbar(
+      controller: _scrollController,
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.only(right: 20),
+        itemCount: widget.users.length,
+        itemBuilder: (context, index) {
+          final user = widget.users[index];
+          return _UserListItem(
+            user: user,
+            onEdit: () => widget.onEditUser(user),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _UserListItem extends StatelessWidget {
+  const _UserListItem({required this.user, required this.onEdit});
+
+  final UserAccount user;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: AppSurface(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      user.personName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  _StatusPill(isActive: user.isActive),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: 'Edit user',
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 6,
+                children: [
+                  _SmallInfo(icon: Icons.badge_outlined, text: user.id),
+                  _SmallInfo(icon: Icons.phone_outlined, text: user.mobile),
+                  _SmallInfo(
+                    icon: Icons.location_on_outlined,
+                    text: user.baseLocationName,
+                  ),
+                  if (user.vehicleNbr.isNotEmpty)
+                    _SmallInfo(
+                      icon: Icons.local_shipping_outlined,
+                      text: user.vehicleNbr,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SmallInfo extends StatelessWidget {
+  const _SmallInfo({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: Colors.black),
+        const SizedBox(width: 4),
+        Text(text, style: const TextStyle(color: Colors.black)),
+      ],
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.isActive});
+
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: isActive ? colorScheme.primary : Colors.black,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          isActive ? 'Active' : 'Inactive',
+          style: const TextStyle(color: Colors.white, fontSize: 12),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.black),
+      ),
+    );
+  }
+}
+
+
+class _UsersData {
+  const _UsersData({
+    required this.users,
+    required this.roles,
+    required this.baseLocations,
+  });
+
+  factory _UsersData.empty() {
+    return const _UsersData(users: [], roles: [], baseLocations: []);
+  }
+
+  final List<UserAccount> users;
+  final List<UserRoleOption> roles;
+  final List<BaseLocation> baseLocations;
+}

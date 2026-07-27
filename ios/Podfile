@@ -1,0 +1,88 @@
+platform :ios, '14.0'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+require 'base64'
+
+def read_google_map_api_key
+  app_env = 'local'
+  generated_xcode_build_settings_path = File.expand_path(
+    File.join('Flutter', 'Generated.xcconfig'),
+    __dir__,
+  )
+  if File.exist?(generated_xcode_build_settings_path)
+    File.foreach(generated_xcode_build_settings_path) do |line|
+      next unless line.start_with?('DART_DEFINES=')
+
+      encoded_defines = line.split('=', 2)[1].to_s.strip
+      encoded_defines.split(',').each do |encoded|
+        decoded = Base64.decode64(encoded)
+        next unless decoded.start_with?('APP_ENV=')
+
+        app_env = decoded.split('=', 2)[1]
+      end
+    end
+  end
+
+  env_file = File.expand_path("../env/#{app_env}.env", __dir__)
+  if File.exist?(env_file)
+    File.foreach(env_file) do |line|
+      trimmed = line.strip
+      next unless trimmed.start_with?('GOOGLE_MAP_API_KEY=')
+
+      return trimmed.split('=', 2)[1].strip
+    end
+  end
+
+  ''
+end
+
+def write_google_maps_xcconfig
+  api_key = read_google_map_api_key
+  xcconfig_path = File.expand_path('Flutter/GoogleMaps.xcconfig', __dir__)
+  File.write(xcconfig_path, "GOOGLE_MAPS_API_KEY=#{api_key}\n")
+end
+
+write_google_maps_xcconfig
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+    end
+  end
+end
