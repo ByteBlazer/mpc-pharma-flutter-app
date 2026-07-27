@@ -20,6 +20,10 @@ import 'widgets/delivery_report_table.dart';
 
 const _mobileLayoutBreakpoint = 768.0;
 const _noDateSelectedLabel = 'No date selected';
+/// Filters vs results grid height split when the on-screen table is visible.
+/// Table uses 40% of the pair (20% less than an even 50/50 split).
+const _deliveryReportFiltersFlex = 3;
+const _deliveryReportTableFlex = 2;
 
 class DeliveryReportScreen extends StatefulWidget {
   const DeliveryReportScreen({
@@ -552,6 +556,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                 children: [
                   if (showTable || showTableLoading)
                     Flexible(
+                      flex: _deliveryReportFiltersFlex,
                       child: SingleChildScrollView(
                         child: Center(
                           child: ConstrainedBox(
@@ -574,7 +579,8 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                     ),
                   if (showTable) ...[
                     const SizedBox(height: 16),
-                    Expanded(
+                    Flexible(
+                      flex: _deliveryReportTableFlex,
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 1200),
@@ -588,8 +594,9 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                   ],
                   if (showTableLoading) ...[
                     const SizedBox(height: 16),
-                    const Expanded(
-                      child: Center(child: CircularProgressIndicator()),
+                    Flexible(
+                      flex: _deliveryReportTableFlex,
+                      child: const Center(child: CircularProgressIndicator()),
                     ),
                   ],
                 ],
@@ -696,16 +703,6 @@ class _FiltersCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Filters',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Filters by document date, not delivery timestamp. Maximum allowed date range is 1 month.',
-              style: TextStyle(color: Colors.black54, fontSize: 12),
-            ),
-            const SizedBox(height: 12),
             _DateFilterRow(
               isWide: isWide,
               fieldWidth: fieldWidth,
