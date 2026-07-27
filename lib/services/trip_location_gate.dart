@@ -24,8 +24,27 @@ class TripLocationGateResult {
 
 /// GPS on + foreground location + always location + notifications (Android 13+).
 class TripLocationGate {
+  static const foregroundDisclosureTitle = 'Location needed for trip tracking';
+  static const foregroundDisclosureMessage =
+      'MPC Pharma needs your location during an active delivery trip so your '
+      'position can be shared with dispatch. Tap Continue to allow location '
+      'access on the next screen.';
+
+  static const backgroundDisclosureTitle = 'Background location needed';
+  static const backgroundDisclosureMessage =
+      'MPC Pharma needs background location during active trips so dispatch '
+      'can track delivery progress even when the app is closed or not in use. '
+      'On the next screen, choose Allow all the time. Tap Continue to proceed.';
+
+  static const notificationDisclosureTitle = 'Notification for live tracking';
+  static const notificationDisclosureMessage =
+      'MPC Pharma shows a persistent notification while live trip tracking is '
+      'running so you know location is being shared with dispatch. Tap Continue '
+      'to allow notifications on the next screen.';
+
   static Future<TripLocationGateResult> ensureReady({
     required Future<bool?> Function(String title, String message) confirmSettings,
+    required Future<bool?> Function(String title, String message) showDisclosure,
   }) async {
     if (kIsWeb) {
       return const TripLocationGateResult.blocked(
@@ -48,6 +67,18 @@ class TripLocationGate {
 
     var whenInUse = await Permission.locationWhenInUse.status;
     if (!whenInUse.isGranted) {
+      if (!whenInUse.isPermanentlyDenied) {
+        final proceed = await showDisclosure(
+          foregroundDisclosureTitle,
+          foregroundDisclosureMessage,
+        );
+        if (proceed != true) {
+          return const TripLocationGateResult.blocked(
+            message:
+                'Location permission is required to start or resume a trip.',
+          );
+        }
+      }
       whenInUse = await Permission.locationWhenInUse.request();
     }
     if (!whenInUse.isGranted) {
@@ -71,6 +102,18 @@ class TripLocationGate {
 
     var always = await Permission.locationAlways.status;
     if (!always.isGranted) {
+      if (!always.isPermanentlyDenied) {
+        final proceed = await showDisclosure(
+          backgroundDisclosureTitle,
+          backgroundDisclosureMessage,
+        );
+        if (proceed != true) {
+          return const TripLocationGateResult.blocked(
+            message:
+                'Background location is required to track an active delivery trip.',
+          );
+        }
+      }
       always = await Permission.locationAlways.request();
     }
     if (!always.isGranted) {
@@ -93,6 +136,18 @@ class TripLocationGate {
     if (defaultTargetPlatform == TargetPlatform.android) {
       var notification = await Permission.notification.status;
       if (!notification.isGranted) {
+        if (!notification.isPermanentlyDenied) {
+          final proceed = await showDisclosure(
+            notificationDisclosureTitle,
+            notificationDisclosureMessage,
+          );
+          if (proceed != true) {
+            return const TripLocationGateResult.blocked(
+              message:
+                  'Notification permission is required for live trip tracking.',
+            );
+          }
+        }
         notification = await Permission.notification.request();
       }
       if (!notification.isGranted) {
