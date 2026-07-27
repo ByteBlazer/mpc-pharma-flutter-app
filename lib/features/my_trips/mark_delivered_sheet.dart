@@ -63,6 +63,7 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
   bool _submitting = false;
   bool _loadingRecent = true;
   String? _proximityWarning;
+  String? _submissionError;
   String? _reusedSignatureBase64;
 
   @override
@@ -147,7 +148,10 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
       return;
     }
 
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _submissionError = null;
+    });
     var updateLocation = _updateCustomerLocation;
     double? lat;
     double? lng;
@@ -201,14 +205,23 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
         }
         return;
       }
+      if (result.success) {
+        showAppSnackBar(
+          context,
+          message: result.displayMessage,
+          type: AppSnackBarType.success,
+        );
+        Navigator.of(context).pop(true);
+        return;
+      }
+      setState(() => _submissionError = result.displayMessage);
       showAppSnackBar(
         context,
         message: result.displayMessage,
-        type: result.success
-            ? AppSnackBarType.success
+        type: result.isCustomerDeliveryCooldown
+            ? AppSnackBarType.warning
             : AppSnackBarType.error,
       );
-      if (result.success) Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
       showAppSnackBar(
@@ -380,18 +393,35 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: FilledButton(
-                onPressed: _submitting || _loadingRecent ? null : _submit,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _submitting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Confirm delivery'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_submissionError != null) ...[
+                    Text(
+                      _submissionError!,
+                      style: TextStyle(
+                        color: Colors.orange.shade900,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  FilledButton(
+                    onPressed: _submitting || _loadingRecent ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _submitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Confirm delivery'),
+                  ),
+                ],
               ),
             ),
           ),

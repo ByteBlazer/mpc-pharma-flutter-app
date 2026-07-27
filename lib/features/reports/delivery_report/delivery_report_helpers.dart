@@ -101,6 +101,10 @@ String? validateDeliveryReportDateRange({
   if (fromDate.isAfter(toDate)) {
     return 'From date cannot be after to date.';
   }
+  final today = istToday();
+  if (fromDate.isAfter(today) || toDate.isAfter(today)) {
+    return 'Document date cannot be in the future.';
+  }
   final inclusiveDays = toDate.difference(fromDate).inDays + 1;
   if (inclusiveDays > deliveryReportMaxDateRangeDays) {
     return 'Document date range cannot exceed 1 month.';
