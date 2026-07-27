@@ -63,20 +63,26 @@ class _DeliveryReportTableState extends State<DeliveryReportTable> {
   }
 
   void _syncHeaderScrollToBody() {
-    if (_syncingHorizontalScroll || !_bodyHorizontalScrollController.hasClients) {
+    if (_syncingHorizontalScroll ||
+        !_bodyHorizontalScrollController.hasClients) {
       return;
     }
     _syncingHorizontalScroll = true;
-    _bodyHorizontalScrollController.jumpTo(_headerHorizontalScrollController.offset);
+    _bodyHorizontalScrollController.jumpTo(
+      _headerHorizontalScrollController.offset,
+    );
     _syncingHorizontalScroll = false;
   }
 
   void _syncBodyScrollToHeader() {
-    if (_syncingHorizontalScroll || !_headerHorizontalScrollController.hasClients) {
+    if (_syncingHorizontalScroll ||
+        !_headerHorizontalScrollController.hasClients) {
       return;
     }
     _syncingHorizontalScroll = true;
-    _headerHorizontalScrollController.jumpTo(_bodyHorizontalScrollController.offset);
+    _headerHorizontalScrollController.jumpTo(
+      _bodyHorizontalScrollController.offset,
+    );
     _syncingHorizontalScroll = false;
   }
 
@@ -136,8 +142,11 @@ class _DeliveryReportTableState extends State<DeliveryReportTable> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final listHeight = (constraints.maxHeight - _scrollBarThickness)
-                      .clamp(0.0, double.infinity);
+                  final listHeight =
+                      (constraints.maxHeight - _scrollBarThickness).clamp(
+                        0.0,
+                        double.infinity,
+                      );
 
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,10 +469,7 @@ class _StatusCell extends StatelessWidget {
 }
 
 class _ReportLinkButton extends StatelessWidget {
-  const _ReportLinkButton({
-    required this.label,
-    required this.onPressed,
-  });
+  const _ReportLinkButton({required this.label, required this.onPressed});
 
   final String label;
   final VoidCallback onPressed;
@@ -546,11 +552,14 @@ class _ScrollBarTrack extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onPanUpdate: scrollable
               ? (details) {
-                  final delta =
-                      isHorizontal ? details.delta.dx : details.delta.dy;
+                  final delta = isHorizontal
+                      ? details.delta.dx
+                      : details.delta.dy;
                   controller.jumpTo(
-                    (controller.offset + delta * contentSize / viewport)
-                        .clamp(0.0, maxScroll),
+                    (controller.offset + delta * contentSize / viewport).clamp(
+                      0.0,
+                      maxScroll,
+                    ),
                   );
                 }
               : null,
@@ -565,8 +574,10 @@ class _ScrollBarTrack extends StatelessWidget {
 
                   final targetOffset =
                       (isHorizontal ? local.dx : local.dy) - thumbMainSize / 2;
-                  final scrollFraction =
-                      (targetOffset / availableTrack).clamp(0.0, 1.0);
+                  final scrollFraction = (targetOffset / availableTrack).clamp(
+                    0.0,
+                    1.0,
+                  );
                   controller.jumpTo(scrollFraction * maxScroll);
                 }
               : null,

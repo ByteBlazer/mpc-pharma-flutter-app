@@ -344,6 +344,11 @@ class MarkDeliveriesBatchResult {
     this.customerId = '',
   });
 
+  /// HTTP 400 from mark-delivered when the different-customer cooldown applies
+  /// (see MIN_MINUTES_BETWEEN_DIFF_CUSTOMER_DELIVERIES). [message] is
+  /// user-ready copy from the API.
+  bool get isCustomerDeliveryCooldown => statusCode == 400;
+
   factory MarkDeliveriesBatchResult.fromHttp({
     required int statusCode,
     required JsonMap json,

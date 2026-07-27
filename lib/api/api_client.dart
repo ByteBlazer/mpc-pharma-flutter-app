@@ -308,6 +308,8 @@ class ApiClient {
     return ScheduledTripsResponse.fromJson(_decodeJsonObject(response.body));
   }
 
+  /// Cancels a scheduled trip. HTTP 403 means only the scheduler or app-admin
+  /// may cancel — [CancelTripResult.message] is user-ready copy.
   Future<CancelTripResult> cancelScheduledTrip({
     String? token,
     required int tripId,
@@ -327,9 +329,7 @@ class ApiClient {
     } on MissingAuthTokenException {
       rethrow;
     } on ApiException catch (error) {
-      if (error.statusCode == 401 || error.statusCode == 403) {
-        rethrow;
-      }
+      if (error.statusCode == 401) rethrow;
       try {
         return CancelTripResult.fromHttp(
           statusCode: error.statusCode,
@@ -595,6 +595,8 @@ class ApiClient {
     }
   }
 
+  /// Batch mark delivered. On HTTP 400 (e.g. different-customer cooldown),
+  /// [MarkDeliveriesBatchResult.message] is ready to show the driver.
   Future<MarkDeliveriesBatchResult> markDeliveriesBatch({
     String? token,
     required int tripId,

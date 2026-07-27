@@ -73,7 +73,7 @@ class SettingsScreen extends StatelessWidget {
                       icon: Icons.tune_outlined,
                       title: 'Miscellaneous',
                       subtitle:
-                          'Location heartbeat, scan cool-off, ERP and SMS flags',
+                          'App behaviour, forced update, ERP, SMS, and delivery rules',
                       color: primary,
                       onTap: () {
                         Navigator.of(context).push(
