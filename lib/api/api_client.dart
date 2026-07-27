@@ -1374,7 +1374,8 @@ class ApiClient {
       }
       return DeliveryReportExcelDownload(
         bytes: response.bodyBytes,
-        fileName: _extractDownloadFileName(response.headers['content-disposition']) ??
+        fileName:
+            _extractDownloadFileName(response.headers['content-disposition']) ??
             'delivery-report-${DateTime.now().millisecondsSinceEpoch}.xlsx',
       );
     }
