@@ -19,11 +19,7 @@ import 'delivery_report_models.dart';
 import 'widgets/delivery_report_table.dart';
 
 const _mobileLayoutBreakpoint = 768.0;
-const _noDateSelectedLabel = 'No date selected';
-/// Filters vs results grid height split when the on-screen table is visible.
-/// Table uses 40% of the pair (20% less than an even 50/50 split).
-const _deliveryReportFiltersFlex = 3;
-const _deliveryReportTableFlex = 2;
+const _noDateSelectedLabel = 'No date selected (Max range: 1 month)';
 
 class DeliveryReportScreen extends StatefulWidget {
   const DeliveryReportScreen({
@@ -556,7 +552,6 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                 children: [
                   if (showTable || showTableLoading)
                     Flexible(
-                      flex: _deliveryReportFiltersFlex,
                       child: SingleChildScrollView(
                         child: Center(
                           child: ConstrainedBox(
@@ -579,8 +574,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                     ),
                   if (showTable) ...[
                     const SizedBox(height: 16),
-                    Flexible(
-                      flex: _deliveryReportTableFlex,
+                    Expanded(
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 1200),
@@ -594,9 +588,8 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                   ],
                   if (showTableLoading) ...[
                     const SizedBox(height: 16),
-                    Flexible(
-                      flex: _deliveryReportTableFlex,
-                      child: const Center(child: CircularProgressIndicator()),
+                    const Expanded(
+                      child: Center(child: CircularProgressIndicator()),
                     ),
                   ],
                 ],
