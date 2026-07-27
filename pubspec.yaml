@@ -53,6 +53,8 @@ dependencies:
   flutter_foreground_task: ^10.0.0
   pointer_interceptor: ^0.10.1+2
   image_picker: ^1.2.3
+  package_info_plus: ^9.0.1
+  in_app_update: ^4.2.5
 
 dev_dependencies:
   flutter_test:

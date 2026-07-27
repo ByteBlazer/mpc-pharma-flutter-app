@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../app_theme.dart';
+import '../../widgets/app_date_picker.dart';
 import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
@@ -108,7 +109,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       _fromDate != null && _toDate != null && _fromDate == _toDate;
 
   Future<void> _pickFromDate() async {
-    final picked = await showDatePicker(
+    final picked = await showAppDatePicker(
       context: context,
       initialDate: _fromDate ?? leaveEarliestAllowedDate(),
       firstDate: leaveEarliestAllowedDate(),
@@ -127,7 +128,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
 
   Future<void> _pickToDate() async {
     final initialFrom = _fromDate ?? leaveEarliestAllowedDate();
-    final picked = await showDatePicker(
+    final picked = await showAppDatePicker(
       context: context,
       initialDate: _toDate ?? initialFrom,
       firstDate: initialFrom,

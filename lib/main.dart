@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_environment.dart';
 import 'app_theme.dart';
+import 'features/force_update/force_update_gate.dart';
 import 'navigation/browser_history_sync.dart';
 import 'navigation/initial_app_screen.dart';
 import 'services/trip_heartbeat_service.dart';
@@ -27,7 +28,7 @@ class MpcPharmaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       navigatorObservers: [_browserHistoryObserver],
-      home: buildInitialAppScreen(),
+      home: ForceUpdateGate(child: buildInitialAppScreen()),
     );
   }
 }

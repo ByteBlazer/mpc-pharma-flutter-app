@@ -186,6 +186,17 @@ class _LeaveRequestsScreenState extends State<LeaveRequestsScreen>
   }
 
   Future<void> _openApplyLeave(_LeaveScreenData data) async {
+    if (data.myDepartments.isEmpty) {
+      showAppSnackBar(
+        context,
+        message:
+            'You must belong to at least one department before applying '
+            'for leave. Contact your administrator.',
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
+
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ApplyLeaveScreen(
@@ -286,7 +297,7 @@ class _LeaveRequestsScreenState extends State<LeaveRequestsScreen>
         future: _loader.future,
         builder: (context, snapshot) {
           final data = snapshot.data;
-          if (data == null || data.myDepartments.isEmpty) {
+          if (data == null) {
             return const SizedBox.shrink();
           }
           return FloatingActionButton.extended(
