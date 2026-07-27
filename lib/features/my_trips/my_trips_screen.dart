@@ -73,6 +73,26 @@ class _MyTripsScreenState extends State<MyTripsScreen> {
     );
   }
 
+  Future<bool?> _confirmDisclosure(String title, String message) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _startOrResume(DriverTripSummary trip) async {
     if (!isMobileNativePlatform) {
       showAppSnackBar(
@@ -85,6 +105,7 @@ class _MyTripsScreenState extends State<MyTripsScreen> {
 
     final gate = await TripLocationGate.ensureReady(
       confirmSettings: _confirmSettings,
+      showDisclosure: _confirmDisclosure,
     );
     if (!gate.ok) {
       if (!mounted) return;
