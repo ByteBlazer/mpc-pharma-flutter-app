@@ -594,14 +594,13 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                 children: [
                   if (showTable || showTableLoading)
                     Flexible(
-                      child: AppScrollbar(
-                        controller: _wideFiltersScrollController,
-                        child: SingleChildScrollView(
-                          controller: _wideFiltersScrollController,
-                          padding: const EdgeInsets.only(right: 18),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 1200),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1200),
+                          child: AppScrollbar(
+                            controller: _wideFiltersScrollController,
+                            child: SingleChildScrollView(
+                              controller: _wideFiltersScrollController,
                               child: filtersAndActions,
                             ),
                           ),
