@@ -19,7 +19,7 @@ import 'delivery_report_models.dart';
 import 'widgets/delivery_report_table.dart';
 
 const _mobileLayoutBreakpoint = 768.0;
-const _noDateSelectedLabel = 'No date selected (Max range: 1 month)';
+const _noDateSelectedLabel = 'Pick date (Max range: 1 month)';
 
 class DeliveryReportScreen extends StatefulWidget {
   const DeliveryReportScreen({
@@ -55,6 +55,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
   bool _loadingData = false;
   bool _downloadingExcel = false;
   final _narrowFormScrollController = ScrollController();
+  final _wideFiltersScrollController = ScrollController();
 
   @override
   void initState() {
@@ -66,9 +67,47 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
   @override
   void dispose() {
     _narrowFormScrollController.dispose();
+    _wideFiltersScrollController.dispose();
     _docIdController.dispose();
     _tripIdController.dispose();
     super.dispose();
+  }
+
+  /// When the on-screen grid appears, keep action buttons visible by scrolling
+  /// the filter panel to the bottom if its content overflows.
+  void _scheduleWideFiltersScrollToBottom({required bool allowGrid}) {
+    if (!allowGrid) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tryScrollWideFiltersToBottom(attempt: 0);
+    });
+  }
+
+  void _tryScrollWideFiltersToBottom({required int attempt}) {
+    if (!mounted || attempt > 4) return;
+
+    final controller = _wideFiltersScrollController;
+    if (!controller.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _tryScrollWideFiltersToBottom(attempt: attempt + 1),
+      );
+      return;
+    }
+
+    final maxExtent = controller.position.maxScrollExtent;
+    if (maxExtent <= 0) {
+      if (attempt < 4) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _tryScrollWideFiltersToBottom(attempt: attempt + 1),
+        );
+      }
+      return;
+    }
+
+    controller.animateTo(
+      maxExtent,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
   }
 
   bool get _hasReportFeedback => _resultStatus != null;
@@ -233,6 +272,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
       }
 
       setState(() => _loadingData = true);
+      _scheduleWideFiltersScrollToBottom(allowGrid: allowGrid);
       final dataResponse = await widget.apiClient.getDeliveryReportData(
         queryParameters: query,
       );
@@ -246,6 +286,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
           matchedCount: dataResponse.totalRecords,
         );
       });
+      _scheduleWideFiltersScrollToBottom(allowGrid: allowGrid);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -327,8 +368,9 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
 
   Future<void> _pickFromDate() async {
     final today = istToday();
-    final lastDate =
-        _toDate != null && _toDate!.isBefore(today) ? _toDate! : today;
+    final lastDate = _toDate != null && _toDate!.isBefore(today)
+        ? _toDate!
+        : today;
     final initial = _fromDate ?? today;
     final picked = await showAppDatePicker(
       context: context,
@@ -552,11 +594,16 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                 children: [
                   if (showTable || showTableLoading)
                     Flexible(
-                      child: SingleChildScrollView(
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 1200),
-                            child: filtersAndActions,
+                      child: AppScrollbar(
+                        controller: _wideFiltersScrollController,
+                        child: SingleChildScrollView(
+                          controller: _wideFiltersScrollController,
+                          padding: const EdgeInsets.only(right: 18),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 1200),
+                              child: filtersAndActions,
+                            ),
                           ),
                         ),
                       ),
