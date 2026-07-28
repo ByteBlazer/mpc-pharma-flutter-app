@@ -22,6 +22,7 @@ class _ForceUpdateGateState extends State<ForceUpdateGate>
   ForceUpdateEvaluation? _evaluation;
   var _checking = false;
   var _isUpdating = false;
+  var _blockingCheckInProgress = false;
 
   bool get _shouldEnforce =>
       ForceUpdateService.appliesToCurrentPlatform && !isPublicTrackingLaunch;
@@ -33,7 +34,7 @@ class _ForceUpdateGateState extends State<ForceUpdateGate>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     if (_shouldEnforce) {
-      _checkForUpdate(showLoading: true);
+      _checkForUpdate(blocking: true);
     }
   }
 
@@ -46,15 +47,18 @@ class _ForceUpdateGateState extends State<ForceUpdateGate>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _shouldEnforce) {
-      _checkForUpdate(showLoading: _isBlocked);
+      // Re-check silently when returning from background so the app tree
+      // (and shared ApiClient) stays mounted while requests are in flight.
+      _checkForUpdate(blocking: false);
     }
   }
 
-  Future<void> _checkForUpdate({required bool showLoading}) async {
+  Future<void> _checkForUpdate({required bool blocking}) async {
     if (_checking) return;
     setState(() {
       _checking = true;
-      if (showLoading && !_isBlocked) {
+      _blockingCheckInProgress = blocking;
+      if (blocking && !_isBlocked) {
         _evaluation = null;
       }
     });
@@ -64,6 +68,7 @@ class _ForceUpdateGateState extends State<ForceUpdateGate>
     if (!mounted) return;
     setState(() {
       _checking = false;
+      _blockingCheckInProgress = false;
       if (evaluation.result == ForceUpdateCheckResult.notApplicable ||
           evaluation.result == ForceUpdateCheckResult.upToDate) {
         _evaluation = null;
@@ -91,7 +96,7 @@ class _ForceUpdateGateState extends State<ForceUpdateGate>
       return widget.child;
     }
 
-    if (_checking && !_isBlocked) {
+    if (_checking && _blockingCheckInProgress && !_isBlocked) {
       return const ForceUpdateCheckingScreen();
     }
 
@@ -100,7 +105,7 @@ class _ForceUpdateGateState extends State<ForceUpdateGate>
       return ForceUpdateScreen(
         evaluation: evaluation,
         onUpdate: _handleUpdate,
-        onRetry: () => _checkForUpdate(showLoading: true),
+        onRetry: () => _checkForUpdate(blocking: true),
         isUpdating: _isUpdating,
         isRetrying: _checking,
       );
