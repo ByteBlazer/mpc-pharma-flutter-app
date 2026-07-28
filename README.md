@@ -447,7 +447,7 @@ Need the following as GitHub Actions secrets:
 - `DOMAIN_NAME` - base domain, for example `byteblazer.com`. If this changes, remove the old hosted zone records and add the required records for the new domain in Route 53.
 - `ANDROID_KEYSTORE_BASE64` - base64-encoded upload keystore file. The keystore file is kept in Google Drive under `ByteBlazer > Google & Android > Google Playstore`. You will need to convert to base64. See below for command.
 - `ANDROID_KEY_ALIAS` - upload key alias. Refer file kept in Google Drive under `Learning > GooglePlayStoreAppUpload-Notes.txt`.
-- `ANDROID_KEYSTORE_PASSWORD` - shared password for both keystore and key. The password is kept in Google Drive under `Learning > GooglePlayStoreAppUpload-Notes.txt`.
+- `ANDROID_KEYSTORE_PASSWORD` - shared password for both keystore and key. The password is kept in Google Drive - Look under `Learning > GooglePlayStoreAppUpload-Notes.txt`.
 
 To generate `ANDROID_KEYSTORE_BASE64`, run this from the folder containing the keystore file:
 
