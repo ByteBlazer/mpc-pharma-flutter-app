@@ -811,10 +811,13 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
               ),
             ),
           if (detail != null)
-            TripSummaryPanel(
-              detail: detail,
-              summary: computeTripProgress(detail: detail, now: DateTime.now()),
-              initiallyExpanded: false,
+            IgnorePointer(
+              ignoring: _selectedCluster != null,
+              child: TripSummaryPanel(
+                detail: detail,
+                summary: computeTripProgress(detail: detail, now: DateTime.now()),
+                initiallyExpanded: false,
+              ),
             ),
         ],
       ),
@@ -841,77 +844,89 @@ class _TripDashboardScreenState extends State<TripDashboardScreen>
       detailLoading: _detailLoading,
     );
 
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (!compact && selectedId != null)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _deselectTrip,
-                icon: const Icon(Icons.grid_view_outlined, size: 18),
-                label: const Text('Show all trips'),
-              ),
+    final mapColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!compact && selectedId != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _deselectTrip,
+              icon: const Icon(Icons.grid_view_outlined, size: 18),
+              label: const Text('Show all trips'),
             ),
-          if (!compact && _detailError != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: const Color(0xFFFFEBEE),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Text(
-                    'Could not load trip details: $_detailError',
-                    style: const TextStyle(color: Color(0xFFB71C1C), fontSize: 13),
-                  ),
+          ),
+        if (!compact && _detailError != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Material(
+              color: const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Text(
+                  'Could not load trip details: $_detailError',
+                  style: const TextStyle(color: Color(0xFFB71C1C), fontSize: 13),
                 ),
               ),
             ),
-          if (!compact && detail != null && selectedId != null)
-            Padding(
+          ),
+        if (!compact && detail != null && selectedId != null)
+          IgnorePointer(
+            ignoring: _selectedCluster != null,
+            child: Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: TripSummaryPanel(
                 detail: detail,
-                summary: computeTripProgress(detail: detail, now: DateTime.now()),
+                summary: computeTripProgress(
+                  detail: detail,
+                  now: DateTime.now(),
+                ),
               ),
             ),
-          Expanded(
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned.fill(
-                  child: TripDashboardMapSection(
-                    heading: heading,
-                    driverTrips: driverTrips,
-                    tripDetail: selectedId != null ? detail : null,
-                    customerClusters: clusters,
-                    selectedTripId: selectedId,
-                    driverMarkersInteractive: selectedId == null,
-                    compact: compact,
-                    onDriverTripTap: _toggleTripSelection,
-                    onCustomerClusterTap: (cluster) {
-                      setState(() => _selectedCluster = cluster);
-                    },
-                    onMapTap: _selectedCluster == null
-                        ? () => setState(() => _selectedCluster = null)
-                        : null,
-                  ),
-                ),
-                if (!compact && _selectedCluster != null)
-                  Positioned(
-                    left: 12,
-                    right: 12,
-                    bottom: 12,
-                    child: _buildCustomerCalloutOverlay(),
-                  ),
-              ],
-            ),
           ),
-        ],
-      ),
+        Expanded(
+          child: TripDashboardMapSection(
+            heading: heading,
+            driverTrips: driverTrips,
+            tripDetail: selectedId != null ? detail : null,
+            customerClusters: clusters,
+            selectedTripId: selectedId,
+            driverMarkersInteractive: selectedId == null,
+            compact: compact,
+            onDriverTripTap: _toggleTripSelection,
+            onCustomerClusterTap: (cluster) {
+              setState(() => _selectedCluster = cluster);
+            },
+            onMapTap: _selectedCluster == null
+                ? () => setState(() => _selectedCluster = null)
+                : null,
+          ),
+        ),
+      ],
+    );
+
+    if (!compact && _selectedCluster != null) {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            mapColumn,
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: _buildCustomerCalloutOverlay(),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: mapColumn,
     );
   }
 
