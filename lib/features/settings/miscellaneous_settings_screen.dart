@@ -6,7 +6,6 @@ import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_snack_bar.dart';
-import '../../widgets/app_surface.dart';
 import 'setting_models.dart';
 
 class MiscellaneousSettingsScreen extends StatefulWidget {
@@ -30,7 +29,9 @@ class _MiscellaneousSettingsScreenState
   late Future<Map<MiscSettingKey, String>> _loadFuture;
   int _refreshToken = 0;
 
-  static const _heartbeatOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+  static const _heartbeatOptions = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+  ];
 
   static const _coolOffOptions = [
     5,
@@ -48,6 +49,9 @@ class _MiscellaneousSettingsScreenState
     450,
     600,
   ];
+
+  static final _deliveryCooldownOptions =
+      List<int>.generate(61, (index) => index);
 
   @override
   void initState() {
@@ -88,6 +92,13 @@ class _MiscellaneousSettingsScreenState
       MiscSettingKey.routeScanCoolOff => Icons.qr_code_scanner_outlined,
       MiscSettingKey.updateDocStatusToErp => Icons.sync_outlined,
       MiscSettingKey.sendTrackingSms => Icons.sms_outlined,
+      MiscSettingKey.defaultGreeting => Icons.waving_hand_outlined,
+      MiscSettingKey.minVersionAndroid => Icons.android,
+      MiscSettingKey.minVersionIos => Icons.phone_iphone,
+      MiscSettingKey.appUpdateMessage => Icons.system_update_alt_outlined,
+      MiscSettingKey.androidStoreUrl => Icons.shop_outlined,
+      MiscSettingKey.iosStoreUrl => Icons.storefront_outlined,
+      MiscSettingKey.deliveryCustomerCooldown => Icons.timer_outlined,
     };
   }
 
@@ -97,6 +108,12 @@ class _MiscellaneousSettingsScreenState
     }
     if (key == MiscSettingKey.locationHeartbeat) {
       final values = _heartbeatOptions.map((v) => v.toString()).toList();
+      _ensureCurrentInOptions(values, currentValue);
+      return values;
+    }
+    if (key == MiscSettingKey.deliveryCustomerCooldown) {
+      final values =
+          _deliveryCooldownOptions.map((v) => v.toString()).toList();
       _ensureCurrentInOptions(values, currentValue);
       return values;
     }
@@ -125,6 +142,11 @@ class _MiscellaneousSettingsScreenState
     if (key == MiscSettingKey.locationHeartbeat) {
       final mins = int.tryParse(value) ?? 0;
       return mins == 1 ? '1 minute' : '$value minutes';
+    }
+    if (key == MiscSettingKey.deliveryCustomerCooldown) {
+      final mins = int.tryParse(value) ?? 0;
+      if (mins == 0) return 'Disabled (0 minutes)';
+      return mins == 1 ? '1 minute' : '$mins minutes';
     }
     final seconds = int.tryParse(value) ?? 0;
     return seconds == 1 ? '1 second' : '$value seconds';
@@ -163,47 +185,35 @@ class _MiscellaneousSettingsScreenState
               }
 
               final values = snapshot.data ?? const {};
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final wide = constraints.maxWidth >= 900;
-                  final medium = constraints.maxWidth >= 640;
-                  final columns = wide ? 2 : (medium ? 2 : 1);
-
-                  return Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1100),
-                        child: AppScrollbar(
-                          controller: _scrollController,
-                          child: GridView.builder(
-                            controller: _scrollController,
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: columns,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                              mainAxisExtent: 280,
-                            ),
-                            itemCount: MiscSettingKey.values.length,
-                            itemBuilder: (context, index) {
-                              final key = MiscSettingKey.values[index];
-                              return _MiscSettingCard(
-                                settingKey: key,
-                                icon: _iconFor(key),
-                                initialValue: values[key] ?? '',
-                                options: _optionsFor(key, values[key] ?? ''),
-                                labelBuilder: (value) =>
-                                    _labelFor(key, value),
-                                apiClient: widget.apiClient,
-                              );
-                            },
-                          ),
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 760),
+                    child: AppScrollbar(
+                      controller: _scrollController,
+                      child: ListView.separated(
+                        controller: _scrollController,
+                        itemCount: MiscSettingKey.values.length,
+                        separatorBuilder: (_, _) => Divider(
+                          height: 32,
+                          color: Colors.black.withValues(alpha: 0.10),
                         ),
+                        itemBuilder: (context, index) {
+                          final key = MiscSettingKey.values[index];
+                          return _MiscSettingRow(
+                            settingKey: key,
+                            icon: _iconFor(key),
+                            initialValue: values[key] ?? '',
+                            options: _optionsFor(key, values[key] ?? ''),
+                            labelBuilder: (value) => _labelFor(key, value),
+                            apiClient: widget.apiClient,
+                          );
+                        },
                       ),
                     ),
-                  );
-                },
+                  ),
+                ),
               );
             },
           ),
@@ -213,8 +223,8 @@ class _MiscellaneousSettingsScreenState
   }
 }
 
-class _MiscSettingCard extends StatefulWidget {
-  const _MiscSettingCard({
+class _MiscSettingRow extends StatefulWidget {
+  const _MiscSettingRow({
     required this.settingKey,
     required this.icon,
     required this.initialValue,
@@ -231,28 +241,45 @@ class _MiscSettingCard extends StatefulWidget {
   final ApiClient apiClient;
 
   @override
-  State<_MiscSettingCard> createState() => _MiscSettingCardState();
+  State<_MiscSettingRow> createState() => _MiscSettingRowState();
 }
 
-class _MiscSettingCardState extends State<_MiscSettingCard> {
+class _MiscSettingRowState extends State<_MiscSettingRow> {
   late String _selectedValue;
   late String _savedValue;
+  TextEditingController? _textController;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedValue = _normalizeInitial(widget.initialValue);
-    _savedValue = _selectedValue;
+    _applyInitial(widget.initialValue);
   }
 
   @override
-  void didUpdateWidget(covariant _MiscSettingCard oldWidget) {
+  void dispose() {
+    _textController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MiscSettingRow oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialValue != widget.initialValue) {
-      _selectedValue = _normalizeInitial(widget.initialValue);
-      _savedValue = _selectedValue;
+      _applyInitial(widget.initialValue);
     }
+  }
+
+  void _applyInitial(String raw) {
+    if (widget.settingKey.usesTextField) {
+      final trimmed = raw.trim();
+      _textController ??= TextEditingController();
+      _textController!.text = trimmed;
+      _savedValue = trimmed;
+      return;
+    }
+    _selectedValue = _normalizeInitial(raw);
+    _savedValue = _selectedValue;
   }
 
   String _normalizeInitial(String raw) {
@@ -266,26 +293,60 @@ class _MiscSettingCardState extends State<_MiscSettingCard> {
     return trimmed;
   }
 
-  bool get _isDirty => _selectedValue != _savedValue;
+  String get _currentValue {
+    if (widget.settingKey.usesTextField) {
+      return _textController?.text.trim() ?? '';
+    }
+    return _selectedValue;
+  }
+
+  bool get _isDirty => _currentValue != _savedValue;
+
+  double _inputMaxWidth(MiscSettingKey key) {
+    return switch (key.inputType) {
+      MiscSettingInputType.boolean => 140,
+      MiscSettingInputType.intSelect => 220,
+      MiscSettingInputType.semverOptional => 160,
+      MiscSettingInputType.textOptional => 320,
+      MiscSettingInputType.textRequired => 360,
+      MiscSettingInputType.urlOptional => 420,
+    };
+  }
 
   Future<void> _save() async {
     if (_isSaving || !_isDirty) return;
+
+    final value = _currentValue;
+    final validationError = widget.settingKey.validateValue(value);
+    if (validationError != null) {
+      showAppSnackBar(
+        context,
+        message: validationError,
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
       final result = await widget.apiClient.updateAppSetting(
         settingName: widget.settingKey.apiName,
-        settingValue: _selectedValue,
+        settingValue: value,
       );
       if (!mounted) return;
       setState(() {
         _savedValue = result.newValue.trim().isEmpty
-            ? _selectedValue
+            ? value
             : result.newValue.trim();
-        _selectedValue = _savedValue;
-        if (widget.settingKey.isBoolean) {
-          _selectedValue =
-              _savedValue.toLowerCase() == 'true' ? 'true' : 'false';
-          _savedValue = _selectedValue;
+        if (widget.settingKey.usesTextField) {
+          _textController?.text = _savedValue;
+        } else {
+          _selectedValue = _savedValue;
+          if (widget.settingKey.isBoolean) {
+            _selectedValue =
+                _savedValue.toLowerCase() == 'true' ? 'true' : 'false';
+            _savedValue = _selectedValue;
+          }
         }
       });
       showAppSnackBar(
@@ -307,91 +368,154 @@ class _MiscSettingCardState extends State<_MiscSettingCard> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+  Widget _buildInput(double maxWidth) {
+    final decoration = InputDecoration(
+      labelText: widget.settingKey.fieldLabel,
+      hintText: widget.settingKey.placeholder,
+      border: const OutlineInputBorder(),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      counterText: widget.settingKey.maxLength == null ? '' : null,
+    );
+
+    if (widget.settingKey.usesTextField) {
+      final controller = _textController!;
+      final isUrl =
+          widget.settingKey.inputType == MiscSettingInputType.urlOptional;
+      return TextFormField(
+        controller: controller,
+        enabled: !_isSaving,
+        keyboardType: isUrl ? TextInputType.url : TextInputType.text,
+        maxLines: isUrl ? 2 : 1,
+        maxLength: widget.settingKey.maxLength,
+        onChanged: (_) => setState(() {}),
+        decoration: decoration,
+      );
+    }
+
     final options = widget.options;
     final dropdownValue =
         options.contains(_selectedValue) ? _selectedValue : null;
 
-    return AppSurface(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return DropdownButtonFormField<String>(
+      key: ValueKey('${widget.settingKey.apiName}-$_selectedValue'),
+      initialValue: dropdownValue,
+      decoration: decoration,
+      items: [
+        for (final option in options)
+          DropdownMenuItem<String>(
+            value: option,
+            child: Text(widget.labelBuilder(option)),
+          ),
+      ],
+      onChanged: _isSaving
+          ? null
+          : (value) {
+              if (value == null) return;
+              setState(() => _selectedValue = value);
+            },
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return FilledButton(
+      onPressed: _isSaving || !_isDirty ? null : _save,
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(72, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+      ),
+      child: _isSaving
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Text('Save'),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final inputMaxWidth = _inputMaxWidth(widget.settingKey);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(widget.icon, color: primary, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    widget.settingKey.title,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
+            Icon(widget.icon, size: 18, color: primary),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
-                widget.settingKey.helpText,
+                widget.settingKey.title,
                 style: const TextStyle(
-                  color: Colors.black54,
-                  height: 1.35,
-                  fontSize: 13,
+                  color: Colors.black,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              key: ValueKey('${widget.settingKey.apiName}-$_selectedValue'),
-              initialValue: dropdownValue,
-              decoration: InputDecoration(
-                labelText: widget.settingKey.fieldLabel,
-                border: const OutlineInputBorder(),
-              ),
-              items: [
-                for (final option in options)
-                  DropdownMenuItem<String>(
-                    value: option,
-                    child: Text(widget.labelBuilder(option)),
-                  ),
-              ],
-              onChanged: _isSaving
-                  ? null
-                  : (value) {
-                      if (value == null) return;
-                      setState(() => _selectedValue = value);
-                    },
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: _isSaving || !_isDirty ? null : _save,
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Save setting'),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 26),
+          child: Text(
+            widget.settingKey.helpText,
+            style: const TextStyle(
+              color: Colors.black54,
+              height: 1.35,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.only(left: 26),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final rowMax = constraints.maxWidth.isFinite
+                  ? constraints.maxWidth
+                  : inputMaxWidth + 96;
+              final fitsInline = rowMax >= inputMaxWidth + 96;
+
+              if (fitsInline) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: inputMaxWidth),
+                      child: _buildInput(inputMaxWidth),
+                    ),
+                    const SizedBox(width: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: _buildSaveButton(),
+                    ),
+                  ],
+                );
+              }
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: rowMax.clamp(160, inputMaxWidth),
+                    ),
+                    child: _buildInput(inputMaxWidth),
+                  ),
+                  _buildSaveButton(),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

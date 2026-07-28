@@ -3,5 +3,5 @@ Future<void> downloadFileImpl({
   required List<int> bytes,
   required String mimeType,
 }) async {
-  throw UnsupportedError('File download is currently available on web only.');
+  throw UnsupportedError('File download is not supported on this platform.');
 }

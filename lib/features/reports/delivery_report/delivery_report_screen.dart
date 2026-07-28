@@ -19,7 +19,7 @@ import 'delivery_report_models.dart';
 import 'widgets/delivery_report_table.dart';
 
 const _mobileLayoutBreakpoint = 768.0;
-const _noDateSelectedLabel = 'No date selected';
+const _noDateSelectedLabel = 'Pick date (Max range: 1 month)';
 
 class DeliveryReportScreen extends StatefulWidget {
   const DeliveryReportScreen({
@@ -55,6 +55,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
   bool _loadingData = false;
   bool _downloadingExcel = false;
   final _narrowFormScrollController = ScrollController();
+  final _wideFiltersScrollController = ScrollController();
 
   @override
   void initState() {
@@ -66,9 +67,47 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
   @override
   void dispose() {
     _narrowFormScrollController.dispose();
+    _wideFiltersScrollController.dispose();
     _docIdController.dispose();
     _tripIdController.dispose();
     super.dispose();
+  }
+
+  /// When the on-screen grid appears, keep action buttons visible by scrolling
+  /// the filter panel to the bottom if its content overflows.
+  void _scheduleWideFiltersScrollToBottom({required bool allowGrid}) {
+    if (!allowGrid) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tryScrollWideFiltersToBottom(attempt: 0);
+    });
+  }
+
+  void _tryScrollWideFiltersToBottom({required int attempt}) {
+    if (!mounted || attempt > 4) return;
+
+    final controller = _wideFiltersScrollController;
+    if (!controller.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _tryScrollWideFiltersToBottom(attempt: attempt + 1),
+      );
+      return;
+    }
+
+    final maxExtent = controller.position.maxScrollExtent;
+    if (maxExtent <= 0) {
+      if (attempt < 4) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _tryScrollWideFiltersToBottom(attempt: attempt + 1),
+        );
+      }
+      return;
+    }
+
+    controller.animateTo(
+      maxExtent,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
   }
 
   bool get _hasReportFeedback => _resultStatus != null;
@@ -233,6 +272,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
       }
 
       setState(() => _loadingData = true);
+      _scheduleWideFiltersScrollToBottom(allowGrid: allowGrid);
       final dataResponse = await widget.apiClient.getDeliveryReportData(
         queryParameters: query,
       );
@@ -246,6 +286,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
           matchedCount: dataResponse.totalRecords,
         );
       });
+      _scheduleWideFiltersScrollToBottom(allowGrid: allowGrid);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -326,12 +367,16 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
   }
 
   Future<void> _pickFromDate() async {
-    final initial = _fromDate ?? istToday();
+    final today = istToday();
+    final lastDate = _toDate != null && _toDate!.isBefore(today)
+        ? _toDate!
+        : today;
+    final initial = _fromDate ?? today;
     final picked = await showAppDatePicker(
       context: context,
-      initialDate: initial,
+      initialDate: initial.isAfter(lastDate) ? lastDate : initial,
       firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
+      lastDate: lastDate,
       helpText: 'Document date from',
     );
     if (picked == null || !mounted) return;
@@ -339,17 +384,21 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
       _fromDate = picked;
       if (_toDate == null || _toDate!.isBefore(picked)) {
         _toDate = picked;
+      } else if (_toDate!.isAfter(today)) {
+        _toDate = today;
       }
     });
   }
 
   Future<void> _pickToDate() async {
-    final initialFrom = _fromDate ?? istToday();
+    final today = istToday();
+    final initialFrom = _fromDate ?? today;
+    final initialTo = _toDate ?? initialFrom;
     final picked = await showAppDatePicker(
       context: context,
-      initialDate: _toDate ?? initialFrom,
+      initialDate: initialTo.isAfter(today) ? today : initialTo,
       firstDate: initialFrom,
-      lastDate: DateTime(2100),
+      lastDate: today,
       helpText: 'Document date to',
     );
     if (picked == null || !mounted) return;
@@ -432,12 +481,16 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
               onFilterEdited: () => _onFiltersChanged(() {}),
             );
 
+            final resultHint = _resultStatus?.compactMessage;
+            final showStatusBanner = _resultStatus?.needsBanner ?? false;
+
             final actionsRow = _ActionsRow(
               isBusy: isBusy,
               loadingCount: _loadingCount,
               loadingData: _loadingData,
               downloadingExcel: _downloadingExcel,
               showViewReport: isWide,
+              resultHint: resultHint,
               onViewReport: () => _viewReport(allowGrid: isWide),
               onDownloadExcel: _downloadExcel,
               onReset: _resetFilters,
@@ -456,11 +509,15 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                             controller: _narrowFormScrollController,
                             child: SingleChildScrollView(
                               controller: _narrowFormScrollController,
-                              padding: const EdgeInsets.only(bottom: 8, right: 18),
+                              padding: const EdgeInsets.only(
+                                bottom: 8,
+                                right: 18,
+                              ),
                               child: Center(
                                 child: ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 1200),
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 1200,
+                                  ),
                                   child: filtersCard,
                                 ),
                               ),
@@ -478,12 +535,9 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                                     begin: Alignment.topCenter,
                                     end: Alignment.bottomCenter,
                                     colors: [
-                                      Theme.of(context)
-                                          .scaffoldBackgroundColor
+                                      Theme.of(context).scaffoldBackgroundColor
                                           .withValues(alpha: 0),
-                                      Theme.of(context)
-                                          .colorScheme
-                                          .primary
+                                      Theme.of(context).colorScheme.primary
                                           .withValues(alpha: 0.05),
                                     ],
                                   ),
@@ -502,7 +556,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (_resultStatus != null) ...[
+                            if (showStatusBanner) ...[
                               _DeliveryReportStatusBanner(
                                 status: _resultStatus!,
                               ),
@@ -526,7 +580,7 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                 filtersCard,
                 const SizedBox(height: 16),
                 actionsRow,
-                if (_resultStatus != null) ...[
+                if (showStatusBanner) ...[
                   const SizedBox(height: 16),
                   _DeliveryReportStatusBanner(status: _resultStatus!),
                 ],
@@ -540,11 +594,15 @@ class _DeliveryReportScreenState extends State<DeliveryReportScreen> {
                 children: [
                   if (showTable || showTableLoading)
                     Flexible(
-                      child: SingleChildScrollView(
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 1200),
-                            child: filtersAndActions,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1200),
+                          child: AppScrollbar(
+                            controller: _wideFiltersScrollController,
+                            child: SingleChildScrollView(
+                              controller: _wideFiltersScrollController,
+                              child: filtersAndActions,
+                            ),
                           ),
                         ),
                       ),
@@ -684,16 +742,6 @@ class _FiltersCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Filters',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Filters by document date, not delivery timestamp. Maximum allowed date range is 1 month.',
-              style: TextStyle(color: Colors.black54, fontSize: 12),
-            ),
-            const SizedBox(height: 12),
             _DateFilterRow(
               isWide: isWide,
               fieldWidth: fieldWidth,
@@ -1018,6 +1066,7 @@ class _ActionsRow extends StatelessWidget {
     required this.onViewReport,
     required this.onDownloadExcel,
     required this.onReset,
+    this.resultHint,
   });
 
   final bool isBusy;
@@ -1025,9 +1074,39 @@ class _ActionsRow extends StatelessWidget {
   final bool loadingData;
   final bool downloadingExcel;
   final bool showViewReport;
+  final String? resultHint;
   final VoidCallback onViewReport;
   final VoidCallback onDownloadExcel;
   final VoidCallback onReset;
+
+  static const _resultHintStyle = TextStyle(
+    fontSize: 12.5,
+    fontWeight: FontWeight.w600,
+    color: Colors.black54,
+    height: 1.2,
+  );
+
+  Widget _resultHintLabel(String text, {required TextAlign align}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(text, textAlign: align, style: _resultHintStyle),
+    );
+  }
+
+  Widget _viewReportButton(ButtonStyle? actionButtonStyle) {
+    return FilledButton.icon(
+      onPressed: isBusy ? null : onViewReport,
+      style: actionButtonStyle,
+      icon: loadingCount || loadingData
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.table_chart_outlined, size: 20),
+      label: Text(loadingCount || loadingData ? 'Loading...' : 'View report'),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1051,7 +1130,7 @@ class _ActionsRow extends StatelessWidget {
 
     final resetButton = TextButton(
       onPressed: isBusy ? null : onReset,
-      child: const Text('Reset filters'),
+      child: const Text('Clear'),
     );
 
     if (!showViewReport) {
@@ -1060,38 +1139,39 @@ class _ActionsRow extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(width: double.infinity, child: downloadButton),
+          if (resultHint != null)
+            _resultHintLabel(resultHint!, align: TextAlign.center),
           Align(alignment: Alignment.centerLeft, child: resetButton),
         ],
       );
     }
 
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FilledButton.icon(
-              onPressed: isBusy ? null : onViewReport,
-              style: actionButtonStyle,
-              icon: loadingCount || loadingData
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.table_chart_outlined, size: 20),
-              label: Text(
-                loadingCount || loadingData ? 'Loading...' : 'View report',
-              ),
-            ),
-            const SizedBox(width: 12),
-            downloadButton,
-          ],
+        IntrinsicWidth(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _viewReportButton(actionButtonStyle),
+              if (resultHint != null)
+                _resultHintLabel(resultHint!, align: TextAlign.center),
+            ],
+          ),
         ),
-        resetButton,
+        const SizedBox(width: 12),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              downloadButton,
+              const SizedBox(width: 12),
+              Center(child: resetButton),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -1120,6 +1200,23 @@ class _DeliveryReportStatus {
 
   final _DeliveryReportStatusKind kind;
   final int? matchedCount;
+
+  /// Short label beside actions — keeps the filter panel compact.
+  String? get compactMessage => switch (kind) {
+    _DeliveryReportStatusKind.loaded =>
+      '${formatDeliveryReportCount(matchedCount ?? 0)} results',
+    _DeliveryReportStatusKind.noResults => 'No results',
+    _DeliveryReportStatusKind.tooManyForGrid ||
+    _DeliveryReportStatusKind.mobileOnly => null,
+  };
+
+  /// Multi-line guidance still uses the status banner.
+  bool get needsBanner => switch (kind) {
+    _DeliveryReportStatusKind.tooManyForGrid ||
+    _DeliveryReportStatusKind.mobileOnly => true,
+    _DeliveryReportStatusKind.loaded ||
+    _DeliveryReportStatusKind.noResults => false,
+  };
 }
 
 class _DeliveryReportStatusBanner extends StatelessWidget {
@@ -1154,7 +1251,8 @@ class _DeliveryReportStatusBanner extends StatelessWidget {
       _DeliveryReportStatusKind.mobileOnly => (
         icon: Icons.phone_android_outlined,
         title: '${formatDeliveryReportCount(matchedCount ?? 0)} records match.',
-        subtitle: 'Click Download Excel above to export results on this device.',
+        subtitle:
+            'Click Download Excel above to export results on this device.',
       ),
       _DeliveryReportStatusKind.loaded => (
         icon: Icons.check_circle_outline,
@@ -1188,11 +1286,7 @@ class _DeliveryReportStatusBanner extends StatelessWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Icon(
-                presentation.icon,
-                color: accent,
-                size: 18,
-              ),
+              child: Icon(presentation.icon, color: accent, size: 18),
             ),
             const SizedBox(width: 12),
             Expanded(

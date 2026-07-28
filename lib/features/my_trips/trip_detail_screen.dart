@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/api_client.dart';
+import '../../app_theme.dart';
 import '../../auth/jwt_payload.dart';
 import '../../services/trip_heartbeat_service.dart';
 import '../../utils/open_maps_location.dart';
@@ -470,8 +471,24 @@ class _DocGroupSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canExpand = !group.dropOffCompleted;
-    return AppSurface(
-      borderRadius: 14,
+    final primary = Theme.of(context).colorScheme.primary;
+    final surfaceDecoration = group.droppable
+        ? AppTheme.gradientPageSurface(primary, borderRadius: 14)
+        : BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.gradientPageSurfaceBorder(primary)),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.gradientPageSurfaceShadow(primary),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          );
+
+    return DecoratedBox(
+      decoration: surfaceDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -629,11 +646,8 @@ class _CustomerClusterCard extends StatelessWidget {
     final rep = cluster.representative;
     final onTrip = cluster.onTripDocs;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return AppSurface(
+      borderRadius: 12,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -813,6 +827,8 @@ class _DocTile extends StatelessWidget {
                 ),
               ),
             ],
+            if (doc.docAmount.isNotEmpty && trailingActions.isNotEmpty)
+              const SizedBox(width: 4),
             ...trailingActions,
           ],
         ),

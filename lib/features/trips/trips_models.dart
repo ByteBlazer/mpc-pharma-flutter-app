@@ -106,6 +106,8 @@ class CancelTripResult {
   final bool success;
   final String message;
 
+  bool get isPermissionDenied => statusCode == 403;
+
   String get displayMessage => message.isEmpty
       ? 'Something went wrong. Please try again.'
       : message;

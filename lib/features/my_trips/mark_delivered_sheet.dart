@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:signature/signature.dart';
 
 import '../../api/api_client.dart';
+import '../../auth/jwt_payload.dart';
 import '../../utils/geo_distance.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../trip_dashboard/trip_dashboard_helpers.dart';
@@ -59,10 +60,11 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
     penStrokeWidth: 3,
     penColor: Colors.black,
   );
-  bool _updateCustomerLocation = true;
+  bool _updateCustomerLocation = false;
+  bool _isSimulationMode = false;
   bool _submitting = false;
-  bool _loadingRecent = true;
   String? _proximityWarning;
+  String? _submissionError;
   String? _reusedSignatureBase64;
 
   @override
@@ -79,43 +81,64 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
   }
 
   Future<void> _bootstrap() async {
+    final isSimulation = await JwtPayload.currentIsImpersonation();
+    if (!mounted) return;
+    setState(() {
+      _isSimulationMode = isSimulation;
+      if (!isSimulation) {
+        _updateCustomerLocation = true;
+      }
+    });
+    _loadRecentSignature();
+    _checkProximity();
+  }
+
+  Future<void> _loadRecentSignature() async {
     final first = widget.docs.first;
     try {
       final recent = await widget.apiClient.getRecentSignature(
         tripId: widget.tripId,
         docId: first.id,
       );
+      if (!mounted) return;
       if (recent.found && recent.signatureBase64.isNotEmpty) {
-        _reusedSignatureBase64 = recent.signatureBase64;
+        setState(() => _reusedSignatureBase64 = recent.signatureBase64);
       }
     } catch (_) {}
+  }
 
-    if (first.hasCustomerGeo) {
-      try {
-        final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 15),
-          ),
-        );
-        final meters = haversineDistanceMeters(
-          lat1: position.latitude,
-          lon1: position.longitude,
-          lat2: first.customerLat!,
-          lon2: first.customerLng!,
-        );
-        if (meters > 500) {
+  Future<void> _checkProximity() async {
+    final first = widget.docs.first;
+    if (!first.hasCustomerGeo || !mounted) return;
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      final meters = haversineDistanceMeters(
+        lat1: position.latitude,
+        lon1: position.longitude,
+        lat2: first.customerLat!,
+        lon2: first.customerLng!,
+      );
+      if (!mounted) return;
+      if (meters > 500) {
+        setState(() {
           _proximityWarning =
               'You appear more than 500 m from this customer’s usual delivery '
               'location (${meters.round()} m away). You can still submit.';
-        }
-      } catch (_) {
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
         _proximityWarning =
             'Could not check distance to the customer location right now.';
-      }
+      });
     }
-
-    if (mounted) setState(() => _loadingRecent = false);
   }
 
   Future<void> _clearSignature() async {
@@ -147,8 +170,11 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
       return;
     }
 
-    setState(() => _submitting = true);
-    var updateLocation = _updateCustomerLocation;
+    setState(() {
+      _submitting = true;
+      _submissionError = null;
+    });
+    var updateLocation = _isSimulationMode ? false : _updateCustomerLocation;
     double? lat;
     double? lng;
 
@@ -201,14 +227,23 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
         }
         return;
       }
+      if (result.success) {
+        showAppSnackBar(
+          context,
+          message: result.displayMessage,
+          type: AppSnackBarType.success,
+        );
+        Navigator.of(context).pop(true);
+        return;
+      }
+      setState(() => _submissionError = result.displayMessage);
       showAppSnackBar(
         context,
         message: result.displayMessage,
-        type: result.success
-            ? AppSnackBarType.success
+        type: result.isCustomerDeliveryCooldown
+            ? AppSnackBarType.warning
             : AppSnackBarType.error,
       );
-      if (result.success) Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
       showAppSnackBar(
@@ -249,10 +284,7 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
               ],
             ),
           ),
-          if (_loadingRecent)
-            const LinearProgressIndicator(minHeight: 2)
-          else
-            const SizedBox(height: 2),
+          const SizedBox(height: 2),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -352,7 +384,7 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _updateCustomerLocation,
-                  onChanged: _submitting
+                  onChanged: _submitting || _isSimulationMode
                       ? null
                       : (value) {
                           setState(
@@ -380,18 +412,35 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: FilledButton(
-                onPressed: _submitting || _loadingRecent ? null : _submit,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _submitting
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Confirm delivery'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_submissionError != null) ...[
+                    Text(
+                      _submissionError!,
+                      style: TextStyle(
+                        color: Colors.orange.shade900,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  FilledButton(
+                    onPressed: _submitting ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: _submitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Confirm delivery'),
+                  ),
+                ],
               ),
             ),
           ),

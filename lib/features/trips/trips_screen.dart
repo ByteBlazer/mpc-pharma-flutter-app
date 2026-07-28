@@ -77,6 +77,22 @@ class _TripsScreenState extends State<TripsScreen> {
       result = await widget.apiClient.cancelScheduledTrip(tripId: trip.tripId);
     } catch (error) {
       if (!mounted) return;
+      if (error is ApiException && error.statusCode == 403) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Cannot cancel trip'),
+            content: Text(error.toString()),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
       if (isAuthErrorMessage(error)) {
         showAppSnackBar(
           context,
@@ -100,7 +116,7 @@ class _TripsScreenState extends State<TripsScreen> {
 
     if (!mounted) return;
 
-    if (result.statusCode == 401 || result.statusCode == 403) {
+    if (result.statusCode == 401) {
       showAppSnackBar(
         context,
         message: result.displayMessage,
@@ -108,6 +124,23 @@ class _TripsScreenState extends State<TripsScreen> {
       );
       await widget.onLoginAgain();
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
+    }
+
+    if (result.isPermissionDenied) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Cannot cancel trip'),
+          content: Text(result.displayMessage),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
       return;
     }
 
