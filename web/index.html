@@ -31,16 +31,60 @@
 
   <title>MPC Pharma</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    #splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      opacity: 1;
+      transition: opacity 200ms ease-out;
+    }
+
+    #splash .splash-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    #splash.splash--removed {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #splash img {
+      width: 120px;
+      height: 120px;
+    }
+
+    #splash p {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 15px;
+      font-weight: 500;
+      color: #5e86b9;
+      letter-spacing: 0.01em;
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <div id="splash" aria-live="polite" aria-busy="true">
+    <div class="splash-content">
+      <img src="splash/app_icon.png" alt="MPC Pharma" width="120" height="120">
+      <p>Please wait…</p>
+    </div>
+  </div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
