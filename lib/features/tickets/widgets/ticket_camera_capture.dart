@@ -55,7 +55,7 @@ Future<TicketCameraCaptureResult?> captureTicketPhoto() async {
     photo = await picker.pickImage(
       source: ImageSource.camera,
       preferredCameraDevice: CameraDevice.rear,
-      imageQuality: 85,
+      imageQuality: 70,
     );
   } on PlatformException catch (error) {
     throw Exception(_messageForPlatformError(error));
