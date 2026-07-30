@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 
 import '../../api/api_client.dart';
+import '../../utils/ticket_attachment_image.dart';
 import 'ticket_models.dart';
 
 class TicketAttachmentLimits {
@@ -76,25 +77,43 @@ class TicketAttachmentManager {
     required List<int> bytes,
     bool isAudio = false,
   }) async {
-    validateCanAdd(bytes.length);
+    var uploadBytes = bytes;
+    var uploadFileName = fileName;
+    var uploadMimeType = mimeType;
+
+    if (!isAudio &&
+        (isTicketAttachmentImageMime(mimeType) ||
+            isTicketAttachmentImageFileName(fileName))) {
+      final compressed = compressTicketAttachmentImage(
+        bytes: bytes,
+        fileName: fileName,
+      );
+      if (compressed != null) {
+        uploadBytes = compressed.bytes;
+        uploadFileName = compressed.fileName;
+        uploadMimeType = compressed.mimeType;
+      }
+    }
+
+    validateCanAdd(uploadBytes.length);
     final init = await apiClient.initiateTicketAttachmentUpload(
-      fileName: fileName,
-      mimeType: mimeType,
-      fileSize: bytes.length,
+      fileName: uploadFileName,
+      mimeType: uploadMimeType,
+      fileSize: uploadBytes.length,
     );
     await apiClient.uploadBytesToPresignedUrl(
       uploadUrl: init.uploadUrl,
-      bytes: bytes,
-      mimeType: mimeType,
+      bytes: uploadBytes,
+      mimeType: uploadMimeType,
     );
     await apiClient.markTicketAttachmentUploaded(
       attachmentId: init.attachmentId,
     );
     final pending = PendingTicketAttachment(
       attachmentId: init.attachmentId,
-      fileName: fileName,
-      mimeType: mimeType,
-      fileSize: bytes.length,
+      fileName: uploadFileName,
+      mimeType: uploadMimeType,
+      fileSize: uploadBytes.length,
       isAudio: isAudio,
     );
     _attachments.add(pending);
