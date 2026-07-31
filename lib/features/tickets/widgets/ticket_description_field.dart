@@ -280,6 +280,7 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
   final GlobalKey<TicketAudioRecorderButtonState> _audioRecorderKey =
       GlobalKey<TicketAudioRecorderButtonState>();
   bool _showCameraButton = false;
+  bool _readingAttachment = false;
 
   bool get _canEdit => widget.enabled && !widget.isSubmitting;
 
@@ -313,11 +314,16 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
 
   Future<void> _pickFiles() async {
     try {
+      if (mounted) setState(() => _readingAttachment = true);
+      await Future<void>.delayed(Duration.zero);
       final result = await FilePicker.pickFiles(
         allowMultiple: true,
         withData: true,
       );
-      if (result == null) return;
+      if (result == null || !mounted) {
+        if (mounted) setState(() => _readingAttachment = false);
+        return;
+      }
 
       for (final file in result.files) {
         await _uploadWithPlaceholder(
@@ -327,6 +333,7 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
       }
     } catch (error) {
       if (!mounted) return;
+      setState(() => _readingAttachment = false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(error.toString())));
@@ -335,8 +342,13 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
 
   Future<void> _capturePhoto() async {
     try {
+      if (mounted) setState(() => _readingAttachment = true);
+      await Future<void>.delayed(Duration.zero);
       final capture = await captureTicketPhoto();
-      if (capture == null || !mounted) return;
+      if (capture == null || !mounted) {
+        if (mounted) setState(() => _readingAttachment = false);
+        return;
+      }
 
       await _uploadWithPlaceholder(
         fileName: capture.fileName,
@@ -348,6 +360,7 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
       );
     } catch (error) {
       if (!mounted) return;
+      setState(() => _readingAttachment = false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(error.toString())));
@@ -362,7 +375,10 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
       id: UniqueKey(),
       fileName: fileName,
     );
-    setState(() => _uploading.add(placeholder));
+    setState(() {
+      _uploading.add(placeholder);
+      _readingAttachment = false;
+    });
 
     try {
       await upload();
@@ -553,6 +569,16 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                     enabled: _canEdit && !isBusy,
                     compact: true,
                   ),
+                if (_readingAttachment) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    'Processing file…',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: accent.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 if (widget.onCancel != null)
                   IconButton(
@@ -573,7 +599,9 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : Icon(widget.submitIcon, color: accent),
                         )
