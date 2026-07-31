@@ -5,14 +5,13 @@ import 'package:flutter/material.dart';
 import '../../api/api_client.dart';
 import '../../utils/download_file.dart';
 import '../../widgets/app_async_list_loader.dart';
-import '../../widgets/app_list_controls_row.dart';
+import '../../widgets/app_sort_controls.dart';
 import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/app_snack_bar.dart';
-import '../../widgets/app_sort_controls.dart';
 import '../users/user_models.dart';
 import 'location_form_screen.dart';
 
@@ -36,7 +35,6 @@ class _LocationsScreenState extends State<LocationsScreen> {
   String _searchQuery = '';
   AppSortField _sortField = AppSortField.id;
   AppSortDirection _sortDirection = AppSortDirection.descending;
-  bool _showInactive = false;
 
   @override
   void initState() {
@@ -181,10 +179,7 @@ class _LocationsScreenState extends State<LocationsScreen> {
             }
 
             final locations = snapshot.data ?? const <BaseLocation>[];
-            final visibleLocations = _showInactive
-                ? locations
-                : locations.where((location) => location.isActive).toList();
-            final filteredLocations = visibleLocations
+            final filteredLocations = locations
                 .where((location) => location.matchesSearch(_searchQuery))
                 .toList();
             filteredLocations.sort(_compareLocations);
@@ -200,13 +195,9 @@ class _LocationsScreenState extends State<LocationsScreen> {
                       _SearchAndActions(
                         controller: _searchController,
                         shownCount: filteredLocations.length,
-                        totalCount: visibleLocations.length,
+                        totalCount: locations.length,
                         sortField: _sortField,
                         sortDirection: _sortDirection,
-                        showInactive: _showInactive,
-                        onShowInactiveChanged: (value) {
-                          setState(() => _showInactive = value);
-                        },
                         onSortChanged: _changeSort,
                         onAddLocation: _addLocation,
                         onDownloadLocations: () =>
@@ -240,8 +231,6 @@ class _SearchAndActions extends StatelessWidget {
     required this.totalCount,
     required this.sortField,
     required this.sortDirection,
-    required this.showInactive,
-    required this.onShowInactiveChanged,
     required this.onSortChanged,
     required this.onAddLocation,
     required this.onDownloadLocations,
@@ -252,8 +241,6 @@ class _SearchAndActions extends StatelessWidget {
   final int totalCount;
   final AppSortField sortField;
   final AppSortDirection sortDirection;
-  final bool showInactive;
-  final ValueChanged<bool> onShowInactiveChanged;
   final ValueChanged<AppSortField> onSortChanged;
   final VoidCallback onAddLocation;
   final VoidCallback onDownloadLocations;
@@ -306,12 +293,10 @@ class _SearchAndActions extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              AppListControlsRow(
-                sortField: sortField,
-                sortDirection: sortDirection,
-                showInactive: showInactive,
-                onShowInactiveChanged: onShowInactiveChanged,
-                onSortChanged: onSortChanged,
+              AppSortControls(
+                field: sortField,
+                direction: sortDirection,
+                onChanged: onSortChanged,
               ),
             ],
           );
@@ -333,12 +318,10 @@ class _SearchAndActions extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            AppListControlsRow(
-              sortField: sortField,
-              sortDirection: sortDirection,
-              showInactive: showInactive,
-              onShowInactiveChanged: onShowInactiveChanged,
-              onSortChanged: onSortChanged,
+            AppSortControls(
+              field: sortField,
+              direction: sortDirection,
+              onChanged: onSortChanged,
             ),
           ],
         );
