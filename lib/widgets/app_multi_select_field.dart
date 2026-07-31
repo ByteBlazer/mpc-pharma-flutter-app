@@ -106,7 +106,19 @@ class AppMultiSelectField<T> extends StatelessWidget {
         '${selectedValues.length} selected';
   }
 
+  void _releaseFocus() {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  void _releaseFocusAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _releaseFocus();
+    });
+  }
+
   Future<void> _openPicker(BuildContext context) async {
+    _releaseFocus();
+
     if (singleSelect) {
       final result = await showDialog<Set<T>>(
         context: context,
@@ -124,6 +136,7 @@ class AppMultiSelectField<T> extends StatelessWidget {
           singleSelect: singleSelect,
         ),
       );
+      _releaseFocusAfterFrame();
       if (result != null) {
         onChanged(result);
       }
@@ -147,6 +160,7 @@ class AppMultiSelectField<T> extends StatelessWidget {
         onSelectionChanged: onChanged,
       ),
     );
+    _releaseFocusAfterFrame();
   }
 
   void _clearSelection() {
