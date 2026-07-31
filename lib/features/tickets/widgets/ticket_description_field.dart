@@ -249,6 +249,7 @@ class TicketComposerField extends StatefulWidget {
     this.onSubmit,
     this.onCancel,
     this.submitTooltip = 'Submit',
+    this.submitLabel,
     this.submitIcon = Icons.send,
   }) : assert(!showTextField || controller != null);
 
@@ -266,6 +267,7 @@ class TicketComposerField extends StatefulWidget {
   final VoidCallback? onSubmit;
   final Future<void> Function()? onCancel;
   final String submitTooltip;
+  final String? submitLabel;
   final IconData submitIcon;
 
   @override
@@ -561,19 +563,38 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                     icon: const Icon(Icons.close, color: Colors.black54),
                   ),
                 if (widget.onSubmit != null)
-                  IconButton(
-                    tooltip: widget.submitTooltip,
-                    onPressed: widget.isSubmitting || isBusy
-                        ? null
-                        : widget.onSubmit,
-                    icon: widget.isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(widget.submitIcon, color: accent),
-                  ),
+                  widget.submitLabel == null
+                      ? IconButton(
+                          tooltip: widget.submitTooltip,
+                          onPressed: widget.isSubmitting || isBusy
+                              ? null
+                              : widget.onSubmit,
+                          icon: widget.isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : Icon(widget.submitIcon, color: accent),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: FilledButton(
+                            onPressed: widget.isSubmitting || isBusy
+                                ? null
+                                : widget.onSubmit,
+                            child: widget.isSubmitting
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(widget.submitLabel!),
+                          ),
+                        ),
               ],
             ),
           ),
