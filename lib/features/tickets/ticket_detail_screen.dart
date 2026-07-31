@@ -694,8 +694,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                             onSubmit: _isLinkingCustomerAttachments
                                 ? null
                                 : () => _linkCustomerAttachments(ticket),
-                            submitTooltip: 'Upload attachments',
-                            submitIcon: Icons.cloud_upload_outlined,
+                            submitLabel: 'Submit',
                           ),
                       ],
                       if (ticket.resolutionSummary.isNotEmpty ||
