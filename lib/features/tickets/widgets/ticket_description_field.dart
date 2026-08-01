@@ -249,6 +249,7 @@ class TicketComposerField extends StatefulWidget {
     this.onSubmit,
     this.onCancel,
     this.submitTooltip = 'Submit',
+    this.submitLabel,
     this.submitIcon = Icons.send,
   }) : assert(!showTextField || controller != null);
 
@@ -266,6 +267,7 @@ class TicketComposerField extends StatefulWidget {
   final VoidCallback? onSubmit;
   final Future<void> Function()? onCancel;
   final String submitTooltip;
+  final String? submitLabel;
   final IconData submitIcon;
 
   @override
@@ -278,6 +280,7 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
   final GlobalKey<TicketAudioRecorderButtonState> _audioRecorderKey =
       GlobalKey<TicketAudioRecorderButtonState>();
   bool _showCameraButton = false;
+  bool _readingAttachment = false;
 
   bool get _canEdit => widget.enabled && !widget.isSubmitting;
 
@@ -311,11 +314,16 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
 
   Future<void> _pickFiles() async {
     try {
+      if (mounted) setState(() => _readingAttachment = true);
+      await Future<void>.delayed(Duration.zero);
       final result = await FilePicker.pickFiles(
         allowMultiple: true,
         withData: true,
       );
-      if (result == null) return;
+      if (result == null || !mounted) {
+        if (mounted) setState(() => _readingAttachment = false);
+        return;
+      }
 
       for (final file in result.files) {
         await _uploadWithPlaceholder(
@@ -325,6 +333,7 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
       }
     } catch (error) {
       if (!mounted) return;
+      setState(() => _readingAttachment = false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(error.toString())));
@@ -333,8 +342,13 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
 
   Future<void> _capturePhoto() async {
     try {
+      if (mounted) setState(() => _readingAttachment = true);
+      await Future<void>.delayed(Duration.zero);
       final capture = await captureTicketPhoto();
-      if (capture == null || !mounted) return;
+      if (capture == null || !mounted) {
+        if (mounted) setState(() => _readingAttachment = false);
+        return;
+      }
 
       await _uploadWithPlaceholder(
         fileName: capture.fileName,
@@ -346,6 +360,7 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
       );
     } catch (error) {
       if (!mounted) return;
+      setState(() => _readingAttachment = false);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(error.toString())));
@@ -360,7 +375,10 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
       id: UniqueKey(),
       fileName: fileName,
     );
-    setState(() => _uploading.add(placeholder));
+    setState(() {
+      _uploading.add(placeholder);
+      _readingAttachment = false;
+    });
 
     try {
       await upload();
@@ -551,6 +569,16 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                     enabled: _canEdit && !isBusy,
                     compact: true,
                   ),
+                if (_readingAttachment) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    'Processing file…',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: accent.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 if (widget.onCancel != null)
                   IconButton(
@@ -561,19 +589,40 @@ class _TicketComposerFieldState extends State<TicketComposerField> {
                     icon: const Icon(Icons.close, color: Colors.black54),
                   ),
                 if (widget.onSubmit != null)
-                  IconButton(
-                    tooltip: widget.submitTooltip,
-                    onPressed: widget.isSubmitting || isBusy
-                        ? null
-                        : widget.onSubmit,
-                    icon: widget.isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(widget.submitIcon, color: accent),
-                  ),
+                  widget.submitLabel == null
+                      ? IconButton(
+                          tooltip: widget.submitTooltip,
+                          onPressed: widget.isSubmitting || isBusy
+                              ? null
+                              : widget.onSubmit,
+                          icon: widget.isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(widget.submitIcon, color: accent),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: FilledButton(
+                            onPressed: widget.isSubmitting || isBusy
+                                ? null
+                                : widget.onSubmit,
+                            child: widget.isSubmitting
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(widget.submitLabel!),
+                          ),
+                        ),
               ],
             ),
           ),
