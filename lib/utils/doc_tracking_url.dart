@@ -33,7 +33,11 @@ String? _originFromApiBaseUrl() {
   return api.replace(path: path, query: '', fragment: '').origin;
 }
 
+String encodeDocTrackingToken(String docId) {
+  return base64Encode(utf8.encode(docId.trim()));
+}
+
 String buildDocTrackingUrl(String docId) {
-  final token = base64Encode(utf8.encode(docId.trim()));
+  final token = encodeDocTrackingToken(docId);
   return '${publicWebOrigin()}/track?t=${Uri.encodeComponent(token)}';
 }
