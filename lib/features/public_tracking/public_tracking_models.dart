@@ -35,6 +35,8 @@ class TripTrackingDocument {
     required this.docAmountRaw,
     required this.status,
     this.comment = '',
+    this.deliveredAt,
+    this.signature = '',
   });
 
   factory TripTrackingDocument.fromJson(JsonMap json) {
@@ -43,6 +45,8 @@ class TripTrackingDocument {
       docAmountRaw: DocTrackingResponse.readAmount(json['docAmount']),
       status: json['status']?.toString() ?? '',
       comment: json['comment']?.toString() ?? '',
+      deliveredAt: parseDate(json['deliveredAt']),
+      signature: json['signature']?.toString() ?? '',
     );
   }
 
@@ -50,9 +54,13 @@ class TripTrackingDocument {
   final String docAmountRaw;
   final String status;
   final String comment;
+  final DateTime? deliveredAt;
+  final String signature;
 
   bool get isDelivered => status.toUpperCase() == 'DELIVERED';
   bool get isUndelivered => status.toUpperCase() == 'UNDELIVERED';
+  bool get isTerminal => isDelivered || isUndelivered;
+  bool get hasSignature => signature.trim().isNotEmpty;
 }
 
 class DocTrackingResponse {
@@ -63,7 +71,9 @@ class DocTrackingResponse {
     required this.docAmountRaw,
     required this.status,
     this.comment = '',
+    this.deliveredAt,
     this.deliveryTimestamp,
+    this.signature = '',
     this.customerFirmName = '',
     this.customerAddress = '',
     this.customerCity = '',
@@ -77,6 +87,9 @@ class DocTrackingResponse {
   });
 
   factory DocTrackingResponse.fromJson(JsonMap json) {
+    final deliveryTimestamp = parseDate(json['deliveryTimestamp']);
+    final deliveredAt =
+        parseDate(json['deliveredAt']) ?? deliveryTimestamp;
     return DocTrackingResponse(
       success: json['success'] == true,
       message: formatApiMessage(json['message'], fallback: ''),
@@ -84,7 +97,9 @@ class DocTrackingResponse {
       docAmountRaw: DocTrackingResponse.readAmount(json['docAmount']),
       status: json['status']?.toString() ?? '',
       comment: json['comment']?.toString() ?? '',
-      deliveryTimestamp: parseDate(json['deliveryTimestamp']),
+      deliveredAt: deliveredAt,
+      deliveryTimestamp: deliveryTimestamp,
+      signature: json['signature']?.toString() ?? '',
       customerFirmName: json['customerFirmName']?.toString() ?? '',
       customerAddress: json['customerAddress']?.toString() ?? '',
       customerCity: json['customerCity']?.toString() ?? '',
@@ -110,7 +125,9 @@ class DocTrackingResponse {
   final String docAmountRaw;
   final String status;
   final String comment;
+  final DateTime? deliveredAt;
   final DateTime? deliveryTimestamp;
+  final String signature;
   final String customerFirmName;
   final String customerAddress;
   final String customerCity;
@@ -132,6 +149,7 @@ class DocTrackingResponse {
   /// Primary tracked invoice plus any siblings from [otherTripDocuments].
   List<TripTrackingDocument> get allTripDocuments {
     final primaryId = docId.trim();
+    final primaryDeliveredAt = deliveredAt ?? deliveryTimestamp;
     final siblings = otherTripDocuments
         .where((doc) => doc.docId.trim().isNotEmpty && doc.docId != primaryId)
         .toList(growable: false);
@@ -142,9 +160,18 @@ class DocTrackingResponse {
         docAmountRaw: docAmountRaw,
         status: status,
         comment: comment,
+        deliveredAt: primaryDeliveredAt,
+        signature: signature,
       ),
       ...siblings,
     ];
+  }
+
+  /// True when every invoice on the page is DELIVERED or UNDELIVERED.
+  bool get allDocumentsTerminal {
+    final docs = allTripDocuments;
+    if (docs.isEmpty) return isTerminal;
+    return docs.every((doc) => doc.isTerminal);
   }
 
   bool get hasMap =>
