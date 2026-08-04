@@ -5,9 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../utils/web_tab_visibility.dart';
-import '../../utils/signature_image.dart';
 import '../../widgets/app_brand_panel.dart';
-import '../trip_dashboard/trip_dashboard_models.dart';
 import 'public_tracking_helpers.dart';
 import 'public_tracking_map.dart';
 import 'public_tracking_models.dart';
@@ -29,7 +27,6 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
   late final bool _ownsApiClient = widget._apiClient == null;
 
   DocTrackingResponse? _tracking;
-  DeliveryStatusDetails? _deliveryStatus;
   Object? _error;
   bool _loading = true;
   Timer? _pollTimer;
@@ -68,6 +65,7 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
 
   bool get _shouldPoll {
     if (_pausePollingOnHidden && !_tabVisible) return false;
+    if (_tracking?.allDocumentsTerminal == true) return false;
     return true;
   }
 
@@ -93,17 +91,10 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
 
     try {
       final tracking = await _apiClient.getDocTracking(token: token);
-      DeliveryStatusDetails? deliveryStatus;
-      if (tracking.isTerminal) {
-        deliveryStatus = await _apiClient.getDocDeliveryStatusPublic(
-          token: token,
-        );
-      }
 
       if (!mounted) return;
       setState(() {
         _tracking = tracking;
-        _deliveryStatus = deliveryStatus;
         _error = null;
         _loading = false;
       });
@@ -182,250 +173,25 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
     }
 
     final tracking = _tracking!;
-    final status = publicTrackingStatusDisplay(tracking.status);
-    final amount = formatPublicTrackingAmount(tracking.docAmountRaw);
     final customerName = tracking.customerFirmName.trim();
     final customerAddressLine = tracking.customerAddressLine;
-    final showDeliveringTo = customerName.isNotEmpty || customerAddressLine.isNotEmpty;
+    final showDeliveringTo =
+        customerName.isNotEmpty || customerAddressLine.isNotEmpty;
     final tripDocuments = tracking.allTripDocuments;
-    final showTripDocuments = tracking.hasOtherTripDocuments;
-    final showTrackingComment =
-        !showTripDocuments &&
-        tracking.comment.trim().isNotEmpty &&
-        !(tracking.isTerminal && _deliveryStatus != null);
     final mapMessage = publicTrackingMapMessage(
       status: tracking.status,
       hasMap: tracking.hasMap,
     );
 
     return Scaffold(
-      body: Column(
-        children: [
-          Material(
-            elevation: 3,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 12,
-                      runSpacing: 8,
-                      children: [
-                        const Text(
-                          'Delivery Tracking',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Chip(
-                          avatar: Icon(
-                            status.icon,
-                            color: status.color,
-                            size: 18,
-                          ),
-                          label: Text(status.label),
-                          side: BorderSide(
-                            color: status.color.withValues(alpha: 0.4),
-                          ),
-                          backgroundColor: status.color.withValues(alpha: 0.08),
-                        ),
-                      ],
-                    ),
-                    if (showTripDocuments) ...[
-                      const SizedBox(height: 8),
-                      PublicTrackingTripDocuments(documents: tripDocuments),
-                    ] else if (tracking.docId.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text.rich(
-                        TextSpan(
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: Colors.black54),
-                          children: [
-                            const TextSpan(
-                              text: 'Invoice: ',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            TextSpan(text: tracking.docId),
-                            if (amount.isNotEmpty) ...[
-                              const TextSpan(text: ' — '),
-                              TextSpan(
-                                text: amount,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (showDeliveringTo) ...[
-                      const SizedBox(height: 8),
-                      Text.rich(
-                        TextSpan(
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: Colors.black54),
-                          children: [
-                            const TextSpan(
-                              text: 'Delivering To: ',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            if (customerName.isNotEmpty)
-                              TextSpan(text: customerName),
-                            if (customerAddressLine.isNotEmpty)
-                              TextSpan(
-                                text: customerName.isNotEmpty
-                                    ? ' $customerAddressLine'
-                                    : customerAddressLine,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: Colors.black54),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (showTrackingComment) ...[
-                      const SizedBox(height: 12),
-                      Text.rich(
-                        TextSpan(
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: Colors.black54),
-                          children: [
-                            const TextSpan(
-                              text: 'Note: ',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            TextSpan(text: tracking.comment.trim()),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (tracking.deliveryTimestamp != null) ...[
-                      const SizedBox(height: 8),
-                      Text.rich(
-                        TextSpan(
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: Colors.black54),
-                          children: [
-                            const TextSpan(
-                              text: 'Delivered at: ',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            TextSpan(
-                              text: formatPublicTrackingInstant(
-                                tracking.deliveryTimestamp,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (tracking.driverLastKnownLocation?.receivedAt !=
-                        null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Driver location updated: ${formatPublicTrackingDriverUpdate(tracking.driverLastKnownLocation!.receivedAt)}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.black38,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                    if (!tracking.isTerminal) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'Estimated Delivery Time:',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.black54,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        formatPublicTrackingEta(tracking.eta, tracking.status),
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: tracking.eta == -1
-                              ? const Color(0xFFFF9800)
-                              : Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                    if (tracking.numEnrouteCustomers > 0) ...[
-                      const SizedBox(height: 12),
-                      Text.rich(
-                        TextSpan(
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Colors.black54,
-                                fontWeight: FontWeight.w400,
-                                height: 1.4,
-                              ),
-                          children: [
-                            TextSpan(
-                              text: tracking.numEnrouteCustomers == 1
-                                  ? 'The driver has 1 delivery before reaching you. Actual time may be longer than estimated.'
-                                  : 'The driver has ${tracking.numEnrouteCustomers} other deliveries before reaching you. Actual time may be longer than estimated.',
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (tracking.isTerminal && _deliveryStatus != null) ...[
-                      const SizedBox(height: 12),
-                      if (_deliveryStatus!.signature.trim().isNotEmpty) ...[
-                        Text(
-                          'Delivery Signature:',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Colors.black54,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(
-                              maxWidth: 120,
-                              maxHeight: 80,
-                            ),
-                            child: SignatureImagePreview(
-                              signatureBase64: _deliveryStatus!.signature,
-                              height: 80,
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (_deliveryStatus!.comment.trim().isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          'Note:',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Colors.black54,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        AppBrandPanel(
-                          child: Text(_deliveryStatus!.comment.trim()),
-                        ),
-                      ],
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final mapHeight = (constraints.maxHeight * 0.55).clamp(
+            280.0,
+            constraints.maxHeight,
+          );
+          final mapSection = SizedBox(
+            height: mapHeight,
             child: tracking.hasMap
                 ? PublicTrackingMap(tracking: tracking)
                 : Center(
@@ -441,8 +207,130 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                       ),
                     ),
                   ),
-          ),
-        ],
+          );
+
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Material(
+                  elevation: 3,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            'Delivery Tracking',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (tripDocuments.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            PublicTrackingTripDocuments(
+                              documents: tripDocuments,
+                            ),
+                          ],
+                          if (showDeliveringTo) ...[
+                            const SizedBox(height: 12),
+                            Text.rich(
+                              TextSpan(
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: Colors.black54),
+                                children: [
+                                  const TextSpan(
+                                    text: 'Delivering To: ',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  if (customerName.isNotEmpty)
+                                    TextSpan(text: customerName),
+                                  if (customerAddressLine.isNotEmpty)
+                                    TextSpan(
+                                      text: customerName.isNotEmpty
+                                          ? ' $customerAddressLine'
+                                          : customerAddressLine,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: Colors.black54),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if (tracking.driverLastKnownLocation?.receivedAt !=
+                              null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Driver location updated: ${formatPublicTrackingDriverUpdate(tracking.driverLastKnownLocation!.receivedAt)}',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.black38,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                            ),
+                          ],
+                          if (!tracking.isTerminal) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              'Estimated Delivery Time:',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Colors.black54,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              formatPublicTrackingEta(
+                                tracking.eta,
+                                tracking.status,
+                              ),
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: tracking.eta == -1
+                                    ? const Color(0xFFFF9800)
+                                    : Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                          if (tracking.numEnrouteCustomers > 0) ...[
+                            const SizedBox(height: 12),
+                            Text.rich(
+                              TextSpan(
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Colors.black54,
+                                      fontWeight: FontWeight.w400,
+                                      height: 1.4,
+                                    ),
+                                children: [
+                                  TextSpan(
+                                    text: tracking.numEnrouteCustomers == 1
+                                        ? 'The driver has 1 delivery before reaching you. Actual time may be longer than estimated.'
+                                        : 'The driver has ${tracking.numEnrouteCustomers} other deliveries before reaching you. Actual time may be longer than estimated.',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                mapSection,
+              ],
+            ),
+          );
+        },
       ),
     );
   }

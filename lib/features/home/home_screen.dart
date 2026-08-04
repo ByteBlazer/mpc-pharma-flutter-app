@@ -13,6 +13,7 @@ import '../../widgets/app_surface.dart';
 import '../../widgets/simulation_mode_banner.dart';
 import '../auth/impersonate_screen.dart';
 import '../customers/customers_screen.dart';
+import '../delivery_tracking/delivery_tracking_screen.dart';
 import '../departments/departments_screen.dart';
 import '../leave_requests/leave_requests_screen.dart';
 import '../locations/locations_screen.dart';
@@ -327,6 +328,7 @@ class _HomeFeatureGrid extends StatelessWidget {
     final showLeaveRequests = hasWebAccess && !isCustomer;
     final showReports = (hasWebAccess || isAppAdmin) && !isCustomer;
     final showComplaints = isCustomer;
+    final showDeliveryTracking = isCustomer;
     final showSettings = await JwtPayload.currentUserIsAppAdmin();
     final showNotifications = hasWebAccess;
     final showCustomers = hasWebAccess;
@@ -342,6 +344,7 @@ class _HomeFeatureGrid extends StatelessWidget {
       showLeaveRequests: showLeaveRequests,
       showReports: showReports,
       showComplaints: showComplaints,
+      showDeliveryTracking: showDeliveryTracking,
       showSettings: showSettings,
       showNotifications: showNotifications,
       showCustomers: showCustomers,
@@ -426,6 +429,21 @@ class _HomeFeatureGrid extends StatelessWidget {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => ComplaintsScreen(
+                  apiClient: apiClient,
+                  onLoginAgain: onLoginAgain,
+                ),
+              ),
+            );
+          },
+        ),
+      if (visibility.showDeliveryTracking)
+        _FeatureTile(
+          icon: Icons.local_shipping_outlined,
+          label: 'Delivery Tracking',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => DeliveryTrackingScreen(
                   apiClient: apiClient,
                   onLoginAgain: onLoginAgain,
                 ),
@@ -727,6 +745,7 @@ class _HomeFeatureVisibility {
     required this.showLeaveRequests,
     required this.showReports,
     required this.showComplaints,
+    required this.showDeliveryTracking,
     required this.showSettings,
     required this.showNotifications,
     required this.showCustomers,
@@ -741,6 +760,7 @@ class _HomeFeatureVisibility {
   final bool showLeaveRequests;
   final bool showReports;
   final bool showComplaints;
+  final bool showDeliveryTracking;
   final bool showSettings;
   final bool showNotifications;
   final bool showCustomers;

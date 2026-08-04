@@ -1,0 +1,155 @@
+import 'dart:convert';
+
+import '../my_trips/my_trips_models.dart' show JsonMap, asInt, parseDate;
+
+class CustomerDeliverySummary {
+  const CustomerDeliverySummary({
+    required this.docId,
+    required this.status,
+    this.tripId,
+    this.docAmountRaw = '',
+    this.docDate,
+    this.lastUpdatedAt,
+  });
+
+  factory CustomerDeliverySummary.fromJson(JsonMap json) {
+    return CustomerDeliverySummary(
+      docId: json['docId']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      tripId: asInt(json['tripId']),
+      docAmountRaw: _readAmount(json['docAmount']),
+      docDate: parseDate(json['docDate']),
+      lastUpdatedAt: parseDate(json['lastUpdatedAt']),
+    );
+  }
+
+  final String docId;
+  final String status;
+  final int? tripId;
+  final String docAmountRaw;
+  final DateTime? docDate;
+  final DateTime? lastUpdatedAt;
+
+  static String _readAmount(Object? value) {
+    if (value == null) return '';
+    if (value is num) return value.toString();
+    return value.toString().trim();
+  }
+
+  static List<CustomerDeliverySummary> parseResponseBody(String body) {
+    if (body.trim().isEmpty) return const [];
+    final decoded = jsonDecode(body);
+    if (decoded is! JsonMap) return const [];
+    final list = decoded['deliveries'];
+    if (list is! List) return const [];
+    return list
+        .whereType<JsonMap>()
+        .map(CustomerDeliverySummary.fromJson)
+        .where((item) => item.docId.trim().isNotEmpty)
+        .toList(growable: false);
+  }
+}
+
+/// Deliveries that share the same [tripId], preserving API list order.
+class CustomerDeliveryTripGroup {
+  const CustomerDeliveryTripGroup({
+    required this.tripId,
+    required this.deliveries,
+  });
+
+  final int? tripId;
+  final List<CustomerDeliverySummary> deliveries;
+
+  bool get hasTripId => tripId != null;
+
+  int get invoiceCount => deliveries.length;
+}
+
+List<CustomerDeliveryTripGroup> groupCustomerDeliveriesByTrip(
+  List<CustomerDeliverySummary> deliveries,
+) {
+  if (deliveries.isEmpty) return const [];
+
+  final orderedKeys = <String>[];
+  final grouped = <String, List<CustomerDeliverySummary>>{};
+
+  for (final delivery in deliveries) {
+    final key = delivery.tripId != null
+        ? 'trip:${delivery.tripId}'
+        : 'doc:${delivery.docId}';
+    grouped.putIfAbsent(key, () {
+      orderedKeys.add(key);
+      return <CustomerDeliverySummary>[];
+    }).add(delivery);
+  }
+
+  return orderedKeys
+      .map((key) {
+        final items = grouped[key]!;
+        return CustomerDeliveryTripGroup(
+          tripId: items.first.tripId,
+          deliveries: List<CustomerDeliverySummary>.unmodifiable(items),
+        );
+      })
+      .toList(growable: false);
+}
+
+class DocLineItem {
+  const DocLineItem({
+    required this.medicineName,
+    required this.unit,
+    required this.qty,
+    required this.unitPrice,
+    required this.lineItemPrice,
+  });
+
+  factory DocLineItem.fromJson(JsonMap json) {
+    return DocLineItem(
+      medicineName: json['medicineName']?.toString() ?? '',
+      unit: json['unit']?.toString() ?? '',
+      qty: asInt(json['qty']) ?? 0,
+      unitPrice: _readPrice(json['unitPrice']),
+      lineItemPrice: _readPrice(json['lineItemPrice']),
+    );
+  }
+
+  final String medicineName;
+  final String unit;
+  final int qty;
+  final double unitPrice;
+  final double lineItemPrice;
+
+  static double _readPrice(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+}
+
+class DocLineItemsResponse {
+  const DocLineItemsResponse({
+    required this.docId,
+    required this.lineItems,
+    required this.invoiceTotal,
+  });
+
+  factory DocLineItemsResponse.fromJson(JsonMap json) {
+    final items = <DocLineItem>[];
+    final rawItems = json['lineItems'];
+    if (rawItems is List) {
+      for (final item in rawItems) {
+        if (item is JsonMap) {
+          items.add(DocLineItem.fromJson(item));
+        }
+      }
+    }
+    return DocLineItemsResponse(
+      docId: json['docId']?.toString() ?? '',
+      lineItems: List<DocLineItem>.unmodifiable(items),
+      invoiceTotal: DocLineItem._readPrice(json['invoiceTotal']),
+    );
+  }
+
+  final String docId;
+  final List<DocLineItem> lineItems;
+  final double invoiceTotal;
+}

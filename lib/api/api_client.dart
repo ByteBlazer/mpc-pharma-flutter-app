@@ -8,6 +8,7 @@ import 'auth_models.dart';
 import 'auth_token_store.dart';
 import '../features/customers/customer_models.dart' hide JsonMap;
 import '../features/leave_requests/leave_models.dart' hide JsonMap;
+import '../features/delivery_tracking/delivery_tracking_models.dart';
 import '../features/departments/department_models.dart' hide JsonMap;
 import '../features/my_trips/my_trips_models.dart' hide JsonMap;
 import '../features/notifications/notification_models.dart' hide JsonMap;
@@ -436,6 +437,30 @@ class ApiClient {
       requiresAuth: true,
     );
     return DeliveryStatusDetails.fromJson(_decodeJsonObject(response.body));
+  }
+
+  /// Customer deliveries from the last 90 days (customer JWT only).
+  Future<List<CustomerDeliverySummary>> getCustomerDeliveries({
+    String? token,
+  }) async {
+    final response = await _get(
+      'doc/customer-deliveries',
+      token: token,
+      requiresAuth: true,
+    );
+    return CustomerDeliverySummary.parseResponseBody(response.body);
+  }
+
+  Future<DocLineItemsResponse> getDocLineItems({
+    String? token,
+    required String docId,
+  }) async {
+    final response = await _get(
+      'doc/line-items/${Uri.encodeComponent(docId.trim())}',
+      token: token,
+      requiresAuth: true,
+    );
+    return DocLineItemsResponse.fromJson(_decodeJsonObject(response.body));
   }
 
   /// Public customer tracking — no auth, never uses stored JWT.
