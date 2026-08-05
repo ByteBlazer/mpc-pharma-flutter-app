@@ -30,6 +30,9 @@ class CustomerDeliverySummary {
   final DateTime? docDate;
   final DateTime? lastUpdatedAt;
 
+  bool get isDelivered => status.toUpperCase() == 'DELIVERED';
+  bool get isUndelivered => status.toUpperCase() == 'UNDELIVERED';
+
   static String _readAmount(Object? value) {
     if (value == null) return '';
     if (value is num) return value.toString();
