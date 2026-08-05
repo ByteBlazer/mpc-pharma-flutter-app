@@ -6,7 +6,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # If version is,say, 1.0.4+6, then if you want to force update app: then make it 1.0.5+7
 # else if you want to update the app without forcing update: then make it 1.0.4+7
-version: 1.0.5+7
+version: 1.0.8+8
 
 environment:
   sdk: ^3.11.3
