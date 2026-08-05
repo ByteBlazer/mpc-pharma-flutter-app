@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../trip_dashboard/trip_dashboard_helpers.dart';
+import 'public_tracking_models.dart';
 
 class PublicTrackingStatusDisplay {
   const PublicTrackingStatusDisplay({
@@ -90,17 +91,43 @@ String formatPublicTrackingDriverUpdate(DateTime? instant) {
   return formatSmartTimestamp(instant);
 }
 
-String publicTrackingMapMessage({
-  required String status,
-  required bool hasMap,
-}) {
-  if (hasMap) return '';
-  switch (status.toUpperCase()) {
-    case 'DELIVERED':
+enum PublicTrackingMapMode {
+  showMap,
+  allDeliveredComplete,
+  partialDeliveredSomeFailed,
+  allFailed,
+}
+
+PublicTrackingMapMode resolvePublicTrackingMapMode(
+  PublicTrackingTripDocumentCounts counts,
+) {
+  if (counts.total == 0) {
+    return PublicTrackingMapMode.showMap;
+  }
+  if (counts.allDelivered) {
+    return PublicTrackingMapMode.allDeliveredComplete;
+  }
+  if (counts.allFailed) {
+    return PublicTrackingMapMode.allFailed;
+  }
+  if (counts.hasPending) {
+    return PublicTrackingMapMode.showMap;
+  }
+  return PublicTrackingMapMode.partialDeliveredSomeFailed;
+}
+
+String publicTrackingMapPanelMessage(PublicTrackingMapMode mode) {
+  switch (mode) {
+    case PublicTrackingMapMode.allDeliveredComplete:
       return 'Delivery has been completed. Location tracking is no longer available.';
-    case 'UNDELIVERED':
-      return 'Delivery could not be completed. Location tracking is no longer available.';
-    default:
+    case PublicTrackingMapMode.partialDeliveredSomeFailed:
+      return 'Some invoices on this trip were delivered, but others could not be '
+          'completed. Expand the invoices section above to see details for each '
+          'invoice.';
+    case PublicTrackingMapMode.allFailed:
+      return 'None of the invoices on this trip could be delivered. Expand the '
+          'invoices section above to see the reason for each invoice.';
+    case PublicTrackingMapMode.showMap:
       return 'Location tracking is not available for this delivery at the moment.';
   }
 }

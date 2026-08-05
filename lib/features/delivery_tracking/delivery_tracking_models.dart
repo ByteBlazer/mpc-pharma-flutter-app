@@ -63,6 +63,37 @@ class CustomerDeliveryTripGroup {
   bool get hasTripId => tripId != null;
 
   int get invoiceCount => deliveries.length;
+
+  /// Doc id for the trip-level Track link (first invoice after status sort).
+  String get trackingDocId => deliveries.first.docId;
+}
+
+int tripInvoiceStatusSortOrder(String status) {
+  switch (status.toUpperCase()) {
+    case 'ON_TRIP':
+      return 0;
+    case 'DELIVERED':
+      return 1;
+    case 'UNDELIVERED':
+      return 2;
+    default:
+      return 0;
+  }
+}
+
+List<CustomerDeliverySummary> sortTripDeliveries(
+  List<CustomerDeliverySummary> deliveries,
+) {
+  if (deliveries.length <= 1) return deliveries;
+  final sorted = List<CustomerDeliverySummary>.from(deliveries);
+  sorted.sort((a, b) {
+    final order = tripInvoiceStatusSortOrder(
+      a.status,
+    ).compareTo(tripInvoiceStatusSortOrder(b.status));
+    if (order != 0) return order;
+    return 0;
+  });
+  return sorted;
 }
 
 List<CustomerDeliveryTripGroup> groupCustomerDeliveriesByTrip(
@@ -85,7 +116,7 @@ List<CustomerDeliveryTripGroup> groupCustomerDeliveriesByTrip(
 
   return orderedKeys
       .map((key) {
-        final items = grouped[key]!;
+        final items = sortTripDeliveries(grouped[key]!);
         return CustomerDeliveryTripGroup(
           tripId: items.first.tripId,
           deliveries: List<CustomerDeliverySummary>.unmodifiable(items),
