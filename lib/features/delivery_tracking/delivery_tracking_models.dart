@@ -32,6 +32,7 @@ class CustomerDeliverySummary {
 
   bool get isDelivered => status.toUpperCase() == 'DELIVERED';
   bool get isUndelivered => status.toUpperCase() == 'UNDELIVERED';
+  bool get isAtTransitHub => status.toUpperCase() == 'AT_TRANSIT_HUB';
 
   static String _readAmount(Object? value) {
     if (value == null) return '';
@@ -53,17 +54,28 @@ class CustomerDeliverySummary {
   }
 }
 
-/// Deliveries that share the same [tripId], preserving API list order.
+/// How a delivery-tracking card group should be rendered.
+enum CustomerDeliveryGroupKind {
+  trip,
+  transitHub,
+  standalone,
+}
+
+/// Deliveries shown together on one delivery-tracking card.
 class CustomerDeliveryTripGroup {
   const CustomerDeliveryTripGroup({
+    required this.kind,
     required this.tripId,
     required this.deliveries,
   });
 
+  final CustomerDeliveryGroupKind kind;
   final int? tripId;
   final List<CustomerDeliverySummary> deliveries;
 
   bool get hasTripId => tripId != null;
+
+  bool get showTrackButton => kind == CustomerDeliveryGroupKind.trip;
 
   int get invoiceCount => deliveries.length;
 
@@ -104,12 +116,15 @@ List<CustomerDeliveryTripGroup> groupCustomerDeliveriesByTrip(
 ) {
   if (deliveries.isEmpty) return const [];
 
+  const transitHubKey = 'transit-hub';
   final orderedKeys = <String>[];
   final grouped = <String, List<CustomerDeliverySummary>>{};
 
   for (final delivery in deliveries) {
     final key = delivery.tripId != null
         ? 'trip:${delivery.tripId}'
+        : delivery.isAtTransitHub
+        ? transitHubKey
         : 'doc:${delivery.docId}';
     grouped.putIfAbsent(key, () {
       orderedKeys.add(key);
@@ -120,8 +135,16 @@ List<CustomerDeliveryTripGroup> groupCustomerDeliveriesByTrip(
   return orderedKeys
       .map((key) {
         final items = sortTripDeliveries(grouped[key]!);
+        final kind = switch (key) {
+          transitHubKey => CustomerDeliveryGroupKind.transitHub,
+          _ when key.startsWith('trip:') => CustomerDeliveryGroupKind.trip,
+          _ => CustomerDeliveryGroupKind.standalone,
+        };
         return CustomerDeliveryTripGroup(
-          tripId: items.first.tripId,
+          kind: kind,
+          tripId: kind == CustomerDeliveryGroupKind.trip
+              ? items.first.tripId
+              : null,
           deliveries: List<CustomerDeliverySummary>.unmodifiable(items),
         );
       })
