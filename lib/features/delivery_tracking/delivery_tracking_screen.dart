@@ -457,6 +457,7 @@ class _DeliveryCard extends StatelessWidget {
                   style: TextStyle(color: primary),
                 ),
               ),
+              const Spacer(),
               if (onViewSignature != null)
                 TextButton(
                   onPressed: onViewSignature,
