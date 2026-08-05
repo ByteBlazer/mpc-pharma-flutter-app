@@ -234,7 +234,6 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
     }
 
     final tripGroups = groupCustomerDeliveriesByTrip(deliveries);
-    final hasTripGrouping = deliveries.any((delivery) => delivery.tripId != null);
 
     return RefreshIndicator(
       onRefresh: () => _refresh(showLoading: false),
@@ -248,7 +247,7 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-              itemCount: (hasTripGrouping ? tripGroups.length : deliveries.length) + 1,
+              itemCount: tripGroups.length + 1,
               separatorBuilder: (_, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 if (index == 0) {
@@ -260,28 +259,14 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
                     ),
                   );
                 }
-                if (hasTripGrouping) {
-                  final group = tripGroups[index - 1];
-                  return _TripDeliveryGroup(
-                    group: group,
-                    primary: primary,
-                    onViewInvoice: _openLineItems,
-                    onViewSignature: _viewSignature,
-                    onViewComment: _viewComment,
-                    onTrack: _openTracking,
-                  );
-                }
-                final delivery = deliveries[index - 1];
-                return _DeliveryCard(
-                  delivery: delivery,
+                final group = tripGroups[index - 1];
+                return _TripDeliveryGroup(
+                  group: group,
                   primary: primary,
-                  onViewInvoice: () => _openLineItems(delivery.docId),
-                  onViewSignature: delivery.isDelivered
-                      ? () => _viewSignature(delivery.docId)
-                      : null,
-                  onViewComment: delivery.isUndelivered
-                      ? () => _viewComment(delivery.docId)
-                      : null,
+                  onViewInvoice: _openLineItems,
+                  onViewSignature: _viewSignature,
+                  onViewComment: _viewComment,
+                  onTrack: _openTracking,
                 );
               },
             ),
@@ -310,13 +295,21 @@ class _TripDeliveryGroup extends StatelessWidget {
   final Future<void> Function(String docId) onTrack;
 
   String _groupTitle() {
-    if (group.hasTripId) {
-      final countLabel = group.invoiceCount == 1
-          ? '1 invoice'
-          : '${group.invoiceCount} invoices';
-      return 'Trip #${group.tripId} · $countLabel';
-    }
-    return 'Invoice';
+    final countLabel = group.invoiceCount == 1
+        ? '1 invoice'
+        : '${group.invoiceCount} invoices';
+    return switch (group.kind) {
+      CustomerDeliveryGroupKind.trip => 'Trip #${group.tripId} · $countLabel',
+      CustomerDeliveryGroupKind.transitHub => 'At Transit Hub · $countLabel',
+      CustomerDeliveryGroupKind.standalone => 'Invoice',
+    };
+  }
+
+  IconData _groupIcon() {
+    return switch (group.kind) {
+      CustomerDeliveryGroupKind.transitHub => Icons.warehouse_outlined,
+      _ => Icons.local_shipping_outlined,
+    };
   }
 
   @override
@@ -331,7 +324,7 @@ class _TripDeliveryGroup extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.local_shipping_outlined, color: primary, size: 20),
+                Icon(_groupIcon(), color: primary, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -345,23 +338,25 @@ class _TripDeliveryGroup extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: () => onTrack(group.trackingDocId),
-              icon: const Icon(Icons.open_in_new, size: 16),
-              label: const Text('Track delivery'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                minimumSize: const Size(double.infinity, 40),
-                textStyle: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+            if (group.showTrackButton) ...[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => onTrack(group.trackingDocId),
+                icon: const Icon(Icons.open_in_new, size: 16),
+                label: const Text('Track delivery'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  minimumSize: const Size(double.infinity, 40),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
+            ],
             const SizedBox(height: 12),
             for (var index = 0; index < group.deliveries.length; index++) ...[
               if (index > 0) const SizedBox(height: 10),
