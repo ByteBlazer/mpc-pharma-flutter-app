@@ -61,6 +61,50 @@ class TripTrackingDocument {
   bool get isUndelivered => status.toUpperCase() == 'UNDELIVERED';
   bool get isTerminal => isDelivered || isUndelivered;
   bool get hasSignature => signature.trim().isNotEmpty;
+
+  bool get isPending => !isTerminal;
+}
+
+/// Counts of invoice statuses for this customer's docs on the trip.
+class PublicTrackingTripDocumentCounts {
+  const PublicTrackingTripDocumentCounts({
+    required this.delivered,
+    required this.failed,
+    required this.pending,
+    required this.total,
+  });
+
+  factory PublicTrackingTripDocumentCounts.fromDocuments(
+    List<TripTrackingDocument> documents,
+  ) {
+    var delivered = 0;
+    var failed = 0;
+    var pending = 0;
+    for (final doc in documents) {
+      if (doc.isDelivered) {
+        delivered++;
+      } else if (doc.isUndelivered) {
+        failed++;
+      } else {
+        pending++;
+      }
+    }
+    return PublicTrackingTripDocumentCounts(
+      delivered: delivered,
+      failed: failed,
+      pending: pending,
+      total: documents.length,
+    );
+  }
+
+  final int delivered;
+  final int failed;
+  final int pending;
+  final int total;
+
+  bool get allDelivered => total > 0 && delivered == total;
+  bool get allFailed => total > 0 && failed == total;
+  bool get hasPending => pending > 0;
 }
 
 class DocTrackingResponse {
@@ -172,6 +216,16 @@ class DocTrackingResponse {
     final docs = allTripDocuments;
     if (docs.isEmpty) return isTerminal;
     return docs.every((doc) => doc.isTerminal);
+  }
+
+  PublicTrackingTripDocumentCounts get tripDocumentCounts =>
+      PublicTrackingTripDocumentCounts.fromDocuments(allTripDocuments);
+
+  /// True when at least one invoice on this trip is still in progress.
+  bool get hasPendingTripDocuments {
+    final counts = tripDocumentCounts;
+    if (counts.total == 0) return !isTerminal;
+    return counts.hasPending;
   }
 
   bool get hasMap =>
