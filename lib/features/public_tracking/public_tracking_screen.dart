@@ -178,10 +178,9 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
     final showDeliveringTo =
         customerName.isNotEmpty || customerAddressLine.isNotEmpty;
     final tripDocuments = tracking.allTripDocuments;
-    final mapMessage = publicTrackingMapMessage(
-      status: tracking.status,
-      hasMap: tracking.hasMap,
-    );
+    final tripCounts = tracking.tripDocumentCounts;
+    final mapMode = resolvePublicTrackingMapMode(tripCounts);
+    final showLiveTracking = mapMode == PublicTrackingMapMode.showMap;
 
     return Scaffold(
       body: LayoutBuilder(
@@ -192,8 +191,26 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
           );
           final mapSection = SizedBox(
             height: mapHeight,
-            child: tracking.hasMap
-                ? PublicTrackingMap(tracking: tracking)
+            child: showLiveTracking
+                ? tracking.hasMap
+                    ? PublicTrackingMap(tracking: tracking)
+                    : Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 600),
+                            child: AppBrandPanel(
+                              padding: const EdgeInsets.all(16),
+                              textAlign: TextAlign.center,
+                              child: Text(
+                                publicTrackingMapPanelMessage(
+                                  PublicTrackingMapMode.showMap,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
                 : Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
@@ -202,7 +219,7 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                         child: AppBrandPanel(
                           padding: const EdgeInsets.all(16),
                           textAlign: TextAlign.center,
-                          child: Text(mapMessage),
+                          child: Text(publicTrackingMapPanelMessage(mapMode)),
                         ),
                       ),
                     ),
@@ -264,8 +281,9 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                               ),
                             ),
                           ],
-                          if (tracking.driverLastKnownLocation?.receivedAt !=
-                              null) ...[
+                          if (showLiveTracking &&
+                              tracking.driverLastKnownLocation?.receivedAt !=
+                                  null) ...[
                             const SizedBox(height: 8),
                             Text(
                               'Driver location updated: ${formatPublicTrackingDriverUpdate(tracking.driverLastKnownLocation!.receivedAt)}',
@@ -276,7 +294,7 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                                   ),
                             ),
                           ],
-                          if (!tracking.isTerminal) ...[
+                          if (tracking.hasPendingTripDocuments) ...[
                             const SizedBox(height: 12),
                             Text(
                               'Estimated Delivery Time:',
@@ -301,7 +319,9 @@ class _PublicTrackingScreenState extends State<PublicTrackingScreen> {
                               ),
                             ),
                           ],
-                          if (tracking.numEnrouteCustomers > 0) ...[
+                          if (showLiveTracking &&
+                              tracking.hasPendingTripDocuments &&
+                              tracking.numEnrouteCustomers > 0) ...[
                             const SizedBox(height: 12),
                             Text.rich(
                               TextSpan(

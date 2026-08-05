@@ -230,7 +230,7 @@ class _TripDeliveryGroup extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: () => onTrack(group.deliveries.first.docId),
+              onPressed: () => onTrack(group.trackingDocId),
               icon: const Icon(Icons.open_in_new, size: 16),
               label: const Text('Track delivery'),
               style: FilledButton.styleFrom(
