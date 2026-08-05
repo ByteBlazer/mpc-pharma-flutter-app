@@ -1,10 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../app_theme.dart';
 import '../../utils/doc_tracking_url.dart';
 import '../../utils/open_external_url.dart';
-import '../../widgets/app_async_list_loader.dart';
 import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
@@ -30,16 +31,25 @@ class DeliveryTrackingScreen extends StatefulWidget {
 
 class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
   final _scrollController = ScrollController();
-  final _loader = AppAsyncListLoader<List<CustomerDeliverySummary>>();
+  Timer? _pollTimer;
+
+  List<CustomerDeliverySummary>? _deliveries;
+  Object? _error;
+  bool _loading = true;
+  bool _refreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _loader.initialize(_loadDeliveries);
+    unawaited(_refresh(showLoading: true));
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      unawaited(_refresh(showLoading: false));
+    });
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -48,9 +58,38 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
     return widget.apiClient.getCustomerDeliveries();
   }
 
-  Future<void> _reload() {
-    return _loader.reload(load: _loadDeliveries, setState: setState);
+  Future<void> _refresh({required bool showLoading}) async {
+    if (showLoading && mounted) {
+      setState(() {
+        _loading = _deliveries == null;
+        _error = null;
+      });
+    } else if (mounted) {
+      setState(() => _refreshing = true);
+    }
+
+    try {
+      final deliveries = await _loadDeliveries();
+      if (!mounted) return;
+      setState(() {
+        _deliveries = deliveries;
+        _error = null;
+        _loading = false;
+        _refreshing = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        if (_deliveries == null) {
+          _error = error;
+        }
+        _loading = false;
+        _refreshing = false;
+      });
+    }
   }
+
+  Future<void> _reload() => _refresh(showLoading: _deliveries == null);
 
   Future<void> _openTracking(String docId) {
     return openUrlInNewTab(buildDocTrackingUrl(docId));
@@ -70,110 +109,139 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
     final primary = Theme.of(context).colorScheme.primary;
 
     return AppScreenScaffold(
-      appBar: AppBar(title: const Text('Delivery Tracking')),
-      body: FutureBuilder<List<CustomerDeliverySummary>>(
-        future: _loader.future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return AppLoadErrorState(
-              title: 'Could not load deliveries',
-              message: snapshot.error.toString(),
-              onRetry: _reload,
-              onLoginAgain: widget.onLoginAgain,
-            );
-          }
+      appBar: AppBar(
+        title: const Text('Delivery Tracking'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _refreshing ? null : () => _refresh(showLoading: false),
+            icon: _refreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+      body: _buildBody(primary),
+    );
+  }
 
-          final deliveries = snapshot.data ?? const [];
-          if (deliveries.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: AppSurface(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.inventory_2_outlined, size: 40),
-                          SizedBox(height: 12),
-                          Text(
-                            'No deliveries found',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w700,
-                            ),
+  Widget _buildBody(Color primary) {
+    if (_loading && _deliveries == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && _deliveries == null) {
+      return AppLoadErrorState(
+        title: 'Could not load deliveries',
+        message: _error.toString(),
+        onRetry: _reload,
+        onLoginAgain: widget.onLoginAgain,
+      );
+    }
+
+    final deliveries = _deliveries ?? const [];
+    if (deliveries.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: () => _refresh(showLoading: false),
+        child: AppScrollbar(
+          controller: _scrollController,
+          child: ListView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              SizedBox(
+                height: MediaQuery.sizeOf(context).height * 0.5,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: AppSurface(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.inventory_2_outlined, size: 40),
+                              SizedBox(height: 12),
+                              Text(
+                                'No deliveries found',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Deliveries from the last 90 days will appear here.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.black87),
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Deliveries from the last 90 days will appear here.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.black87),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            );
-          }
+            ],
+          ),
+        ),
+      );
+    }
 
-          final tripGroups = groupCustomerDeliveriesByTrip(deliveries);
-          final hasTripGrouping = deliveries.any((delivery) => delivery.tripId != null);
+    final tripGroups = groupCustomerDeliveriesByTrip(deliveries);
+    final hasTripGrouping = deliveries.any((delivery) => delivery.tripId != null);
 
-          return RefreshIndicator(
-            onRefresh: _reload,
-            child: AppScrollbar(
+    return RefreshIndicator(
+      onRefresh: () => _refresh(showLoading: false),
+      child: AppScrollbar(
+        controller: _scrollController,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: ListView.separated(
               controller: _scrollController,
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: ListView.separated(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                    itemCount: (hasTripGrouping ? tripGroups.length : deliveries.length) + 1,
-                    separatorBuilder: (_, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return Text(
-                          'Deliveries from the last 90 days',
-                          style: TextStyle(
-                            color: AppTheme.primaryAccentText(primary),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        );
-                      }
-                      if (hasTripGrouping) {
-                        final group = tripGroups[index - 1];
-                        return _TripDeliveryGroup(
-                          group: group,
-                          primary: primary,
-                          onOpenLineItems: _openLineItems,
-                          onTrack: _openTracking,
-                        );
-                      }
-                      final delivery = deliveries[index - 1];
-                      return _DeliveryCard(
-                        delivery: delivery,
-                        primary: primary,
-                        onOpenLineItems: () => _openLineItems(delivery.docId),
-                        onTrack: () => _openTracking(delivery.docId),
-                      );
-                    },
-                  ),
-                ),
-              ),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              itemCount: (hasTripGrouping ? tripGroups.length : deliveries.length) + 1,
+              separatorBuilder: (_, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Text(
+                    'Deliveries from the last 90 days',
+                    style: TextStyle(
+                      color: AppTheme.primaryAccentText(primary),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  );
+                }
+                if (hasTripGrouping) {
+                  final group = tripGroups[index - 1];
+                  return _TripDeliveryGroup(
+                    group: group,
+                    primary: primary,
+                    onOpenLineItems: _openLineItems,
+                    onTrack: _openTracking,
+                  );
+                }
+                final delivery = deliveries[index - 1];
+                return _DeliveryCard(
+                  delivery: delivery,
+                  primary: primary,
+                  onOpenLineItems: () => _openLineItems(delivery.docId),
+                  onTrack: () => _openTracking(delivery.docId),
+                );
+              },
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }

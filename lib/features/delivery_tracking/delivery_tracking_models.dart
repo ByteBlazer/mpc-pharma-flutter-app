@@ -73,11 +73,11 @@ int tripInvoiceStatusSortOrder(String status) {
     case 'ON_TRIP':
       return 0;
     case 'DELIVERED':
-      return 1;
-    case 'UNDELIVERED':
       return 2;
+    case 'UNDELIVERED':
+      return 3;
     default:
-      return 0;
+      return 1;
   }
 }
 
