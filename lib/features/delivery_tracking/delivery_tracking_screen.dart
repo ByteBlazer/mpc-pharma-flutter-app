@@ -11,6 +11,7 @@ import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_scrollbar.dart';
 import '../../widgets/app_surface.dart';
 import '../public_tracking/public_tracking_helpers.dart';
+import '../reports/delivery_report/widgets/delivery_report_dialogs.dart';
 import '../trip_dashboard/trip_dashboard_helpers.dart';
 import 'delivery_tracking_models.dart';
 import 'doc_line_items_dialog.dart';
@@ -102,6 +103,43 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
       docId: docId,
       onLoginAgain: widget.onLoginAgain,
     );
+  }
+
+  Future<void> _viewSignature(String docId) async {
+    try {
+      final details = await widget.apiClient.getDocDeliveryStatus(docId: docId);
+      if (!mounted) return;
+      if (details.signature.trim().isEmpty) return;
+      await showDeliveryReportSignatureDialog(
+        context: context,
+        docId: docId,
+        signatureBase64: details.signature,
+        lastUpdatedAt: details.deliveredAt,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
+
+  Future<void> _viewComment(String docId) async {
+    try {
+      final details = await widget.apiClient.getDocDeliveryStatus(docId: docId);
+      if (!mounted) return;
+      if (details.comment.trim().isEmpty) return;
+      await showDeliveryReportCommentDialog(
+        context: context,
+        docId: docId,
+        comment: details.comment,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
   }
 
   @override
@@ -227,7 +265,9 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
                   return _TripDeliveryGroup(
                     group: group,
                     primary: primary,
-                    onOpenLineItems: _openLineItems,
+                    onViewInvoice: _openLineItems,
+                    onViewSignature: _viewSignature,
+                    onViewComment: _viewComment,
                     onTrack: _openTracking,
                   );
                 }
@@ -235,8 +275,13 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
                 return _DeliveryCard(
                   delivery: delivery,
                   primary: primary,
-                  onOpenLineItems: () => _openLineItems(delivery.docId),
-                  onTrack: () => _openTracking(delivery.docId),
+                  onViewInvoice: () => _openLineItems(delivery.docId),
+                  onViewSignature: delivery.isDelivered
+                      ? () => _viewSignature(delivery.docId)
+                      : null,
+                  onViewComment: delivery.isUndelivered
+                      ? () => _viewComment(delivery.docId)
+                      : null,
                 );
               },
             ),
@@ -251,13 +296,17 @@ class _TripDeliveryGroup extends StatelessWidget {
   const _TripDeliveryGroup({
     required this.group,
     required this.primary,
-    required this.onOpenLineItems,
+    required this.onViewInvoice,
+    required this.onViewSignature,
+    required this.onViewComment,
     required this.onTrack,
   });
 
   final CustomerDeliveryTripGroup group;
   final Color primary;
-  final Future<void> Function(String docId) onOpenLineItems;
+  final Future<void> Function(String docId) onViewInvoice;
+  final Future<void> Function(String docId) onViewSignature;
+  final Future<void> Function(String docId) onViewComment;
   final Future<void> Function(String docId) onTrack;
 
   String _groupTitle() {
@@ -320,8 +369,14 @@ class _TripDeliveryGroup extends StatelessWidget {
                 delivery: group.deliveries[index],
                 primary: primary,
                 nested: group.invoiceCount > 1,
-                onOpenLineItems: () =>
-                    onOpenLineItems(group.deliveries[index].docId),
+                onViewInvoice: () =>
+                    onViewInvoice(group.deliveries[index].docId),
+                onViewSignature: group.deliveries[index].isDelivered
+                    ? () => onViewSignature(group.deliveries[index].docId)
+                    : null,
+                onViewComment: group.deliveries[index].isUndelivered
+                    ? () => onViewComment(group.deliveries[index].docId)
+                    : null,
               ),
             ],
           ],
@@ -335,16 +390,26 @@ class _DeliveryCard extends StatelessWidget {
   const _DeliveryCard({
     required this.delivery,
     required this.primary,
-    required this.onOpenLineItems,
-    this.onTrack,
+    required this.onViewInvoice,
+    this.onViewSignature,
+    this.onViewComment,
     this.nested = false,
   });
 
   final CustomerDeliverySummary delivery;
   final Color primary;
-  final VoidCallback onOpenLineItems;
-  final VoidCallback? onTrack;
+  final VoidCallback onViewInvoice;
+  final VoidCallback? onViewSignature;
+  final VoidCallback? onViewComment;
   final bool nested;
+
+  static final _actionStyle = TextButton.styleFrom(
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    minimumSize: Size.zero,
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    visualDensity: VisualDensity.compact,
+    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -352,36 +417,23 @@ class _DeliveryCard extends StatelessWidget {
     final amount = formatInrAmount(delivery.docAmountRaw);
 
     final card = Padding(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  delivery.docId,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-              Icon(
-                Icons.expand_more,
-                color: primary.withValues(alpha: 0.7),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
           Wrap(
             spacing: 8,
-            runSpacing: 8,
+            runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _StatusChip(status: status),
+              Text(
+                delivery.docId,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
               if (amount.isNotEmpty)
                 Text(
                   amount,
@@ -391,68 +443,58 @@ class _DeliveryCard extends StatelessWidget {
                     fontSize: 13,
                   ),
                 ),
+              _StatusChip(status: status),
             ],
           ),
-          if (onTrack != null) ...[
-            const SizedBox(height: 10),
-            FilledButton.icon(
-              onPressed: onTrack,
-              icon: const Icon(Icons.open_in_new, size: 16),
-              label: const Text('Track delivery'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                minimumSize: const Size(double.infinity, 40),
-                textStyle: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              TextButton(
+                onPressed: onViewInvoice,
+                style: _actionStyle,
+                child: Text(
+                  'View Invoice',
+                  style: TextStyle(color: primary),
                 ),
               ),
-            ),
-          ] else
-            const SizedBox(height: 10),
-          const SizedBox(height: 4),
-          Text(
-            'Tap for line items',
-            style: TextStyle(
-              color: AppTheme.primaryAccentText(primary),
-              fontSize: 12,
-            ),
+              if (onViewSignature != null)
+                TextButton(
+                  onPressed: onViewSignature,
+                  style: _actionStyle,
+                  child: Text(
+                    'View Signature',
+                    style: TextStyle(color: primary),
+                  ),
+                )
+              else if (onViewComment != null)
+                TextButton(
+                  onPressed: onViewComment,
+                  style: _actionStyle,
+                  child: Text(
+                    'View Comment',
+                    style: TextStyle(color: primary),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
     );
 
     if (!nested) {
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onOpenLineItems,
-          borderRadius: BorderRadius.circular(16),
-          child: AppSurface(
-            borderRadius: 16,
-            child: card,
-          ),
-        ),
+      return AppSurface(
+        borderRadius: 16,
+        child: card,
       );
     }
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onOpenLineItems,
+    return DecoratedBox(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: primary.withValues(alpha: 0.18)),
-            color: primary.withValues(alpha: 0.04),
-          ),
-          child: card,
-        ),
+        border: Border.all(color: primary.withValues(alpha: 0.18)),
+        color: primary.withValues(alpha: 0.04),
       ),
+      child: card,
     );
   }
 }
