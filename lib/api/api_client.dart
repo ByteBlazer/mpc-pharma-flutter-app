@@ -439,14 +439,23 @@ class ApiClient {
     return DeliveryStatusDetails.fromJson(_decodeJsonObject(response.body));
   }
 
-  /// Customer deliveries from the last 90 days (customer JWT only).
+  /// Customer deliveries from the last 90 days.
+  ///
+  /// Customer JWT: omit [customerId] (uses logged-in customer).
+  /// Employee JWT: pass [customerId] for that customer's docs.
   Future<List<CustomerDeliverySummary>> getCustomerDeliveries({
     String? token,
+    String? customerId,
   }) async {
+    final trimmedCustomerId = customerId?.trim();
     final response = await _get(
       'doc/customer-deliveries',
       token: token,
       requiresAuth: true,
+      queryParameters:
+          trimmedCustomerId == null || trimmedCustomerId.isEmpty
+          ? null
+          : {'customerId': trimmedCustomerId},
     );
     return CustomerDeliverySummary.parseResponseBody(response.body);
   }

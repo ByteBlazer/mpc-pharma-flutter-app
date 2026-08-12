@@ -14,6 +14,7 @@ import '../departments/department_models.dart';
 import 'ticket_attachment_manager.dart';
 import 'ticket_models.dart';
 import 'widgets/ticket_description_field.dart';
+import 'widgets/ticket_related_invoice_field.dart';
 
 class CreateEmployeeTicketScreen extends StatefulWidget {
   const CreateEmployeeTicketScreen({
@@ -43,6 +44,7 @@ class _CreateEmployeeTicketScreenState
   String? _selectedCategoryId;
   String? _selectedDepartmentId;
   String? _selectedAssigneeId;
+  String? _selectedRelatedDocId;
   TicketPriority _priority = TicketPriority.medium;
   bool _isSubmitting = false;
   bool _allowExitWithoutPrompt = false;
@@ -65,6 +67,9 @@ class _CreateEmployeeTicketScreenState
       return true;
     }
     if (_selectedAssigneeId != null && _selectedAssigneeId!.isNotEmpty) {
+      return true;
+    }
+    if (_selectedRelatedDocId != null && _selectedRelatedDocId!.isNotEmpty) {
       return true;
     }
     if (_priority != TicketPriority.medium) return true;
@@ -202,6 +207,10 @@ class _CreateEmployeeTicketScreenState
     if (_isCustomerTicket) {
       body['customerId'] = _selectedCustomerId;
       body['ticketComplaintCategoryId'] = _selectedCategoryId;
+      final relatedDocId = _selectedRelatedDocId?.trim();
+      if (relatedDocId != null && relatedDocId.isNotEmpty) {
+        body['relatedDocId'] = relatedDocId;
+      }
     } else {
       body['ticketInternalCategoryId'] = _selectedCategoryId;
     }
@@ -299,11 +308,15 @@ class _CreateEmployeeTicketScreenState
                                     ),
                                   )
                                   .toList(),
-                              onChanged: (values) => setState(
-                                () => _selectedCustomerId = values.isEmpty
+                              onChanged: (values) => setState(() {
+                                final nextCustomerId = values.isEmpty
                                     ? null
-                                    : values.first,
-                              ),
+                                    : values.first;
+                                if (nextCustomerId != _selectedCustomerId) {
+                                  _selectedRelatedDocId = null;
+                                }
+                                _selectedCustomerId = nextCustomerId;
+                              }),
                             ),
                           if (_isCustomerTicket) const SizedBox(height: 16),
                           if (_isCustomerTicket) ...[
@@ -326,6 +339,17 @@ class _CreateEmployeeTicketScreenState
                                       _selectedCategoryId = value;
                                       _applyCategoryDefaults(data, value);
                                     }),
+                            ),
+                            const SizedBox(height: 16),
+                            TicketRelatedInvoiceField(
+                              apiClient: widget.apiClient,
+                              selectedDocId: _selectedRelatedDocId,
+                              customerId: _selectedCustomerId,
+                              requireCustomerId: true,
+                              enabled: !_isSubmitting,
+                              onChanged: (docId) => setState(
+                                () => _selectedRelatedDocId = docId,
+                              ),
                             ),
                             const SizedBox(height: 16),
                           ] else ...[

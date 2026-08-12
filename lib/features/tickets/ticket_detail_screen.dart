@@ -12,6 +12,7 @@ import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/unsaved_changes_dialog.dart';
+import '../delivery_tracking/doc_line_items_dialog.dart';
 import '../departments/department_models.dart';
 import 'ticket_attachment_manager.dart';
 import 'ticket_models.dart';
@@ -699,11 +700,20 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
                       ],
                       if (ticket.resolutionSummary.isNotEmpty ||
                           ticket.invalidationReason.isNotEmpty ||
+                          ticket.hasRelatedDoc ||
                           widget.isEmployeeView) ...[
                         const SizedBox(height: 16),
                         _TicketFieldsPanel(
                           ticket: ticket,
                           isEmployeeView: widget.isEmployeeView,
+                          onRelatedInvoiceTap: ticket.hasRelatedDoc
+                              ? () => showDocLineItemsDialog(
+                                    context: context,
+                                    apiClient: widget.apiClient,
+                                    docId: ticket.relatedDocId,
+                                    onLoginAgain: widget.onLoginAgain,
+                                  )
+                              : null,
                         ),
                       ],
                       if (widget.isEmployeeView) ...[
@@ -1524,14 +1534,23 @@ class _TicketDescriptionHero extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow(this.label, this.value);
+  const _InfoRow(this.label, this.value, {this.onTap});
 
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     if (value.trim().isEmpty) return const SizedBox.shrink();
+    final primary = Theme.of(context).colorScheme.primary;
+    final valueStyle = TextStyle(
+      color: onTap == null ? Colors.black : primary,
+      height: 1.35,
+      fontWeight: onTap == null ? FontWeight.w400 : FontWeight.w600,
+      decoration: onTap == null ? null : TextDecoration.underline,
+      decorationColor: primary,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -1548,10 +1567,12 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(color: Colors.black, height: 1.35),
-            ),
+            child: onTap == null
+                ? Text(value, style: valueStyle)
+                : InkWell(
+                    onTap: onTap,
+                    child: Text(value, style: valueStyle),
+                  ),
           ),
         ],
       ),
@@ -1563,10 +1584,12 @@ class _TicketFieldsPanel extends StatelessWidget {
   const _TicketFieldsPanel({
     required this.ticket,
     required this.isEmployeeView,
+    this.onRelatedInvoiceTap,
   });
 
   final TicketDetail ticket;
   final bool isEmployeeView;
+  final VoidCallback? onRelatedInvoiceTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1589,6 +1612,12 @@ class _TicketFieldsPanel extends StatelessWidget {
               _InfoRow('Resolution', ticket.resolutionSummary),
             if (ticket.invalidationReason.isNotEmpty)
               _InfoRow('Invalidation reason', ticket.invalidationReason),
+            if (ticket.hasRelatedDoc)
+              _InfoRow(
+                'Related invoice',
+                ticket.relatedDocId,
+                onTap: onRelatedInvoiceTap,
+              ),
             if (isEmployeeView) ...[
               _InfoRow('Priority', ticket.priority.label),
               _InfoRow(
