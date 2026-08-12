@@ -891,6 +891,23 @@ class _TicketSummaryCard extends StatelessWidget {
                       color: primary,
                     ),
                   ],
+                  if (ticket.hasRelatedDoc) ...[
+                    const SizedBox(height: 4),
+                    _TicketCardMetaRow(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Related invoice',
+                      value: ticket.relatedDocId,
+                      color: primary,
+                    ),
+                  ],
+                ] else if (ticket.hasRelatedDoc) ...[
+                  const SizedBox(height: 8),
+                  _TicketCardMetaRow(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'Related invoice',
+                    value: ticket.relatedDocId,
+                    color: primary,
+                  ),
                 ],
               ],
             ),
