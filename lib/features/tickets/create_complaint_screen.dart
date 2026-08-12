@@ -11,6 +11,7 @@ import '../../widgets/unsaved_changes_dialog.dart';
 import 'ticket_attachment_manager.dart';
 import 'ticket_models.dart';
 import 'widgets/ticket_description_field.dart';
+import 'widgets/ticket_related_invoice_field.dart';
 
 class CreateComplaintScreen extends StatefulWidget {
   const CreateComplaintScreen({
@@ -31,6 +32,7 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
   late final TicketAttachmentManager _attachmentManager;
   late Future<List<ComplaintCategory>> _categoriesFuture;
   String? _selectedCategoryId;
+  String? _selectedRelatedDocId;
   bool _isSubmitting = false;
   bool _allowExitWithoutPrompt = false;
 
@@ -39,6 +41,9 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
     if (_descriptionController.text.trim().isNotEmpty) return true;
     if (_attachmentManager.attachments.isNotEmpty) return true;
     if (_selectedCategoryId != null && _selectedCategoryId!.isNotEmpty) {
+      return true;
+    }
+    if (_selectedRelatedDocId != null && _selectedRelatedDocId!.isNotEmpty) {
       return true;
     }
     return false;
@@ -98,12 +103,17 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
 
     setState(() => _isSubmitting = true);
     try {
+      final body = <String, dynamic>{
+        'ticketComplaintCategoryId': categoryId,
+        'description': description,
+        'attachmentIds': _attachmentManager.attachmentIds,
+      };
+      final relatedDocId = _selectedRelatedDocId?.trim();
+      if (relatedDocId != null && relatedDocId.isNotEmpty) {
+        body['relatedDocId'] = relatedDocId;
+      }
       await widget.apiClient.createTicket(
-        body: {
-          'ticketComplaintCategoryId': categoryId,
-          'description': description,
-          'attachmentIds': _attachmentManager.attachmentIds,
-        },
+        body: body,
         isEmployeeView: false,
       );
       if (!mounted) return;
@@ -177,6 +187,15 @@ class _CreateComplaintScreenState extends State<CreateComplaintScreen> {
                                 : (value) => setState(
                                     () => _selectedCategoryId = value,
                                   ),
+                          ),
+                          const SizedBox(height: 20),
+                          TicketRelatedInvoiceField(
+                            apiClient: widget.apiClient,
+                            selectedDocId: _selectedRelatedDocId,
+                            enabled: !_isSubmitting,
+                            onChanged: (docId) => setState(
+                              () => _selectedRelatedDocId = docId,
+                            ),
                           ),
                           const SizedBox(height: 20),
                           TicketDescriptionField(

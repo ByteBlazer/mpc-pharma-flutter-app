@@ -340,6 +340,7 @@ class TicketSummary {
     required this.lastUpdatedAt,
     this.ticketComplaintCategoryName = '',
     this.ticketInternalCategoryName = '',
+    this.relatedDocId = '',
     this.slaHours,
     this.raisedByCustomer,
     this.slaMissed = false,
@@ -368,6 +369,7 @@ class TicketSummary {
       lastUpdatedAt: DateTime.tryParse(_string(json['lastUpdatedAt'])),
       ticketComplaintCategoryName: _string(json['ticketComplaintCategoryName']),
       ticketInternalCategoryName: _string(json['ticketInternalCategoryName']),
+      relatedDocId: _string(json['relatedDocId']),
       slaHours: _positiveInt(json['slaHours']),
       raisedByCustomer: _optionalBool(json['raisedByCustomer']),
       slaMissed: json['slaMissed'] == true,
@@ -390,6 +392,7 @@ class TicketSummary {
   final DateTime? lastUpdatedAt;
   final String ticketComplaintCategoryName;
   final String ticketInternalCategoryName;
+  final String relatedDocId;
   final int? slaHours;
 
   /// Customer JWT only: true = self-raised, false = company-raised.
@@ -401,6 +404,8 @@ class TicketSummary {
   bool get isRaisedByCustomer => raisedByCustomer == true;
 
   bool get isCustomerTicket => ticketType == TicketType.raisedForCustomer;
+
+  bool get hasRelatedDoc => relatedDocId.trim().isNotEmpty;
 
   String get categoryDisplayLabel {
     final name = (ticketType == TicketType.internal
@@ -425,6 +430,7 @@ class TicketSummary {
       createdByName,
       ticketComplaintCategoryName,
       ticketInternalCategoryName,
+      relatedDocId,
     ].join(' ').toLowerCase().contains(normalized);
   }
 }
@@ -462,6 +468,7 @@ class TicketDetail {
     required this.lastUpdatedAt,
     required this.lastUpdatedBy,
     required this.isEmployeeView,
+    this.relatedDocId = '',
     this.raisedByCustomer,
   });
 
@@ -507,6 +514,7 @@ class TicketDetail {
       ticketComplaintCategoryName: _string(json['ticketComplaintCategoryName']),
       ticketInternalCategoryId: _string(json['ticketInternalCategoryId']),
       ticketInternalCategoryName: _string(json['ticketInternalCategoryName']),
+      relatedDocId: _string(json['relatedDocId']),
       slaHours: _positiveInt(json['slaHours']),
       attachments: attachmentsJson is List
           ? attachmentsJson
@@ -565,11 +573,14 @@ class TicketDetail {
   final DateTime? lastUpdatedAt;
   final String lastUpdatedBy;
   final bool isEmployeeView;
+  final String relatedDocId;
 
   /// Customer JWT only: true = self-raised, false = company-raised.
   final bool? raisedByCustomer;
 
   bool get isRaisedByCustomer => raisedByCustomer == true;
+
+  bool get hasRelatedDoc => relatedDocId.trim().isNotEmpty;
 
   String get categoryDisplayLabel {
     final name = (ticketType == TicketType.internal
