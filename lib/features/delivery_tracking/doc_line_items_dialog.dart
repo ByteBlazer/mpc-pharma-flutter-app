@@ -231,7 +231,7 @@ class _LineItemsTable extends StatelessWidget {
     return Table(
       columnWidths: const {
         0: FlexColumnWidth(2.4),
-        1: FlexColumnWidth(1),
+        1: FlexColumnWidth(1.1),
         2: FlexColumnWidth(0.6),
         3: FlexColumnWidth(1),
         4: FlexColumnWidth(1),
@@ -248,8 +248,8 @@ class _LineItemsTable extends StatelessWidget {
             color: Colors.black.withValues(alpha: 0.04),
           ),
           children: const [
-            _TableHeaderCell('Medicine'),
-            _TableHeaderCell('Unit'),
+            _TableHeaderCell('Item Name'),
+            _TableHeaderCell('Batch'),
             _TableHeaderCell('Qty'),
             _TableHeaderCell('Unit price'),
             _TableHeaderCell('Amount'),
@@ -259,7 +259,9 @@ class _LineItemsTable extends StatelessWidget {
           TableRow(
             children: [
               _TableBodyCell(item.medicineName),
-              _TableBodyCell(item.unit),
+              _TableBodyCell(
+                item.batchNo.trim().isEmpty ? '—' : item.batchNo.trim(),
+              ),
               _TableBodyCell('${item.qty}'),
               _TableBodyCell(
                 formatInrAmount(item.unitPrice.toStringAsFixed(2)),
@@ -319,8 +321,11 @@ class _LineItemCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${item.qty} ${item.unit} · '
-            '${formatInrAmount(item.unitPrice.toStringAsFixed(2))} each',
+            [
+              if (item.batchNo.trim().isNotEmpty) 'Batch ${item.batchNo.trim()}',
+              'Qty ${item.qty}',
+              '${formatInrAmount(item.unitPrice.toStringAsFixed(2))} each',
+            ].join(' · '),
             style: const TextStyle(color: Colors.black54, fontSize: 12),
           ),
         ],

@@ -452,8 +452,7 @@ class ApiClient {
       'doc/customer-deliveries',
       token: token,
       requiresAuth: true,
-      queryParameters:
-          trimmedCustomerId == null || trimmedCustomerId.isEmpty
+      queryParameters: trimmedCustomerId == null || trimmedCustomerId.isEmpty
           ? null
           : {'customerId': trimmedCustomerId},
     );
@@ -463,11 +462,13 @@ class ApiClient {
   Future<DocLineItemsResponse> getDocLineItems({
     String? token,
     required String docId,
+    bool mock = true,
   }) async {
     final response = await _get(
       'doc/line-items/${Uri.encodeComponent(docId.trim())}',
       token: token,
       requiresAuth: true,
+      queryParameters: {'mock': mock.toString()},
     );
     return DocLineItemsResponse.fromJson(_decodeJsonObject(response.body));
   }

@@ -158,12 +158,14 @@ class DocLineItem {
     required this.qty,
     required this.unitPrice,
     required this.lineItemPrice,
+    this.batchNo = '',
   });
 
   factory DocLineItem.fromJson(JsonMap json) {
     return DocLineItem(
       medicineName: json['medicineName']?.toString() ?? '',
       unit: json['unit']?.toString() ?? '',
+      batchNo: json['batchNo']?.toString() ?? '',
       qty: asInt(json['qty']) ?? 0,
       unitPrice: _readPrice(json['unitPrice']),
       lineItemPrice: _readPrice(json['lineItemPrice']),
@@ -172,6 +174,7 @@ class DocLineItem {
 
   final String medicineName;
   final String unit;
+  final String batchNo;
   final int qty;
   final double unitPrice;
   final double lineItemPrice;
