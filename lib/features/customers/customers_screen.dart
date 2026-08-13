@@ -330,7 +330,7 @@ class _CustomersSectionState extends State<_CustomersSection> {
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.only(right: 20),
-        itemExtent: 120,
+        itemExtent: 140,
         cacheExtent: 600,
         itemCount: widget.customers.length,
         itemBuilder: (context, index) {
@@ -364,7 +364,7 @@ class _CustomerListItem extends StatelessWidget {
     final city = customer.city.trim();
 
     return SizedBox(
-      height: 120,
+      height: 140,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: AppSurface(
@@ -412,7 +412,7 @@ class _CustomerListItem extends StatelessWidget {
                 ),
               ),
               if (canViewDetails) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: AppViewDetailsButton(onPressed: onViewMore),
