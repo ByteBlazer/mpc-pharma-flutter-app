@@ -108,9 +108,7 @@ class _DatabaseManagementScreenState extends State<DatabaseManagementScreen> {
               CircularProgressIndicator(),
               SizedBox(width: 20),
               Expanded(
-                child: Text(
-                  'Creating backup... This may take a few minutes.',
-                ),
+                child: Text('Creating backup... This may take a few minutes.'),
               ),
             ],
           ),
@@ -127,8 +125,8 @@ class _DatabaseManagementScreenState extends State<DatabaseManagementScreen> {
         context,
         message: filename.isEmpty
             ? (result.message.isEmpty
-                ? 'Backup created successfully.'
-                : result.message)
+                  ? 'Backup created successfully.'
+                  : result.message)
             : 'Backup created: $filename',
         type: AppSnackBarType.success,
       );
@@ -190,8 +188,9 @@ class _DatabaseManagementScreenState extends State<DatabaseManagementScreen> {
       barrierDismissible: false,
       builder: (dialogContext) => _RestoreBackupDialog(
         backup: backup,
-        initialHasRecentCurrentEnvBackup:
-            hasRecentCurrentEnvironmentBackup(knownBackups),
+        initialHasRecentCurrentEnvBackup: hasRecentCurrentEnvironmentBackup(
+          knownBackups,
+        ),
         onRecheckRecentBackup: () async {
           final backups = await widget.apiClient.listDatabaseBackups();
           await _refresh();
@@ -255,9 +254,7 @@ class _DatabaseManagementScreenState extends State<DatabaseManagementScreen> {
                           children: [
                             Text(
                               'Manual backup',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
+                              style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
                                     color: Colors.black,
                                     fontWeight: FontWeight.w700,
@@ -288,9 +285,7 @@ class _DatabaseManagementScreenState extends State<DatabaseManagementScreen> {
                                       )
                                     : const Icon(Icons.backup_outlined),
                                 label: Text(
-                                  _isCreating
-                                      ? 'Creating…'
-                                      : 'Create Backup',
+                                  _isCreating ? 'Creating…' : 'Create Backup',
                                 ),
                               ),
                             ),
@@ -302,9 +297,9 @@ class _DatabaseManagementScreenState extends State<DatabaseManagementScreen> {
                     Text(
                       'Available backups',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        color: Colors.black,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -365,7 +360,9 @@ class _DatabaseManagementScreenState extends State<DatabaseManagementScreen> {
                                 return _BackupCard(
                                   backup: backup,
                                   primary: primary,
-                                  dateLabel: formatBackupDate(backup.lastModified),
+                                  dateLabel: formatBackupDate(
+                                    backup.lastModified,
+                                  ),
                                   isDownloading: downloading,
                                   onDownload: () => _downloadBackup(backup),
                                   onRestore: () => _openRestoreFlow(backup),
@@ -685,9 +682,9 @@ class _RestoreBackupDialogState extends State<_RestoreBackupDialog> {
                 child: Text(
                   backup.isProduction
                       ? 'This will permanently delete all current PRODUCTION '
-                          'database data and replace it with the selected backup.'
+                            'database data and replace it with the selected backup.'
                       : 'This will permanently delete all current database data '
-                          'and replace it with the selected backup.',
+                            'and replace it with the selected backup.',
                   style: TextStyle(
                     color: Colors.red.shade900,
                     fontWeight: FontWeight.w600,
@@ -717,7 +714,7 @@ class _RestoreBackupDialogState extends State<_RestoreBackupDialog> {
                       const SizedBox(height: 6),
                       Text(
                         'Create a backup of the current "$envName" environment '
-                        'first. A backup from the last 5 minutes is required '
+                        'first. A backup from the last 30 minutes is required '
                         'before restore can proceed. Cancel this dialog, use '
                         'Create Backup, then open Restore again.',
                         style: TextStyle(
@@ -755,7 +752,10 @@ class _RestoreBackupDialogState extends State<_RestoreBackupDialog> {
                 ),
               const SizedBox(height: 16),
               _RestoreDetailRow(label: 'Filename', value: backup.filename),
-              _RestoreDetailRow(label: 'Environment', value: backup.environment),
+              _RestoreDetailRow(
+                label: 'Environment',
+                value: backup.environment,
+              ),
               _RestoreDetailRow(label: 'Type', value: backup.backupType),
               _RestoreDetailRow(label: 'Size', value: backup.sizeLabel),
               _RestoreDetailRow(label: 'Date', value: dateLabel),
@@ -816,8 +816,8 @@ class _RestoreBackupDialogState extends State<_RestoreBackupDialog> {
                         _isSafetyCheckError
                             ? 'Recent backup required'
                             : _isPasskeyError
-                                ? 'Invalid passkey'
-                                : 'Restore failed',
+                            ? 'Invalid passkey'
+                            : 'Restore failed',
                         style: TextStyle(
                           color: _isSafetyCheckError
                               ? Colors.orange.shade900
@@ -839,7 +839,7 @@ class _RestoreBackupDialogState extends State<_RestoreBackupDialog> {
                         const SizedBox(height: 8),
                         Text(
                           'Create a backup from this screen, then tap recheck '
-                          'or open Restore again within 5 minutes.',
+                          'or open Restore again within 30 minutes.',
                           style: TextStyle(
                             color: Colors.orange.shade900,
                             height: 1.35,
@@ -847,8 +847,9 @@ class _RestoreBackupDialogState extends State<_RestoreBackupDialog> {
                         ),
                         const SizedBox(height: 12),
                         OutlinedButton.icon(
-                          onPressed:
-                              _isRechecking ? null : _recheckRecentBackup,
+                          onPressed: _isRechecking
+                              ? null
+                              : _recheckRecentBackup,
                           icon: const Icon(Icons.refresh, size: 18),
                           label: const Text('Recheck recent backup'),
                         ),
@@ -868,9 +869,7 @@ class _RestoreBackupDialogState extends State<_RestoreBackupDialog> {
         ),
         FilledButton(
           onPressed: _canSubmit ? _submit : null,
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.red.shade700,
-          ),
+          style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
           child: const Text('Restore'),
         ),
       ],

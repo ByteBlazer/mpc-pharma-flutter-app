@@ -76,7 +76,6 @@ class ComplaintCategory {
     required this.name,
     required this.assignedDepartmentId,
     required this.assignedDepartmentName,
-    required this.slaHours,
     required this.isActive,
   });
 
@@ -86,7 +85,6 @@ class ComplaintCategory {
       name: _string(json['name']),
       assignedDepartmentId: _string(json['assignedDepartmentId']),
       assignedDepartmentName: _string(json['assignedDepartmentName']),
-      slaHours: _positiveInt(json['slaHours']) ?? 24,
       isActive: json['isActive'] == true,
     );
   }
@@ -95,19 +93,11 @@ class ComplaintCategory {
   final String name;
   final String assignedDepartmentId;
   final String assignedDepartmentName;
-  final int slaHours;
   final bool isActive;
 
+  /// Shared day options for internal-category SLA (and ticket display helpers).
   static const slaHoursPerDay = 24;
   static const slaDayOptions = [1, 2, 3, 4, 5, 6, 7];
-
-  /// UI representation of [slaHours] as whole days (1–7).
-  int get slaDays {
-    final days = (slaHours / slaHoursPerDay).round();
-    return days.clamp(slaDayOptions.first, slaDayOptions.last);
-  }
-
-  String get slaDaysLabel => slaDays == 1 ? '1 day' : '$slaDays days';
 
   static int slaHoursFromDays(int days) => days * slaHoursPerDay;
 
@@ -118,8 +108,6 @@ class ComplaintCategory {
       id,
       name,
       assignedDepartmentName,
-      '$slaHours',
-      slaDaysLabel,
       isActive ? 'active' : 'inactive',
     ].join(' ').toLowerCase().contains(normalized);
   }

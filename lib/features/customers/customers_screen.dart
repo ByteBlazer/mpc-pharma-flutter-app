@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
+import '../../app_theme.dart';
 import '../../auth/jwt_payload.dart';
 import '../../utils/download_file.dart';
 import '../../widgets/app_load_error_state.dart';
@@ -15,6 +16,7 @@ import '../../widgets/app_search_field.dart';
 import '../../widgets/app_view_details_button.dart';
 import 'customer_detail_screen.dart';
 import 'customer_models.dart';
+import 'edit_customer_sla_dialog.dart';
 
 class CustomersScreen extends StatefulWidget {
   const CustomersScreen({
@@ -62,13 +64,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   Future<_CustomersData> _loadData() async {
     final results = await Future.wait([
-      widget.apiClient.getCustomersLightweight(),
+      widget.apiClient.getCustomersFull(),
       _loadHasWebAccess(),
+      JwtPayload.currentUserIsAppAdmin(),
     ]);
 
+    final customers = (results[0] as List<Customer>)
+        .map(CustomerSummary.fromCustomer)
+        .toList();
+
     return _CustomersData(
-      customers: results[0] as List<CustomerSummary>,
+      customers: customers,
       hasWebAccess: results[1] as bool,
+      canEditSla: results[2] as bool,
     );
   }
 
@@ -90,6 +98,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ),
       ),
     );
+    if (!mounted) return;
+    _refresh();
+  }
+
+  Future<void> _editSla(CustomerSummary customer) async {
+    final updatedHours = await showEditCustomerSlaDialog(
+      context: context,
+      apiClient: widget.apiClient,
+      customerId: customer.id,
+      customerLabel: customer.firmName,
+      currentSlaHours: customer.slaHours,
+    );
+    if (updatedHours == null || !mounted) return;
+    _refresh();
   }
 
   Future<void> _downloadCustomers() async {
@@ -126,6 +148,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         'Phone',
         'Latitude',
         'Longitude',
+        'SLA Days',
         'Created At',
         'Last Updated At',
       ],
@@ -139,6 +162,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           customer.phone,
           customer.geoLatitude,
           customer.geoLongitude,
+          '${customer.slaDays}',
           customer.createdAt?.toUtc().toIso8601String() ?? '',
           customer.lastUpdatedAt?.toUtc().toIso8601String() ?? '',
         ],
@@ -208,7 +232,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         child: _CustomersSection(
                           customers: filteredCustomers,
                           canViewDetails: data.hasWebAccess,
+                          canEditSla: data.canEditSla,
                           onViewCustomer: _viewCustomer,
+                          onEditSla: _editSla,
                         ),
                       ),
                     ],
@@ -299,12 +325,16 @@ class _CustomersSection extends StatefulWidget {
   const _CustomersSection({
     required this.customers,
     required this.canViewDetails,
+    required this.canEditSla,
     required this.onViewCustomer,
+    required this.onEditSla,
   });
 
   final List<CustomerSummary> customers;
   final bool canViewDetails;
+  final bool canEditSla;
   final ValueChanged<CustomerSummary> onViewCustomer;
+  final ValueChanged<CustomerSummary> onEditSla;
 
   @override
   State<_CustomersSection> createState() => _CustomersSectionState();
@@ -330,7 +360,7 @@ class _CustomersSectionState extends State<_CustomersSection> {
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.only(right: 20),
-        itemExtent: 140,
+        itemExtent: 168,
         cacheExtent: 600,
         itemCount: widget.customers.length,
         itemBuilder: (context, index) {
@@ -339,7 +369,9 @@ class _CustomersSectionState extends State<_CustomersSection> {
             key: ValueKey(customer.id),
             customer: customer,
             canViewDetails: widget.canViewDetails,
+            canEditSla: widget.canEditSla,
             onViewMore: () => widget.onViewCustomer(customer),
+            onEditSla: () => widget.onEditSla(customer),
           );
         },
       ),
@@ -352,76 +384,109 @@ class _CustomerListItem extends StatelessWidget {
     super.key,
     required this.customer,
     required this.canViewDetails,
+    required this.canEditSla,
     required this.onViewMore,
+    required this.onEditSla,
   });
 
   final CustomerSummary customer;
   final bool canViewDetails;
+  final bool canEditSla;
   final VoidCallback onViewMore;
+  final VoidCallback onEditSla;
 
   @override
   Widget build(BuildContext context) {
     final city = customer.city.trim();
+    final primary = Theme.of(context).colorScheme.primary;
 
     return SizedBox(
-      height: 140,
+      height: 168,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: AppSurface(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          customer.firmName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            height: 1.25,
+                          ),
+                        ),
+                      ),
+                      if (city.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 12),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 140),
+                            child: Text(
+                              city,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 14,
+                                height: 1.25,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Row(
                   children: [
                     Expanded(
                       child: Text(
-                        customer.firmName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        'SLA: ${customer.slaDaysLabel}',
                         style: const TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          height: 1.25,
+                          color: Colors.black87,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    if (city.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 12),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 140),
-                          child: Text(
-                            city,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.right,
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 14,
-                              height: 1.25,
-                            ),
+                    if (canEditSla)
+                      Theme(
+                        data: AppTheme.withCompactButtons(Theme.of(context)),
+                        child: TextButton(
+                          onPressed: onEditSla,
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.primaryAccentText(primary),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
+                          child: const Text('Edit SLA'),
                         ),
                       ),
                   ],
                 ),
-              ),
-              if (canViewDetails) ...[
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: AppViewDetailsButton(onPressed: onViewMore),
-                ),
+                if (canViewDetails) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: AppViewDetailsButton(onPressed: onViewMore),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -445,17 +510,22 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-
 class _CustomersData {
   const _CustomersData({
     required this.customers,
     required this.hasWebAccess,
+    required this.canEditSla,
   });
 
   factory _CustomersData.empty() {
-    return const _CustomersData(customers: [], hasWebAccess: false);
+    return const _CustomersData(
+      customers: [],
+      hasWebAccess: false,
+      canEditSla: false,
+    );
   }
 
   final List<CustomerSummary> customers;
   final bool hasWebAccess;
+  final bool canEditSla;
 }

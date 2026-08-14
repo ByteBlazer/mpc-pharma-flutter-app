@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
 import '../../app_theme.dart';
+import '../../auth/jwt_payload.dart';
 import '../../utils/open_maps_location.dart';
 import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
 import 'customer_models.dart';
+import 'edit_customer_sla_dialog.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   const CustomerDetailScreen({
@@ -25,17 +27,47 @@ class CustomerDetailScreen extends StatefulWidget {
 }
 
 class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
-  late Future<Customer> _customerFuture;
+  late Future<_CustomerDetailData> _dataFuture;
 
   @override
   void initState() {
     super.initState();
-    _customerFuture = widget.apiClient.getCustomer(id: widget.customerId);
+    _dataFuture = _loadData();
+  }
+
+  Future<_CustomerDetailData> _loadData() async {
+    final results = await Future.wait([
+      widget.apiClient.getCustomer(id: widget.customerId),
+      JwtPayload.currentUserIsAppAdmin(),
+    ]);
+    return _CustomerDetailData(
+      customer: results[0] as Customer,
+      canEditSla: results[1] as bool,
+    );
   }
 
   void _refresh() {
     setState(() {
-      _customerFuture = widget.apiClient.getCustomer(id: widget.customerId);
+      _dataFuture = _loadData();
+    });
+  }
+
+  Future<void> _editSla(Customer customer, {required bool canEditSla}) async {
+    final updatedHours = await showEditCustomerSlaDialog(
+      context: context,
+      apiClient: widget.apiClient,
+      customerId: customer.id,
+      customerLabel: customer.firmName,
+      currentSlaHours: customer.slaHours,
+    );
+    if (updatedHours == null || !mounted) return;
+    setState(() {
+      _dataFuture = Future.value(
+        _CustomerDetailData(
+          customer: customer.copyWith(slaHours: updatedHours),
+          canEditSla: canEditSla,
+        ),
+      );
     });
   }
 
@@ -64,8 +96,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     return AppScreenScaffold(
       appBar: AppBar(title: const Text('Customer')),
       body: SafeArea(
-        child: FutureBuilder<Customer>(
-          future: _customerFuture,
+        child: FutureBuilder<_CustomerDetailData>(
+          future: _dataFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const Center(child: CircularProgressIndicator());
@@ -80,7 +112,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               );
             }
 
-            final customer = snapshot.data;
+            final data = snapshot.data;
+            final customer = data?.customer;
             if (customer == null) {
               return const Center(
                 child: Text(
@@ -115,6 +148,14 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                           _InfoRow(label: 'City', value: customer.city),
                           _InfoRow(label: 'Pincode', value: customer.pincode),
                           _InfoRow(label: 'Phone', value: customer.phone),
+                          _SlaRow(
+                            slaLabel: customer.slaDaysLabel,
+                            canEdit: data?.canEditSla ?? false,
+                            onEdit: () => _editSla(
+                              customer,
+                              canEditSla: data?.canEditSla ?? false,
+                            ),
+                          ),
                           _CoordinatesRow(
                             customer: customer,
                             onOpenMaps: () => _openCoordinatesInMaps(customer),
@@ -128,6 +169,62 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _SlaRow extends StatelessWidget {
+  const _SlaRow({
+    required this.slaLabel,
+    required this.canEdit,
+    required this.onEdit,
+  });
+
+  final String slaLabel;
+  final bool canEdit;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(
+            width: 132,
+            child: Text(
+              'SLA',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              slaLabel,
+              style: const TextStyle(color: Colors.black),
+            ),
+          ),
+          if (canEdit)
+            Theme(
+              data: AppTheme.withCompactButtons(Theme.of(context)),
+              child: TextButton(
+                onPressed: onEdit,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.primaryAccentText(primary),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('Edit SLA'),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -226,4 +323,14 @@ class _InfoRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CustomerDetailData {
+  const _CustomerDetailData({
+    required this.customer,
+    required this.canEditSla,
+  });
+
+  final Customer customer;
+  final bool canEditSla;
 }
