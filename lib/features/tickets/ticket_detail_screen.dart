@@ -57,6 +57,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   bool _isComposingComment = false;
   bool _isAddingCustomerAttachments = false;
   bool _isLinkingCustomerAttachments = false;
+
+  /// Set when API says ticket is not truly RESOLVED (e.g. CLOSED shown as RESOLVED).
+  bool _reopenBlocked = false;
   String? _currentUserId;
 
   bool get _hasUnsavedChanges {
@@ -165,8 +168,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
   }
 
   Future<void> _cancelComposingComment() async {
-    for (final attachment
-        in List<PendingTicketAttachment>.from(_commentAttachmentManager.attachments)) {
+    for (final attachment in List<PendingTicketAttachment>.from(
+      _commentAttachmentManager.attachments,
+    )) {
       await _commentAttachmentManager.removeUnlinked(attachment.attachmentId);
     }
     _commentController.clear();
@@ -185,6 +189,205 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     setState(() {
       _ticketFuture = _loadTicket();
     });
+  }
+
+  Future<bool> _canShowReopen(TicketDetail ticket) async {
+    if (_reopenBlocked) return false;
+    if (ticket.status != TicketStatus.resolved) return false;
+    // CLOSED tickets remapped to RESOLVED for customers may still expose a
+    // close activity; never offer reopen once closed.
+    if (_activityIndicatesClosed(ticket)) return false;
+
+    if (!widget.isEmployeeView) {
+      return ticket.isRaisedByCustomer;
+    }
+
+    final userId = await JwtPayload.currentUserId();
+    if (userId == null || userId.isEmpty) return false;
+    if (await JwtPayload.currentUserIsAppAdmin()) return true;
+    if (ticket.createdBy == userId) return true;
+
+    if (ticket.assignedDepartmentId.isEmpty) return false;
+    try {
+      final departments = await widget.apiClient.getDepartments();
+      Department? assignedDepartment;
+      for (final department in departments) {
+        if (department.id == ticket.assignedDepartmentId) {
+          assignedDepartment = department;
+          break;
+        }
+      }
+      final membership = assignedDepartment?.users
+          .where((user) => user.id == userId)
+          .firstOrNull;
+      return membership?.isDepartmentLead == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _activityIndicatesClosed(TicketDetail ticket) {
+    for (final entry in ticket.activity) {
+      final newValue = (entry.newValue ?? '').toUpperCase();
+      if (newValue.contains('CLOSED') && newValue.contains('STATUS')) {
+        return true;
+      }
+      final message = entry.message.trim().toLowerCase();
+      if (message.contains('ticket closed')) return true;
+    }
+    return false;
+  }
+
+  Future<void> _reopenTicket(TicketDetail ticket) async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => const _ReopenTicketDialog(),
+    );
+    if (reason == null) return;
+
+    try {
+      final reopeningReason = await _buildReopeningReasonPayload(
+        ticket: ticket,
+        reason: reason,
+      );
+      await widget.apiClient.reopenTicket(
+        ticketId: widget.ticketId,
+        reopeningReason: reopeningReason,
+        isEmployeeView: widget.isEmployeeView,
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Ticket reopened.',
+        type: AppSnackBarType.success,
+      );
+      _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      final message = _reopenErrorMessage(error);
+      final isWrongStatus = message == 'Only resolved tickets can be reopened.';
+      if (isWrongStatus) {
+        setState(() => _reopenBlocked = true);
+      }
+      showAppSnackBar(context, message: message, type: AppSnackBarType.error);
+      if (isWrongStatus) _refresh();
+    }
+  }
+
+  Future<String> _buildReopeningReasonPayload({
+    required TicketDetail ticket,
+    required String reason,
+  }) async {
+    final resolveActivity = _latestResolveActivity(ticket);
+    final resolverName = () {
+      final fromActivity = resolveActivity?.createdByName.trim() ?? '';
+      if (fromActivity.isNotEmpty) return fromActivity;
+      return 'an employee';
+    }();
+    final resolvedAt = resolveActivity?.createdAt ?? ticket.lastUpdatedAt;
+    final resolvedAtLabel = resolvedAt == null
+        ? 'an unknown date and time'
+        : _formatTicketTimestamp(resolvedAt);
+    final resolutionSummary = ticket.resolutionSummary.trim().isEmpty
+        ? 'none'
+        : ticket.resolutionSummary.trim();
+    final actorType = widget.isEmployeeView ? 'employee' : 'customer';
+    final reopenerName = await _currentReopenerDisplayName(ticket);
+
+    return _composeBracketedReopeningReason(
+      resolverName: resolverName,
+      resolvedAtLabel: resolvedAtLabel,
+      resolutionSummary: resolutionSummary,
+      actorType: actorType,
+      reopenerName: reopenerName,
+      reason: reason.trim(),
+    );
+  }
+
+  Future<String> _currentReopenerDisplayName(TicketDetail ticket) async {
+    if (!widget.isEmployeeView) {
+      final customerName = ticket.raisedForCustomerName.trim();
+      return customerName.isEmpty ? 'customer' : customerName;
+    }
+
+    final userId = await JwtPayload.currentUserId();
+    if (userId == null || userId.isEmpty) return 'employee';
+
+    try {
+      final departments = await widget.apiClient.getDepartments();
+      for (final department in departments) {
+        for (final user in department.users) {
+          if (user.id == userId && user.personName.trim().isNotEmpty) {
+            return user.personName.trim();
+          }
+        }
+      }
+    } catch (_) {
+      // Fall through to users list / id.
+    }
+
+    try {
+      final users = await widget.apiClient.getUsers();
+      for (final user in users) {
+        if (user.id == userId && user.personName.trim().isNotEmpty) {
+          return user.personName.trim();
+        }
+      }
+    } catch (_) {
+      // Fall through to id.
+    }
+
+    return userId;
+  }
+
+  TicketActivity? _latestResolveActivity(TicketDetail ticket) {
+    TicketActivity? latest;
+    for (final entry in ticket.activity) {
+      final newValue = (entry.newValue ?? '').toUpperCase();
+      final message = entry.message.trim().toLowerCase();
+      final looksResolved =
+          (newValue.contains('RESOLVED') && newValue.contains('STATUS')) ||
+          message.contains('ticket resolved') ||
+          message == 'resolved';
+      if (!looksResolved) continue;
+      if (latest == null) {
+        latest = entry;
+        continue;
+      }
+      final latestAt = latest.createdAt;
+      final entryAt = entry.createdAt;
+      if (latestAt == null && entryAt != null) {
+        latest = entry;
+      } else if (latestAt != null &&
+          entryAt != null &&
+          entryAt.isAfter(latestAt)) {
+        latest = entry;
+      }
+    }
+    return latest;
+  }
+
+  String _reopenErrorMessage(Object error) {
+    final raw = error.toString();
+    final lower = raw.toLowerCase();
+    if (lower.contains('only tickets in resolved status can be reopened')) {
+      return 'Only resolved tickets can be reopened.';
+    }
+    if (lower.contains('only the customer who raised') ||
+        lower.contains('only the ticket raiser') ||
+        lower.contains('department lead') ||
+        lower.contains('app-admin')) {
+      return "You don't have permission to reopen this ticket.";
+    }
+    if (lower.contains('reopeningreason is required') ||
+        lower.contains('reopening reason is required')) {
+      return 'Please enter a reason for reopening.';
+    }
+    if (lower.contains('at most 500') ||
+        lower.contains('must be at most 500')) {
+      return 'Reason must be 500 characters or fewer.';
+    }
+    return raw;
   }
 
   Future<void> _downloadAttachment(TicketAttachment attachment) async {
@@ -245,7 +448,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       _refresh();
     } catch (error) {
       if (!mounted) return;
-      showAppSnackBar(context, message: error.toString(), type: AppSnackBarType.error);
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
     }
   }
 
@@ -264,7 +471,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       _refresh();
     } catch (error) {
       if (!mounted) return;
-      showAppSnackBar(context, message: error.toString(), type: AppSnackBarType.error);
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
     }
   }
 
@@ -283,7 +494,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       _refresh();
     } catch (error) {
       if (!mounted) return;
-      showAppSnackBar(context, message: error.toString(), type: AppSnackBarType.error);
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
     }
   }
 
@@ -293,7 +508,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
       _refresh();
     } catch (error) {
       if (!mounted) return;
-      showAppSnackBar(context, message: error.toString(), type: AppSnackBarType.error);
+      showAppSnackBar(
+        context,
+        message: error.toString(),
+        type: AppSnackBarType.error,
+      );
     }
   }
 
@@ -357,7 +576,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     for (final attachment in List<PendingTicketAttachment>.from(
       _descriptionAttachmentManager.attachments,
     )) {
-      await _descriptionAttachmentManager.removeUnlinked(attachment.attachmentId);
+      await _descriptionAttachmentManager.removeUnlinked(
+        attachment.attachmentId,
+      );
     }
     _descriptionController.clear();
     if (!mounted) return;
@@ -377,9 +598,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
 
     setState(() => _isSavingDescription = true);
     try {
-      final body = <String, Object?>{
-        'description': description,
-      };
+      final body = <String, Object?>{'description': description};
       if (_descriptionAttachmentManager.attachmentIds.isNotEmpty) {
         body['attachmentIds'] = _descriptionAttachmentManager.attachmentIds;
       }
@@ -414,7 +633,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
     for (final attachment in List<PendingTicketAttachment>.from(
       _descriptionAttachmentManager.attachments,
     )) {
-      await _descriptionAttachmentManager.removeUnlinked(attachment.attachmentId);
+      await _descriptionAttachmentManager.removeUnlinked(
+        attachment.attachmentId,
+      );
     }
     if (!mounted) return;
     setState(() => _isAddingCustomerAttachments = false);
@@ -482,275 +703,305 @@ class _TicketDetailScreenState extends State<TicketDetailScreen>
             title: Text(widget.isEmployeeView ? 'Ticket' : 'Complaint'),
           ),
           body: SafeArea(
-        child: FutureBuilder<TicketDetail>(
-          future: _ticketFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return AppLoadErrorState(
-                title: widget.isEmployeeView
-                    ? 'Failed to load Ticket'
-                    : 'Failed to load Complaint',
-                message: snapshot.error.toString(),
-                onRetry: _refresh,
-                onLoginAgain: widget.onLoginAgain,
-              );
-            }
-            final ticket = snapshot.data;
-            if (ticket == null) {
-              return const Center(child: Text('Ticket not found.'));
-            }
-            return SingleChildScrollView(
-              controller: _pageScrollController,
-              padding: const EdgeInsets.all(24),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 900),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_isEditingSubject &&
-                          ticket.canEditSubjectAndDescription(_currentUserId)) ...[
-                        Text(
-                          '#${ticket.id}',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _subjectController,
-                          enabled: !_isSavingSubject,
-                          autofocus: true,
-                          decoration: const InputDecoration(labelText: 'Subject'),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            TextButton(
-                              onPressed:
-                                  _isSavingSubject ? null : _cancelEditingSubject,
-                              child: const Text('Cancel'),
+            child: FutureBuilder<TicketDetail>(
+              future: _ticketFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return AppLoadErrorState(
+                    title: widget.isEmployeeView
+                        ? 'Failed to load Ticket'
+                        : 'Failed to load Complaint',
+                    message: snapshot.error.toString(),
+                    onRetry: _refresh,
+                    onLoginAgain: widget.onLoginAgain,
+                  );
+                }
+                final ticket = snapshot.data;
+                if (ticket == null) {
+                  return const Center(child: Text('Ticket not found.'));
+                }
+                return SingleChildScrollView(
+                  controller: _pageScrollController,
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 900),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_isEditingSubject &&
+                              ticket.canEditSubjectAndDescription(
+                                _currentUserId,
+                              )) ...[
+                            Text(
+                              '#${ticket.id}',
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                             ),
-                            const SizedBox(width: 8),
-                            FilledButton(
-                              onPressed: _isSavingSubject
-                                  ? null
-                                  : () => _saveSubject(ticket),
-                              child: _isSavingSubject
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('Save'),
-                            ),
-                            const Spacer(),
-                            TicketStatusChip(status: ticket.status),
-                          ],
-                        ),
-                      ] else
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text.rich(
-                                TextSpan(
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                        color: Colors.black,
-                                        fontWeight: FontWeight.w700,
-                                        height: 1.25,
-                                      ),
-                                  children: [
-                                    TextSpan(text: '#${ticket.id} · '),
-                                    TextSpan(
-                                      text: ticket.subject.trim().isEmpty
-                                          ? '—'
-                                          : ticket.subject,
-                                    ),
-                                    if (widget.isEmployeeView &&
-                                        ticket.canEditSubjectAndDescription(
-                                          _currentUserId,
-                                        ))
-                                      WidgetSpan(
-                                        alignment: PlaceholderAlignment.middle,
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(left: 4),
-                                          child: IconButton(
-                                            tooltip: 'Edit subject',
-                                            onPressed: () =>
-                                                _startEditingSubject(ticket),
-                                            icon: const Icon(
-                                              Icons.edit_outlined,
-                                              size: 18,
-                                            ),
-                                            visualDensity: VisualDensity.compact,
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(
-                                              minWidth: 28,
-                                              minHeight: 28,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _subjectController,
+                              enabled: !_isSavingSubject,
+                              autofocus: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Subject',
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            TicketStatusChip(status: ticket.status),
-                          ],
-                        ),
-                      if (widget.isEmployeeView) ...[
-                        const SizedBox(height: 8),
-                        _RaisedByLine(
-                          apiClient: widget.apiClient,
-                          ticket: ticket,
-                        ),
-                        const SizedBox(height: 8),
-                        _TicketAssigneeHeader(
-                          apiClient: widget.apiClient,
-                          ticket: ticket,
-                          onReassigned: _refresh,
-                        ),
-                      ],
-                      if (widget.isEmployeeView) ...[
-                        const SizedBox(height: 16),
-                        _EmployeeActions(
-                          apiClient: widget.apiClient,
-                          ticket: ticket,
-                          onStart: _startWork,
-                          onResolve: _resolveTicket,
-                          onInvalidate: _invalidateTicket,
-                          onClose: _closeTicket,
-                        ),
-                      ],
-                      const SizedBox(height: 20),
-                      if (widget.isEmployeeView &&
-                          _isEditingDescription &&
-                          ticket.canEditSubjectAndDescription(_currentUserId))
-                        TicketDescriptionField(
-                          controller: _descriptionController,
-                          attachmentManager: _descriptionAttachmentManager,
-                          onAttachmentsChanged: () => setState(() {}),
-                          labelText: 'Description',
-                          enabled: !_isSavingDescription,
-                          isSubmitting: _isSavingDescription,
-                          autofocus: true,
-                          onCancel: _isSavingDescription
-                              ? null
-                              : _cancelEditingDescription,
-                          onSubmit: _isSavingDescription
-                              ? null
-                              : () => _saveDescription(ticket),
-                        )
-                      else
-                        _TicketDescriptionHero(
-                          description: ticket.description,
-                          onEdit: widget.isEmployeeView &&
-                                  ticket.canEditSubjectAndDescription(
-                                    _currentUserId,
-                                  )
-                              ? () => _startEditingDescription(ticket)
-                              : null,
-                        ),
-                      if (widget.isEmployeeView || ticket.isRaisedByCustomer) ...[
-                        const SizedBox(height: 16),
-                        _AttachmentsSection(
-                          attachments: ticket.attachments,
-                          onOpen: _downloadAttachment,
-                        ),
-                      ],
-                      if (!widget.isEmployeeView &&
-                          ticket.canCustomerAddAttachments) ...[
-                        const SizedBox(height: 16),
-                        if (!_isAddingCustomerAttachments)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: OutlinedButton.icon(
-                              onPressed: () =>
-                                  _startAddingCustomerAttachments(ticket),
-                              icon: const Icon(Icons.attach_file),
-                              label: const Text('Add attachments'),
-                            ),
-                          )
-                        else
-                          TicketComposerField(
-                            attachmentManager: _descriptionAttachmentManager,
-                            onAttachmentsChanged: () => setState(() {}),
-                            showTextField: false,
-                            enabled: !_isLinkingCustomerAttachments,
-                            isSubmitting: _isLinkingCustomerAttachments,
-                            onCancel: _isLinkingCustomerAttachments
-                                ? null
-                                : _cancelAddingCustomerAttachments,
-                            onSubmit: _isLinkingCustomerAttachments
-                                ? null
-                                : () => _linkCustomerAttachments(ticket),
-                            submitLabel: 'Submit',
-                          ),
-                      ],
-                      if (ticket.resolutionSummary.isNotEmpty ||
-                          ticket.invalidationReason.isNotEmpty ||
-                          ticket.hasRelatedDoc ||
-                          widget.isEmployeeView) ...[
-                        const SizedBox(height: 16),
-                        _TicketFieldsPanel(
-                          ticket: ticket,
-                          isEmployeeView: widget.isEmployeeView,
-                          onRelatedInvoiceTap: ticket.hasRelatedDoc
-                              ? () => showDocLineItemsDialog(
-                                    context: context,
-                                    apiClient: widget.apiClient,
-                                    docId: ticket.relatedDocId,
-                                    onLoginAgain: widget.onLoginAgain,
-                                  )
-                              : null,
-                        ),
-                      ],
-                      if (widget.isEmployeeView) ...[
-                        const SizedBox(height: 24),
-                        _TicketDiscussionTabs(
-                          tabController: _discussionTabController,
-                          comments: ticket.comments,
-                          activity: ticket.activity,
-                          attachments: ticket.attachments,
-                          commentsScrollController: _commentsScrollController,
-                          canComposeComment: !ticket.isClosed,
-                          isComposingComment: _isComposingComment,
-                          addCommentButtonKey: _addCommentButtonKey,
-                          onStartComposing: () => _startComposingComment(ticket),
-                          onOpenAttachment: _downloadAttachment,
-                          commentComposer: _isComposingComment && !ticket.isClosed
-                              ? _CommentComposer(
-                                  controller: _commentController,
-                                  attachmentManager: _commentAttachmentManager,
-                                  isSubmitting: _isSubmittingComment,
-                                  onAttachmentsChanged: () => setState(() {}),
-                                  onCancel: _isSubmittingComment
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                TextButton(
+                                  onPressed: _isSavingSubject
                                       ? null
-                                      : _cancelComposingComment,
-                                  onSubmit: _addComment,
-                                )
-                              : null,
-                        ),
-                      ],
-                    ],
+                                      : _cancelEditingSubject,
+                                  child: const Text('Cancel'),
+                                ),
+                                const SizedBox(width: 8),
+                                FilledButton(
+                                  onPressed: _isSavingSubject
+                                      ? null
+                                      : () => _saveSubject(ticket),
+                                  child: _isSavingSubject
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text('Save'),
+                                ),
+                                const Spacer(),
+                                TicketStatusChip(status: ticket.status),
+                              ],
+                            ),
+                          ] else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text.rich(
+                                    TextSpan(
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                            color: Colors.black,
+                                            fontWeight: FontWeight.w700,
+                                            height: 1.25,
+                                          ),
+                                      children: [
+                                        TextSpan(text: '#${ticket.id} · '),
+                                        TextSpan(
+                                          text: ticket.subject.trim().isEmpty
+                                              ? '—'
+                                              : ticket.subject,
+                                        ),
+                                        if (widget.isEmployeeView &&
+                                            ticket.canEditSubjectAndDescription(
+                                              _currentUserId,
+                                            ))
+                                          WidgetSpan(
+                                            alignment:
+                                                PlaceholderAlignment.middle,
+                                            child: Padding(
+                                              padding: const EdgeInsets.only(
+                                                left: 4,
+                                              ),
+                                              child: IconButton(
+                                                tooltip: 'Edit subject',
+                                                onPressed: () =>
+                                                    _startEditingSubject(
+                                                      ticket,
+                                                    ),
+                                                icon: const Icon(
+                                                  Icons.edit_outlined,
+                                                  size: 18,
+                                                ),
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                padding: EdgeInsets.zero,
+                                                constraints:
+                                                    const BoxConstraints(
+                                                      minWidth: 28,
+                                                      minHeight: 28,
+                                                    ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                TicketStatusChip(status: ticket.status),
+                              ],
+                            ),
+                          if (widget.isEmployeeView) ...[
+                            const SizedBox(height: 8),
+                            _RaisedByLine(
+                              apiClient: widget.apiClient,
+                              ticket: ticket,
+                            ),
+                            const SizedBox(height: 8),
+                            _TicketAssigneeHeader(
+                              apiClient: widget.apiClient,
+                              ticket: ticket,
+                              onReassigned: _refresh,
+                            ),
+                          ],
+                          if (widget.isEmployeeView) ...[
+                            const SizedBox(height: 16),
+                            _EmployeeActions(
+                              apiClient: widget.apiClient,
+                              ticket: ticket,
+                              onStart: _startWork,
+                              onResolve: _resolveTicket,
+                              onInvalidate: _invalidateTicket,
+                              onClose: _closeTicket,
+                            ),
+                          ],
+                          const SizedBox(height: 20),
+                          if (widget.isEmployeeView &&
+                              _isEditingDescription &&
+                              ticket.canEditSubjectAndDescription(
+                                _currentUserId,
+                              ))
+                            TicketDescriptionField(
+                              controller: _descriptionController,
+                              attachmentManager: _descriptionAttachmentManager,
+                              onAttachmentsChanged: () => setState(() {}),
+                              labelText: 'Description',
+                              enabled: !_isSavingDescription,
+                              isSubmitting: _isSavingDescription,
+                              autofocus: true,
+                              onCancel: _isSavingDescription
+                                  ? null
+                                  : _cancelEditingDescription,
+                              onSubmit: _isSavingDescription
+                                  ? null
+                                  : () => _saveDescription(ticket),
+                            )
+                          else
+                            _TicketDescriptionHero(
+                              description: ticket.description,
+                              onEdit:
+                                  widget.isEmployeeView &&
+                                      ticket.canEditSubjectAndDescription(
+                                        _currentUserId,
+                                      )
+                                  ? () => _startEditingDescription(ticket)
+                                  : null,
+                            ),
+                          if (widget.isEmployeeView ||
+                              ticket.isRaisedByCustomer) ...[
+                            const SizedBox(height: 16),
+                            _AttachmentsSection(
+                              attachments: ticket.attachments,
+                              onOpen: _downloadAttachment,
+                            ),
+                          ],
+                          if (!widget.isEmployeeView &&
+                              ticket.canCustomerAddAttachments) ...[
+                            const SizedBox(height: 16),
+                            if (!_isAddingCustomerAttachments)
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: OutlinedButton.icon(
+                                  onPressed: () =>
+                                      _startAddingCustomerAttachments(ticket),
+                                  icon: const Icon(Icons.attach_file),
+                                  label: const Text('Add attachments'),
+                                ),
+                              )
+                            else
+                              TicketComposerField(
+                                attachmentManager:
+                                    _descriptionAttachmentManager,
+                                onAttachmentsChanged: () => setState(() {}),
+                                showTextField: false,
+                                enabled: !_isLinkingCustomerAttachments,
+                                isSubmitting: _isLinkingCustomerAttachments,
+                                onCancel: _isLinkingCustomerAttachments
+                                    ? null
+                                    : _cancelAddingCustomerAttachments,
+                                onSubmit: _isLinkingCustomerAttachments
+                                    ? null
+                                    : () => _linkCustomerAttachments(ticket),
+                                submitLabel: 'Submit',
+                              ),
+                          ],
+                          if (ticket.resolutionSummary.isNotEmpty ||
+                              ticket.invalidationReason.isNotEmpty ||
+                              ticket.hasRelatedDoc ||
+                              widget.isEmployeeView) ...[
+                            const SizedBox(height: 16),
+                            FutureBuilder<bool>(
+                              future: _canShowReopen(ticket),
+                              builder: (context, reopenSnapshot) {
+                                return _TicketFieldsPanel(
+                                  ticket: ticket,
+                                  isEmployeeView: widget.isEmployeeView,
+                                  canReopen: reopenSnapshot.data == true,
+                                  onReopen: () => _reopenTicket(ticket),
+                                  onRelatedInvoiceTap: ticket.hasRelatedDoc
+                                      ? () => showDocLineItemsDialog(
+                                          context: context,
+                                          apiClient: widget.apiClient,
+                                          docId: ticket.relatedDocId,
+                                          onLoginAgain: widget.onLoginAgain,
+                                        )
+                                      : null,
+                                );
+                              },
+                            ),
+                          ],
+                          if (widget.isEmployeeView) ...[
+                            const SizedBox(height: 24),
+                            _TicketDiscussionTabs(
+                              tabController: _discussionTabController,
+                              comments: ticket.comments,
+                              activity: ticket.activity,
+                              attachments: ticket.attachments,
+                              commentsScrollController:
+                                  _commentsScrollController,
+                              canComposeComment: !ticket.isClosed,
+                              isComposingComment: _isComposingComment,
+                              addCommentButtonKey: _addCommentButtonKey,
+                              onStartComposing: () =>
+                                  _startComposingComment(ticket),
+                              onOpenAttachment: _downloadAttachment,
+                              commentComposer:
+                                  _isComposingComment && !ticket.isClosed
+                                  ? _CommentComposer(
+                                      controller: _commentController,
+                                      attachmentManager:
+                                          _commentAttachmentManager,
+                                      isSubmitting: _isSubmittingComment,
+                                      onAttachmentsChanged: () =>
+                                          setState(() {}),
+                                      onCancel: _isSubmittingComment
+                                          ? null
+                                          : _cancelComposingComment,
+                                      onSubmit: _addComment,
+                                    )
+                                  : null,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -810,6 +1061,102 @@ class _TicketPromptDialogState extends State<_TicketPromptDialog> {
   }
 }
 
+class _ReopenTicketDialog extends StatefulWidget {
+  const _ReopenTicketDialog();
+
+  @override
+  State<_ReopenTicketDialog> createState() => _ReopenTicketDialogState();
+}
+
+class _ReopenTicketDialogState extends State<_ReopenTicketDialog> {
+  static const _maxLength = 500;
+
+  late final TextEditingController _controller = TextEditingController();
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      if (_errorMessage != null) setState(() => _errorMessage = null);
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    if (value.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter a reason for reopening.';
+      });
+      return;
+    }
+    if (value.length > _maxLength) {
+      setState(() {
+        _errorMessage = 'Reason must be 500 characters or fewer.';
+      });
+      return;
+    }
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmedEmpty = _controller.text.trim().isEmpty;
+
+    return AlertDialog(
+      title: const Text('Reopen ticket'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              minLines: 3,
+              maxLines: 8,
+              maxLength: _maxLength,
+              decoration: const InputDecoration(
+                labelText: 'Reason for reopening',
+                hintText: 'Describe what is still wrong or what came back…',
+                alignLabelWithHint: true,
+              ),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: trimmedEmpty ? null : _submit,
+          child: const Text('Reopen'),
+        ),
+      ],
+    );
+  }
+}
+
 class _EmployeeActions extends StatelessWidget {
   const _EmployeeActions({
     required this.apiClient,
@@ -830,8 +1177,7 @@ class _EmployeeActions extends StatelessWidget {
   Future<_EmployeeActionPermissions> _loadPermissions() async {
     final userId = await JwtPayload.currentUserId();
     final roles = await JwtPayload.currentRoles();
-    final isAssignee =
-        userId != null && userId == ticket.assigneeAppUserId;
+    final isAssignee = userId != null && userId == ticket.assigneeAppUserId;
     final isAdmin = roles.hasRole(AppRole.appAdmin);
 
     var isDepartmentLead = false;
@@ -865,12 +1211,14 @@ class _EmployeeActions extends StatelessWidget {
         canActOnWorkStatus;
 
     return _EmployeeActionPermissions(
-      canStartWork: isAssignee &&
+      canStartWork:
+          isAssignee &&
           (ticket.status == TicketStatus.open ||
               ticket.status == TicketStatus.assigned),
       canResolve: canActOnTicket && ticket.status == TicketStatus.inProgress,
       canInvalidate: canActOnTicket,
-      canClose: isAdmin &&
+      canClose:
+          isAdmin &&
           (ticket.status == TicketStatus.resolved ||
               ticket.status == TicketStatus.invalid),
     );
@@ -995,8 +1343,9 @@ class _TicketAssigneeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final assigneeLabel =
-        ticket.assigneeName.trim().isEmpty ? 'Unassigned' : ticket.assigneeName;
+    final assigneeLabel = ticket.assigneeName.trim().isEmpty
+        ? 'Unassigned'
+        : ticket.assigneeName;
     final theme = Theme.of(context);
 
     return FutureBuilder<_TicketAssignmentViewData>(
@@ -1029,10 +1378,8 @@ class _TicketAssigneeHeader extends StatelessWidget {
               const SizedBox(width: 8),
               IconButton(
                 tooltip: 'Reassign',
-                onPressed: () => _openReassignDialog(
-                  context,
-                  data?.departments ?? const [],
-                ),
+                onPressed: () =>
+                    _openReassignDialog(context, data?.departments ?? const []),
                 icon: const Icon(Icons.swap_horiz, size: 16),
                 style: IconButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
@@ -1083,6 +1430,7 @@ class _ReassignTicketDialog extends StatefulWidget {
 
 class _ReassignTicketDialogState extends State<_ReassignTicketDialog> {
   late String? _selectedDepartmentId;
+
   /// Empty string means unassigned; null means no selection yet.
   late String? _selectedAssigneeId;
   bool _isSaving = false;
@@ -1198,24 +1546,18 @@ class _ReassignTicketDialogState extends State<_ReassignTicketDialog> {
     final assignees = _assigneeOptions;
     final assigneeItems = <DropdownMenuItem<String>>[
       if (!_departmentChanged)
-        const DropdownMenuItem<String>(
-          value: '',
-          child: Text('Unassigned'),
-        ),
+        const DropdownMenuItem<String>(value: '', child: Text('Unassigned')),
       ...assignees.map(
         (user) => DropdownMenuItem(
           value: user.id,
           child: Text(
-            user.isActive
-                ? user.personName
-                : '${user.personName} (Inactive)',
+            user.isActive ? user.personName : '${user.personName} (Inactive)',
           ),
         ),
       ),
     ];
-    final assigneeValue = assigneeItems.any(
-          (item) => item.value == _selectedAssigneeId,
-        )
+    final assigneeValue =
+        assigneeItems.any((item) => item.value == _selectedAssigneeId)
         ? _selectedAssigneeId
         : (_departmentChanged ? null : '');
 
@@ -1228,7 +1570,8 @@ class _ReassignTicketDialogState extends State<_ReassignTicketDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DropdownButtonFormField<String>(
-              initialValue: _departmentOptions.any(
+              initialValue:
+                  _departmentOptions.any(
                     (dept) => dept.id == _selectedDepartmentId,
                   )
                   ? _selectedDepartmentId
@@ -1257,9 +1600,9 @@ class _ReassignTicketDialogState extends State<_ReassignTicketDialog> {
                           _selectedAssigneeId =
                               dept?.activeTicketTriager?.id ?? '';
                         } else {
-                          final current = widget.ticket.assigneeAppUserId.trim();
-                          _selectedAssigneeId =
-                              current.isEmpty ? '' : current;
+                          final current = widget.ticket.assigneeAppUserId
+                              .trim();
+                          _selectedAssigneeId = current.isEmpty ? '' : current;
                         }
                       });
                     },
@@ -1274,16 +1617,16 @@ class _ReassignTicketDialogState extends State<_ReassignTicketDialog> {
                 labelText: _selectedDepartmentId == null
                     ? 'Assignee (Select Dept First)'
                     : _departmentChanged
-                        ? 'Assignee'
-                        : 'Assignee (optional)',
+                    ? 'Assignee'
+                    : 'Assignee (optional)',
               ),
               items: assigneeItems,
               onChanged: _isSaving || _selectedDepartmentId == null
                   ? null
                   : (value) => setState(() {
-                        _selectedAssigneeId = value ?? '';
-                        _errorMessage = null;
-                      }),
+                      _selectedAssigneeId = value ?? '';
+                      _errorMessage = null;
+                    }),
             ),
             if (_errorMessage != null) ...[
               const SizedBox(height: 12),
@@ -1319,20 +1662,14 @@ class _ReassignTicketDialogState extends State<_ReassignTicketDialog> {
 }
 
 class _RaisedByDisplay {
-  const _RaisedByDisplay({
-    required this.name,
-    this.onBehalfOfCustomer,
-  });
+  const _RaisedByDisplay({required this.name, this.onBehalfOfCustomer});
 
   final String name;
   final String? onBehalfOfCustomer;
 }
 
 class _RaisedByLine extends StatefulWidget {
-  const _RaisedByLine({
-    required this.apiClient,
-    required this.ticket,
-  });
+  const _RaisedByLine({required this.apiClient, required this.ticket});
 
   final ApiClient apiClient;
   final TicketDetail ticket;
@@ -1399,8 +1736,9 @@ class _RaisedByLineState extends State<_RaisedByLine> {
     try {
       final departments = await apiClient.getDepartments();
       for (final department in departments) {
-        final match =
-            department.users.where((user) => user.id == userId).firstOrNull;
+        final match = department.users
+            .where((user) => user.id == userId)
+            .firstOrNull;
         final name = match?.personName.trim() ?? '';
         if (name.isNotEmpty) return name;
       }
@@ -1474,10 +1812,7 @@ class _RaisedByLineState extends State<_RaisedByLine> {
 }
 
 class _TicketDescriptionHero extends StatelessWidget {
-  const _TicketDescriptionHero({
-    required this.description,
-    this.onEdit,
-  });
+  const _TicketDescriptionHero({required this.description, this.onEdit});
 
   final String description;
   final VoidCallback? onEdit;
@@ -1485,11 +1820,11 @@ class _TicketDescriptionHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bodyStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: Colors.black,
-          fontWeight: FontWeight.w500,
-          height: 1.55,
-          fontSize: 17,
-        );
+      color: Colors.black,
+      fontWeight: FontWeight.w500,
+      height: 1.55,
+      fontSize: 17,
+    );
     final text = description.trim().isEmpty ? 'No description.' : description;
 
     return AppSurface(
@@ -1503,10 +1838,10 @@ class _TicketDescriptionHero extends StatelessWidget {
                 Text(
                   'Description',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Colors.black54,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
                 ),
                 if (onEdit != null) ...[
                   const SizedBox(width: 4),
@@ -1584,11 +1919,15 @@ class _TicketFieldsPanel extends StatelessWidget {
   const _TicketFieldsPanel({
     required this.ticket,
     required this.isEmployeeView,
+    required this.canReopen,
+    required this.onReopen,
     this.onRelatedInvoiceTap,
   });
 
   final TicketDetail ticket;
   final bool isEmployeeView;
+  final bool canReopen;
+  final VoidCallback onReopen;
   final VoidCallback? onRelatedInvoiceTap;
 
   @override
@@ -1602,14 +1941,18 @@ class _TicketFieldsPanel extends StatelessWidget {
             Text(
               'Details',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  ),
+                color: Colors.black54,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
             ),
             const SizedBox(height: 8),
             if (ticket.resolutionSummary.isNotEmpty)
-              _InfoRow('Resolution', ticket.resolutionSummary),
+              _ResolutionRow(
+                summary: ticket.resolutionSummary,
+                canReopen: canReopen,
+                onReopen: onReopen,
+              ),
             if (ticket.invalidationReason.isNotEmpty)
               _InfoRow('Invalidation reason', ticket.invalidationReason),
             if (ticket.hasRelatedDoc)
@@ -1636,6 +1979,57 @@ class _TicketFieldsPanel extends StatelessWidget {
   }
 }
 
+class _ResolutionRow extends StatelessWidget {
+  const _ResolutionRow({
+    required this.summary,
+    required this.canReopen,
+    required this.onReopen,
+  });
+
+  final String summary;
+  final bool canReopen;
+  final VoidCallback onReopen;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final linkColor = AppTheme.primaryAccentText(primary);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(
+            width: 140,
+            child: Text(
+              'Resolution',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(summary, style: const TextStyle(color: Colors.black)),
+          ),
+          if (canReopen)
+            TextButton(
+              onPressed: onReopen,
+              style: TextButton.styleFrom(
+                foregroundColor: linkColor,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('Not Resolved?'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AttachmentsSection extends StatelessWidget {
   const _AttachmentsSection({required this.attachments, required this.onOpen});
 
@@ -1653,10 +2047,10 @@ class _AttachmentsSection extends StatelessWidget {
             Text(
               'Attachments',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  ),
+                color: Colors.black54,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
             ),
             const SizedBox(height: 12),
             if (attachments.isEmpty)
@@ -1700,7 +2094,9 @@ class _AttachmentGridTile extends StatelessWidget {
     if (mime.startsWith('audio/')) return Icons.mic;
     if (mime.startsWith('image/')) return Icons.image_outlined;
     if (mime == 'application/pdf') return Icons.picture_as_pdf_outlined;
-    if (mime.contains('sheet') || mime.contains('excel') || mime.contains('csv')) {
+    if (mime.contains('sheet') ||
+        mime.contains('excel') ||
+        mime.contains('csv')) {
       return Icons.table_chart_outlined;
     }
     if (mime.contains('word') || mime.contains('document')) {
@@ -1847,14 +2243,8 @@ class _TicketDiscussionTabs extends StatelessWidget {
               splashFactory: NoSplash.splashFactory,
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
               tabs: [
-                Tab(
-                  height: 36,
-                  text: 'Comments (${comments.length})',
-                ),
-                Tab(
-                  height: 36,
-                  text: 'Activity (${activity.length})',
-                ),
+                Tab(height: 36, text: 'Comments (${comments.length})'),
+                Tab(height: 36, text: 'Activity (${activity.length})'),
               ],
             ),
           ),
@@ -2147,4 +2537,39 @@ String _formatTicketTimestamp(DateTime dateTime) {
   final minute = local.minute.toString().padLeft(2, '0');
   final period = local.hour < 12 ? 'AM' : 'PM';
   return '$month ${local.day}, ${local.year} · $hourOfPeriod:$minute $period';
+}
+
+/// Builds the API `reopeningReason`, capped at 500 chars (API limit).
+String _composeBracketedReopeningReason({
+  required String resolverName,
+  required String resolvedAtLabel,
+  required String resolutionSummary,
+  required String actorType,
+  required String reopenerName,
+  required String reason,
+}) {
+  String build(String reasonPart) {
+    return '['
+        'This ticket was marked as resolved by $resolverName on $resolvedAtLabel '
+        'with the resolution summary as \'$resolutionSummary\', but the $actorType '
+        '$reopenerName has reopened this ticket. The reason provided for '
+        'reopening was: \'$reasonPart\''
+        ']';
+  }
+
+  final full = build(reason);
+  if (full.length <= 500) return full;
+
+  final overhead = build('').length;
+  final maxReasonLength = 500 - overhead;
+  if (maxReasonLength <= 0) {
+    return '${full.substring(0, 497)}...]';
+  }
+  if (maxReasonLength <= 3) {
+    return build(reason.substring(0, maxReasonLength));
+  }
+  final truncated = reason.length > maxReasonLength
+      ? '${reason.substring(0, maxReasonLength - 3)}...'
+      : reason;
+  return build(truncated);
 }
