@@ -912,6 +912,21 @@ class ApiClient {
     return Customer.fromJson(_decodeJsonObject(response.body));
   }
 
+  /// Employee only. Updates customer complaint SLA (positive multiple of 24).
+  Future<Customer> updateCustomerSla({
+    String? token,
+    required String customerId,
+    required int slaHours,
+  }) async {
+    final response = await _put(
+      'customers/${Uri.encodeComponent(customerId)}/sla',
+      token: token,
+      requiresAuth: true,
+      body: {'slaHours': slaHours},
+    );
+    return Customer.fromJson(_decodeJsonObject(response.body));
+  }
+
   Future<List<ComplaintCategory>> getComplaintCategories({
     String? token,
   }) async {
@@ -929,7 +944,6 @@ class ApiClient {
     String? token,
     required String name,
     required String assignedDepartmentId,
-    required int slaHours,
     bool isActive = true,
   }) async {
     final response = await _post(
@@ -939,7 +953,6 @@ class ApiClient {
       body: {
         'name': name,
         'assignedDepartmentId': assignedDepartmentId,
-        'slaHours': slaHours,
         'isActive': isActive,
       },
     );
@@ -951,7 +964,6 @@ class ApiClient {
     required String categoryId,
     required String name,
     required String assignedDepartmentId,
-    required int slaHours,
     required bool isActive,
   }) async {
     final response = await _put(
@@ -961,7 +973,6 @@ class ApiClient {
       body: {
         'name': name,
         'assignedDepartmentId': assignedDepartmentId,
-        'slaHours': slaHours,
         'isActive': isActive,
       },
     );
@@ -1254,6 +1265,25 @@ class ApiClient {
     return TicketDetail.fromJson(
       _decodeJsonObject(response.body),
       isEmployeeView: true,
+    );
+  }
+
+  /// Reopens a RESOLVED ticket (employee or customer JWT).
+  Future<TicketDetail> reopenTicket({
+    String? token,
+    required String ticketId,
+    required String reopeningReason,
+    required bool isEmployeeView,
+  }) async {
+    final response = await _put(
+      'ticket/reopen/${Uri.encodeComponent(ticketId)}',
+      token: token,
+      requiresAuth: true,
+      body: {'reopeningReason': reopeningReason},
+    );
+    return TicketDetail.fromJson(
+      _decodeJsonObject(response.body),
+      isEmployeeView: isEmployeeView,
     );
   }
 
