@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../api/api_client.dart';
 import '../../app_theme.dart';
+import '../../utils/app_vibrator.dart';
 import '../../widgets/app_screen_scaffold.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/app_surface.dart';
@@ -33,7 +33,9 @@ class _ScanScreenState extends State<ScanScreen> {
   static const _requiredConsecutiveScans = 3;
   static const _maxBarcodeLength = 50;
 
-  final _audioPlayer = AudioPlayer();
+  final _successPlayer = AudioPlayer();
+  final _errorPlayer = AudioPlayer();
+  Future<void>? _prepareAudioFuture;
   MobileScannerController? _scannerController;
   CameraFacing _activeCameraFacing = CameraFacing.back;
 
@@ -52,12 +54,76 @@ class _ScanScreenState extends State<ScanScreen> {
   bool _showingUnscanDialog = false;
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(_prepareScanAudio());
+  }
+
+  @override
   void dispose() {
     _bannerTimer?.cancel();
-    _audioPlayer.dispose();
+    unawaited(_successPlayer.dispose());
+    unawaited(_errorPlayer.dispose());
+    unawaited(
+      AudioPlayer.global.setAudioContext(AudioContext()),
+    );
     _scannerController?.dispose();
     WakelockPlus.disable();
     super.dispose();
+  }
+
+  AudioContext get _scanAudioContext => AudioContextConfig(
+        route: AudioContextConfigRoute.speaker,
+        focus: AudioContextConfigFocus.duckOthers,
+        respectSilence: false,
+      ).build();
+
+  Future<void> _prepareScanAudio() {
+    return _prepareAudioFuture ??= () async {
+      try {
+        final context = _scanAudioContext;
+        await AudioPlayer.global.setAudioContext(context);
+        await Future.wait([
+          _configurePlayer(
+            _successPlayer,
+            'sounds/positive_beep.mp3',
+            context: context,
+          ),
+          _configurePlayer(
+            _errorPlayer,
+            'sounds/negative_beep.mp3',
+            context: context,
+          ),
+        ]);
+      } catch (_) {
+        _prepareAudioFuture = null;
+      }
+    }();
+  }
+
+  Future<void> _configurePlayer(
+    AudioPlayer player,
+    String assetPath, {
+    required AudioContext context,
+  }) async {
+    await player.setAudioContext(context);
+    await player.setPlayerMode(PlayerMode.mediaPlayer);
+    await player.setReleaseMode(ReleaseMode.stop);
+    await player.setVolume(1);
+    await player.setSource(AssetSource(assetPath));
+  }
+
+  /// Browser autoplay and some Android audio sessions only unlock after a
+  /// user gesture. START is that gesture.
+  Future<void> _unlockScanAudio() async {
+    await _prepareScanAudio();
+    try {
+      await _successPlayer.setVolume(0);
+      await _successPlayer.resume();
+      await _successPlayer.stop();
+      await _successPlayer.seek(Duration.zero);
+      await _successPlayer.setVolume(1);
+    } catch (_) {}
   }
 
   Future<void> _ensureScannerController() async {
@@ -213,6 +279,9 @@ class _ScanScreenState extends State<ScanScreen> {
     final allowed = await _requestCameraPermission();
     if (!allowed || !mounted) return;
 
+    await _unlockScanAudio();
+    if (!mounted) return;
+
     await _ensureScannerController();
     if (!mounted) return;
 
@@ -277,6 +346,7 @@ class _ScanScreenState extends State<ScanScreen> {
     final value = barcode.trim();
     if (value.isEmpty) return;
     if (value.length > _maxBarcodeLength) {
+      unawaited(_playFeedback(success: false));
       _showBanner(
         const ScanDocResult(
           statusCode: 400,
@@ -351,29 +421,27 @@ class _ScanScreenState extends State<ScanScreen> {
     setState(() => _isLoading = false);
 
     if (result.isUiSuccess) {
-      await _playFeedback(success: true);
+      unawaited(_playFeedback(success: true));
       if (!_scanMode) {
         await _showUnscanSuccessDialog(result);
       } else {
         _showBanner(result, autoClear: const Duration(seconds: 2));
       }
     } else {
-      await _playFeedback(success: false);
+      unawaited(_playFeedback(success: false));
       _showBanner(result, autoClear: const Duration(seconds: 3));
     }
   }
 
   Future<void> _playFeedback({required bool success}) async {
+    unawaited(AppVibrator.vibrate(durationMs: success ? 100 : 500));
     try {
-      if (success) {
-        await HapticFeedback.mediumImpact();
-        await _audioPlayer.play(AssetSource('sounds/scan_success.wav'));
-      } else {
-        await HapticFeedback.heavyImpact();
-        await Future<void>.delayed(const Duration(milliseconds: 80));
-        await HapticFeedback.vibrate();
-        await _audioPlayer.play(AssetSource('sounds/scan_error.wav'));
-      }
+      await _prepareScanAudio();
+      final player = success ? _successPlayer : _errorPlayer;
+      await player.stop();
+      await player.seek(Duration.zero);
+      await player.setVolume(1);
+      await player.resume();
     } catch (_) {
       // Sound/haptics are best-effort.
     }
@@ -456,6 +524,8 @@ class _ScanScreenState extends State<ScanScreen> {
       );
       return;
     }
+    await _unlockScanAudio();
+    if (!mounted) return;
     _acceptBarcode(value);
   }
 
