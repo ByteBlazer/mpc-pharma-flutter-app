@@ -6,7 +6,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # If version is,say, 1.0.4+6, then if you want to force update app: then make it 1.0.5+7
 # else if you want to update the app without forcing update: then make it 1.0.4+7
-version: 1.0.12+12
+version: 1.0.13+13
 
 environment:
   sdk: ^3.11.3
@@ -75,8 +75,8 @@ flutter:
     - env/production.env
     - assets/images/customer_map_marker.png
     - assets/images/truck_map_marker.png
-    - assets/sounds/scan_success.wav
-    - assets/sounds/scan_error.wav
+    - assets/sounds/positive_beep.mp3
+    - assets/sounds/negative_beep.mp3
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -462,7 +462,7 @@ class ApiClient {
   Future<DocLineItemsResponse> getDocLineItems({
     String? token,
     required String docId,
-    bool mock = true,
+    bool mock = false,
   }) async {
     final response = await _get(
       'doc/line-items/${Uri.encodeComponent(docId.trim())}',
