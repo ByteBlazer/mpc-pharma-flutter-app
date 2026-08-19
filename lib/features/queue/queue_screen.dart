@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/api_client.dart';
@@ -28,11 +30,31 @@ class _QueueScreenState extends State<QueueScreen> {
   List<RouteSummary>? _routes;
   String? _emptyMessage;
   bool _unscanning = false;
+  final _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _future = _load();
+    _searchController.addListener(_handleSearchChange);
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.removeListener(_handleSearchChange);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _handleSearchChange() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      setState(() => _searchQuery = _searchController.text);
+    });
   }
 
   Future<DispatchQueueResponse> _load() async {
@@ -232,6 +254,11 @@ class _QueueScreenState extends State<QueueScreen> {
                 );
               }
 
+              final filteredRoutes = routes
+                  .map((route) => route.filterForSearch(_searchQuery))
+                  .whereType<QueueRouteSearchResult>()
+                  .toList();
+
               return ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                 children: [
@@ -243,16 +270,45 @@ class _QueueScreenState extends State<QueueScreen> {
                       fontSize: 15,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  for (final route in routes) ...[
+                  const SizedBox(height: 12),
+                  AppSearchField(
+                    controller: _searchController,
+                    labelText: 'Search routes or Doc ID',
+                    hintText: 'Route name or document ID...',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${filteredRoutes.length} of ${routes.length} routes',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (filteredRoutes.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Text(
+                        'No routes match the search.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  else
+                    for (final entry in filteredRoutes) ...[
                     Text(
-                      route.route.isEmpty ? 'Unknown route' : route.route,
+                      entry.route.route.isEmpty
+                          ? 'Unknown route'
+                          : entry.route.route,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
                     ),
                     const SizedBox(height: 10),
-                    for (final batch in route.batches) ...[
+                    for (final batch in entry.visibleBatches) ...[
                       Padding(
                         padding: const EdgeInsets.only(left: 8, bottom: 10),
                         child: _BatchCard(
