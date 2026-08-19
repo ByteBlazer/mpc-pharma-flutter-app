@@ -38,13 +38,15 @@ class ScanDocResult {
   String get displayMessage =>
       message.isEmpty ? 'Something went wrong. Please try again.' : message;
 
-  /// Green success banner (includes 409 re-scan ack when success is true).
-  bool get isUiSuccess => success;
+  /// Re-scan acknowledgement (409 with success).
+  bool get isRescanAck => success && statusCode == 409;
 
-  /// Red error banner.
-  bool get isUiHardError =>
-      !success && (statusCode == 400 || statusCode == 500);
+  /// Green success banner (new scan only; re-scan ack uses yellow).
+  bool get isUiSuccess => success && !isRescanAck;
 
-  /// Yellow warning / soft failure / network.
-  bool get isUiSoftError => !success && !isUiHardError;
+  /// Red error banner — all failures (network, validation, conflicts, etc.).
+  bool get isUiHardError => !success;
+
+  /// Yellow banner — re-scan acknowledgement only.
+  bool get isUiWarning => isRescanAck;
 }
