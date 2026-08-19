@@ -421,7 +421,7 @@ class _ScanScreenState extends State<ScanScreen> {
     setState(() => _isLoading = false);
 
     if (result.success) {
-      unawaited(_playFeedback(success: true));
+      unawaited(_playFeedback(success: !result.isRescanAck));
       if (!_scanMode) {
         await _showUnscanSuccessDialog(result);
       } else {
@@ -786,7 +786,7 @@ class _ScanResultBanner extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border(left: BorderSide(color: color, width: 5)),
+          border: Border(left: BorderSide(color: color, width: 15)),
         ),
         padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
         child: Row(
