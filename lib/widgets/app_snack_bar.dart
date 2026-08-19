@@ -163,7 +163,7 @@ class _AppSnackBarOverlayState extends State<_AppSnackBarOverlay>
     return switch (widget.type) {
       AppSnackBarType.success => const Color(0xFF2E7D32),
       AppSnackBarType.error => Colors.red,
-      AppSnackBarType.warning => const Color(0xFFB26A00),
+      AppSnackBarType.warning => const Color(0xFFF9A825),
     };
   }
 }

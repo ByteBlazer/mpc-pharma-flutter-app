@@ -420,7 +420,7 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _handleResult(ScanDocResult result) async {
     setState(() => _isLoading = false);
 
-    if (result.isUiSuccess) {
+    if (result.success) {
       unawaited(_playFeedback(success: true));
       if (!_scanMode) {
         await _showUnscanSuccessDialog(result);
@@ -531,8 +531,8 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Color _bannerColor(ScanDocResult result) {
     if (result.isUiSuccess) return const Color(0xFF2E7D32);
-    if (result.isUiHardError) return const Color(0xFFC62828);
-    return const Color(0xFFB26A00);
+    if (result.isUiWarning) return const Color(0xFFF9A825);
+    return const Color(0xFFC62828);
   }
 
   @override

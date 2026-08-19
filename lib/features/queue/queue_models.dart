@@ -48,6 +48,39 @@ class RouteSummary {
 
   final String route;
   final List<QueueBatch> batches;
+
+  /// Route-name search shows all batches; doc-id search shows only matching
+  /// scan sets within the route.
+  QueueRouteSearchResult? filterForSearch(String query) {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return QueueRouteSearchResult(route: this, visibleBatches: batches);
+    }
+
+    if (route.toLowerCase().contains(normalized)) {
+      return QueueRouteSearchResult(route: this, visibleBatches: batches);
+    }
+
+    final matchingBatches = batches
+        .where((batch) => batch.matchesDocSearch(normalized))
+        .toList();
+    if (matchingBatches.isEmpty) return null;
+
+    return QueueRouteSearchResult(
+      route: this,
+      visibleBatches: matchingBatches,
+    );
+  }
+}
+
+class QueueRouteSearchResult {
+  const QueueRouteSearchResult({
+    required this.route,
+    required this.visibleBatches,
+  });
+
+  final RouteSummary route;
+  final List<QueueBatch> visibleBatches;
 }
 
 /// One scanner batch under a route (selection unit for scheduling).
@@ -78,6 +111,13 @@ class QueueBatch {
   final int count;
   final List<String> docIdList;
   bool isChecked;
+
+  bool matchesDocSearch(String normalizedQuery) {
+    if (normalizedQuery.isEmpty) return true;
+    return docIdList.any(
+      (docId) => docId.toLowerCase().contains(normalizedQuery),
+    );
+  }
 
   /// Payload for Schedule New Trip (no docIdList).
   ScheduleBatchSelection toSelection() {
