@@ -7,6 +7,7 @@ import '../../api/auth_token_store.dart';
 import '../../app_theme.dart';
 import '../../auth/jwt_payload.dart';
 import '../../utils/build_timestamp.dart';
+import '../../utils/platform_device.dart';
 import '../../widgets/app_brand_page_background.dart';
 import '../../widgets/app_load_error_state.dart';
 import '../../widgets/app_surface.dart';
@@ -15,6 +16,7 @@ import '../auth/impersonate_screen.dart';
 import '../customers/customers_screen.dart';
 import '../delivery_tracking/delivery_tracking_screen.dart';
 import '../departments/departments_screen.dart';
+import '../help/help_support_screen.dart';
 import '../leave_requests/leave_requests_screen.dart';
 import '../locations/locations_screen.dart';
 import '../notifications/notification_inbox_controller.dart';
@@ -522,6 +524,18 @@ class _HomeFeatureGrid extends StatelessWidget {
                   apiClient: apiClient,
                   onLoginAgain: onLoginAgain,
                 ),
+              ),
+            );
+          },
+        ),
+      if (showHelpSupportOnPlatform)
+        _FeatureTile(
+          icon: Icons.help_outline,
+          label: 'Help',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const HelpSupportScreen(),
               ),
             );
           },
