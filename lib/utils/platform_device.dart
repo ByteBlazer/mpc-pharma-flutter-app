@@ -13,3 +13,9 @@ bool get isMobileNativePlatform {
 /// True for native Android/iOS apps and mobile browsers on those platforms.
 bool get isMobileDevice =>
     isMobileNativePlatform || (kIsWeb && isMobileWebBrowser);
+
+/// Help / support entry points: iOS app and web only (not Android app).
+bool get showHelpSupportOnPlatform {
+  if (kIsWeb) return true;
+  return defaultTargetPlatform == TargetPlatform.iOS;
+}
