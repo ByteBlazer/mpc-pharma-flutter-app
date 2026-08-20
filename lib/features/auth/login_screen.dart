@@ -13,6 +13,7 @@ import '../../utils/platform_device.dart';
 import '../../widgets/app_brand_page_background.dart';
 import '../../widgets/app_snack_bar.dart';
 import '../../widgets/simulation_mode_banner.dart';
+import '../help/help_support_screen.dart';
 import '../home/home_screen.dart';
 import '../notifications/notification_bell_button.dart';
 import '../notifications/notification_inbox_controller.dart';
@@ -510,6 +511,21 @@ class _LoginCard extends StatelessWidget {
                 TextButton(
                   onPressed: isLoading ? null : onChangePhone,
                   child: const Text('Change mobile number'),
+                ),
+              ],
+              if (showHelpSupportOnPlatform) ...[
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const HelpSupportScreen(),
+                            ),
+                          );
+                        },
+                  child: const Text('Need help?'),
                 ),
               ],
             ],
