@@ -39,6 +39,10 @@
 	<string>Record voice messages for ticket and complaint attachments.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan invoice barcodes to add or remove documents from the dispatch queue.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MPC Pharma needs access to your photo library so you can attach images to tickets and complaints.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>MPC Pharma may save images you capture for ticket and complaint attachments.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>MPC Pharma needs your location while you use the app during an active delivery trip so your position can be shared with dispatch.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
