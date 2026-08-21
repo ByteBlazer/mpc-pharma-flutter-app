@@ -1,2 +1,3 @@
 #include? "GoogleMaps.xcconfig"
 #include "Generated.xcconfig"
+BUNDLE_DISPLAY_NAME=MPC Pharma

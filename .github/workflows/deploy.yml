@@ -427,6 +427,11 @@ jobs:
     name: Package iOS app
     runs-on: macos-latest
     needs: deploy-web
+    env:
+      IOS_IS_PRODUCTION: ${{ github.ref_name == 'main' }}
+      IOS_BUNDLE_ID: ${{ github.ref_name == 'main' && 'com.mpc.pharma.mpcPharma' || 'com.mpc.pharma.mpcPharma.staging' }}
+      IOS_FLAVOR: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      IOS_DART_ENV: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
 
     steps:
       - name: Check out repository
@@ -439,16 +444,18 @@ jobs:
           echo "Commit: ${{ github.sha }}"
           echo "Flutter version: ${FLUTTER_VERSION}"
           echo "App environment: ${APP_ENV}"
+          echo "iOS flavor: ${IOS_FLAVOR}"
+          echo "iOS bundle id: ${IOS_BUNDLE_ID}"
           sw_vers
           xcodebuild -version
 
       - name: Validate Apple signing secrets
-        if: github.ref_name == 'main'
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_PROVISIONING_PROFILE_STAGING_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_STAGING_BASE64 }}
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
@@ -457,11 +464,15 @@ jobs:
           test -n "${APPLE_TEAM_ID}" || (echo "Missing secret: APPLE_TEAM_ID" && exit 1)
           test -n "${APPLE_CERTIFICATE_BASE64}" || (echo "Missing secret: APPLE_CERTIFICATE_BASE64" && exit 1)
           test -n "${APPLE_CERTIFICATE_PASSWORD}" || (echo "Missing secret: APPLE_CERTIFICATE_PASSWORD" && exit 1)
-          test -n "${APPLE_PROVISIONING_PROFILE_BASE64}" || (echo "Missing secret: APPLE_PROVISIONING_PROFILE_BASE64" && exit 1)
           test -n "${APP_STORE_CONNECT_API_KEY_ID}" || (echo "Missing secret: APP_STORE_CONNECT_API_KEY_ID" && exit 1)
           test -n "${APP_STORE_CONNECT_ISSUER_ID}" || (echo "Missing secret: APP_STORE_CONNECT_ISSUER_ID" && exit 1)
           test -n "${APP_STORE_CONNECT_API_KEY_BASE64}" || (echo "Missing secret: APP_STORE_CONNECT_API_KEY_BASE64" && exit 1)
-          echo "Apple signing secrets are present."
+          if [ "${IOS_IS_PRODUCTION}" = "true" ]; then
+            test -n "${APPLE_PROVISIONING_PROFILE_BASE64}" || (echo "Missing secret: APPLE_PROVISIONING_PROFILE_BASE64" && exit 1)
+          else
+            test -n "${APPLE_PROVISIONING_PROFILE_STAGING_BASE64}" || (echo "Missing secret: APPLE_PROVISIONING_PROFILE_STAGING_BASE64" && exit 1)
+          fi
+          echo "Apple signing secrets are present for ${IOS_FLAVOR}."
 
       - name: Patch environment file
         env:
@@ -519,47 +530,33 @@ jobs:
           flutter --version
           flutter pub get
 
-      - name: Build staging iOS app without code signing
-        if: github.ref_name == 'staging'
+      - name: Apply iOS flavor (bundle id + display name)
         run: |
           set -euxo pipefail
-          echo "Build timestamp file:"
-          cat BUILD_TIMESTAMP
-          flutter build ios --debug --no-codesign --dart-define=APP_ENV=staging
-          ls -lh build/ios/iphoneos/
-
-      - name: Archive unsigned staging iOS app artifact
-        if: github.ref_name == 'staging'
-        run: |
-          set -euxo pipefail
-          cd build/ios/iphoneos
-          zip -r ../ios-${{ github.ref_name }}-unsigned.zip Runner.app
-          ls -lh ../ios-${{ github.ref_name }}-unsigned.zip
-
-      - name: Upload unsigned staging iOS artifact
-        if: github.ref_name == 'staging'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-${{ github.ref_name }}-unsigned
-          path: build/ios/ios-${{ github.ref_name }}-unsigned.zip
-          if-no-files-found: error
+          chmod +x tool/prepare_ios_flavor.sh
+          tool/prepare_ios_flavor.sh "${IOS_FLAVOR}"
 
       - name: Import Apple signing certificate
-        if: github.ref_name == 'main'
         uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
       - name: Install provisioning profile and prepare export options
-        if: github.ref_name == 'main'
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_PROVISIONING_PROFILE_STAGING_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_STAGING_BASE64 }}
         run: |
           set -euxo pipefail
+          if [ "${IOS_IS_PRODUCTION}" = "true" ]; then
+            PROFILE_B64="${APPLE_PROVISIONING_PROFILE_BASE64}"
+          else
+            PROFILE_B64="${APPLE_PROVISIONING_PROFILE_STAGING_BASE64}"
+          fi
+
           PROFILE_PATH="$RUNNER_TEMP/appstore.mobileprovision"
-          echo -n "${APPLE_PROVISIONING_PROFILE_BASE64}" | base64 --decode > "${PROFILE_PATH}"
+          echo -n "${PROFILE_B64}" | base64 --decode > "${PROFILE_PATH}"
 
           PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
           security cms -D -i "${PROFILE_PATH}" > "${PROFILE_PLIST}"
@@ -571,8 +568,8 @@ jobs:
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "${PROFILE_PATH}" "$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
 
-          BUNDLE_ID="com.mpc.pharma.mpcPharma"
-          export BUNDLE_ID PROFILE_NAME APPLE_TEAM_ID
+          export BUNDLE_ID="${IOS_BUNDLE_ID}"
+          export PROFILE_NAME APPLE_TEAM_ID
           python3 - <<'PY'
           import os
           from pathlib import Path
@@ -623,31 +620,27 @@ jobs:
             echo 'CODE_SIGN_IDENTITY=Apple Distribution' >> ios/Flutter/Release.xcconfig
           fi
 
-          echo "PROFILE_NAME=${PROFILE_NAME}" >> "$GITHUB_ENV"
           cat ios/ExportOptions.plist
           cat ios/Flutter/Release.xcconfig
 
-      - name: Build signed production IPA
-        if: github.ref_name == 'main'
+      - name: Build signed IPA
         run: |
           set -euxo pipefail
           echo "Build timestamp file:"
           cat BUILD_TIMESTAMP
           flutter build ipa --release \
-            --dart-define=APP_ENV=production \
+            --dart-define=APP_ENV="${IOS_DART_ENV}" \
             --export-options-plist=ios/ExportOptions.plist
           ls -lh build/ios/ipa/
 
       - name: Upload signed IPA artifact
-        if: github.ref_name == 'main'
         uses: actions/upload-artifact@v4
         with:
-          name: ios-main-ipa
+          name: ios-${{ github.ref_name }}-ipa
           path: build/ios/ipa/*.ipa
           if-no-files-found: error
 
       - name: Upload IPA to App Store Connect
-        if: github.ref_name == 'main'
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -656,7 +649,7 @@ jobs:
           set -euxo pipefail
           IPA_PATH="$(ls build/ios/ipa/*.ipa | head -n 1)"
           test -n "${IPA_PATH}"
-          echo "Uploading ${IPA_PATH}"
+          echo "Uploading ${IPA_PATH} (${IOS_FLAVOR} / ${IOS_BUNDLE_ID})"
 
           API_KEY_DIR="$HOME/.appstoreconnect/private_keys"
           mkdir -p "${API_KEY_DIR}"
@@ -676,6 +669,8 @@ jobs:
           echo "iOS packaging job failed."
           echo "Branch: ${{ github.ref_name }}"
           echo "App environment: ${APP_ENV}"
+          echo "iOS flavor: ${IOS_FLAVOR}"
+          echo "iOS bundle id: ${IOS_BUNDLE_ID}"
           echo "iOS build outputs:"
           find build/ios -maxdepth 4 -type f -print || true
           echo "Xcode version:"
