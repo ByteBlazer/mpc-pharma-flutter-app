@@ -249,7 +249,8 @@ Branch behavior:
 - `main` loads `env/production.env` and deploys the web app to `<DOMAIN_NAME>`.
 - `staging` packages a debug Android APK.
 - `main` packages a signed release Android APK and signed release Android App Bundle that can be uploaded to Play Console.
-- iOS is built on a macOS runner and uploaded as an unsigned artifact. A signed IPA needs Apple signing certificate/profile secrets to be added later.
+- `staging` packages an unsigned iOS debug artifact.
+- `main` signs a release IPA with Apple Distribution credentials and uploads it to App Store Connect (TestFlight processing).
 
 Required GitHub Actions secrets:
 
@@ -261,6 +262,13 @@ DOMAIN_NAME
 ANDROID_KEYSTORE_BASE64
 ANDROID_KEYSTORE_PASSWORD
 ANDROID_KEY_ALIAS
+APPLE_TEAM_ID
+APPLE_CERTIFICATE_BASE64
+APPLE_CERTIFICATE_PASSWORD
+APPLE_PROVISIONING_PROFILE_BASE64
+APP_STORE_CONNECT_API_KEY_ID
+APP_STORE_CONNECT_ISSUER_ID
+APP_STORE_CONNECT_API_KEY_BASE64
 ```
 
 `DOMAIN_NAME` is the base domain, for example `byteblazer.com`. The workflow derives the deployment hostnames from it.
