@@ -252,7 +252,7 @@ TripProgressSummary computeTripProgress({
 
   var lotPending = 0;
   for (final group in detail.docGroups) {
-    if (group.showDropOffButton) lotPending++;
+    if (group.shouldShowDropOffAtHub) lotPending++;
   }
 
   final status = detail.status.toUpperCase();

@@ -226,6 +226,16 @@ class TripDocGroup {
   final List<TripDoc> docs;
 
   bool get hasOnTripDocs => docs.any((d) => d.isOnTrip);
+
+  /// True when every doc in this lot/group is delivered (none left on trip
+  /// as undelivered either — all statuses are DELIVERED).
+  bool get allDocsDelivered =>
+      docs.isNotEmpty && docs.every((d) => d.isDelivered);
+
+  /// Hub drop-off while the API allows it and some docs remain on trip.
+  /// Hidden once every doc in the lot has been marked delivered.
+  bool get shouldShowDropOffAtHub =>
+      droppable && showDropOffButton && hasOnTripDocs && !allDocsDelivered;
 }
 
 class TripDoc {
@@ -383,7 +393,8 @@ class MarkDeliveriesBatchResult {
       message.isEmpty ? 'Something went wrong. Please try again.' : message;
 }
 
-/// Groups direct-delivery docs by [TripDoc.customerId] (first-seen order).
+/// Groups docs by [TripDoc.customerId] (first-seen order). Used for both
+/// direct-delivery groups and lot contents on the active trip screen.
 List<CustomerDeliveryCluster> clusterDirectDeliveries(List<TripDoc> docs) {
   final order = <String>[];
   final map = <String, List<TripDoc>>{};
