@@ -69,13 +69,11 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         group.heading,
         () => group.expandGroupByDefault && !group.dropOffCompleted,
       );
-      if (!group.droppable) {
-        _searchControllers.putIfAbsent(
-          group.heading,
-          TextEditingController.new,
-        );
-      }
-      for (final doc in group.docs.where((d) => d.isOnTrip && d.isDirectDelivery)) {
+      _searchControllers.putIfAbsent(
+        group.heading,
+        TextEditingController.new,
+      );
+      for (final doc in group.docs.where((d) => d.isOnTrip)) {
         _selectedDocIds.add(doc.id);
       }
     }
@@ -340,7 +338,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                         setState(() {
                           final next = !(_expanded[group.heading] ?? false);
                           _expanded[group.heading] = next;
-                          if (!next && !group.droppable) {
+                          if (!next) {
                             _searchControllers[group.heading]?.clear();
                           }
                         });
@@ -508,14 +506,14 @@ class _DocGroupSection extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (group.droppable &&
-                      group.showDropOffButton &&
-                      group.hasOnTripDocs)
+                  if (group.shouldShowDropOffAtHub)
                     TextButton(
                       onPressed: enabled ? onDropOff : null,
                       child: const Text('Drop Off At Hub'),
                     )
-                  else if (group.droppable && !group.showDropOffButton)
+                  else if (group.droppable &&
+                      !group.showDropOffButton &&
+                      !group.allDocsDelivered)
                     TextButton(
                       onPressed: canExpand ? onToggleExpanded : null,
                       child: const Text('Dropped Off At Hub'),
@@ -526,9 +524,9 @@ class _DocGroupSection extends StatelessWidget {
               ),
             ),
           ),
-            if (expanded) ...[
+          if (expanded) ...[
             const Divider(height: 1),
-            if (!group.droppable && searchController != null)
+            if (searchController != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                 child: AppSearchField(
@@ -537,17 +535,15 @@ class _DocGroupSection extends StatelessWidget {
                   hintText: 'Doc ID or firm name',
                 ),
               ),
-            if (group.droppable)
-              ..._lotDocs(context)
-            else if (searchController != null)
+            if (searchController != null)
               ListenableBuilder(
                 listenable: searchController!,
                 builder: (context, _) => Column(
-                  children: _directClusters(context),
+                  children: _customerClusters(context),
                 ),
               )
             else
-              ..._directClusters(context),
+              ..._customerClusters(context),
             const SizedBox(height: 8),
           ],
         ],
@@ -555,27 +551,7 @@ class _DocGroupSection extends StatelessWidget {
     );
   }
 
-  List<Widget> _lotDocs(BuildContext context) {
-    return [
-      for (final doc in group.docs)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: _DocTile(
-            doc: doc,
-            selected: selectedDocIds.contains(doc.id),
-            enabled: enabled,
-            onToggle: null,
-            onIssue: null,
-            onDial: doc.customerPhone.trim().isEmpty
-                ? null
-                : () => onDial(doc.customerPhone.trim()),
-            onMaps: doc.hasCustomerGeo ? () => onMaps(doc) : null,
-          ),
-        ),
-    ];
-  }
-
-  List<Widget> _directClusters(BuildContext context) {
+  List<Widget> _customerClusters(BuildContext context) {
     final query = searchController?.text.trim().toLowerCase() ?? '';
     var docs = group.docs;
     if (query.isNotEmpty) {
