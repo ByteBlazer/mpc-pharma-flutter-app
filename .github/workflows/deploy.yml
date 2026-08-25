@@ -623,11 +623,26 @@ jobs:
           cat ios/ExportOptions.plist
           cat ios/Flutter/Release.xcconfig
 
+      - name: Write Google Maps iOS API key
+        run: |
+          set -euxo pipefail
+          ENV_FILE="env/${APP_ENV}.env"
+          test -f "${ENV_FILE}"
+          KEY="$(grep -E '^GOOGLE_MAP_API_KEY=' "${ENV_FILE}" | head -n 1 | cut -d= -f2- | tr -d '\r')"
+          if [ -z "${KEY}" ]; then
+            echo "GOOGLE_MAP_API_KEY is empty in ${ENV_FILE}"
+            exit 1
+          fi
+          printf 'GOOGLE_MAPS_API_KEY=%s\n' "${KEY}" > ios/Flutter/GoogleMaps.xcconfig
+          echo "Wrote ios/Flutter/GoogleMaps.xcconfig for APP_ENV=${APP_ENV} (key length=${#KEY})"
+
       - name: Build signed IPA
         run: |
           set -euxo pipefail
           echo "Build timestamp file:"
           cat BUILD_TIMESTAMP
+          test -f ios/Flutter/GoogleMaps.xcconfig
+          grep -q '^GOOGLE_MAPS_API_KEY=.\+' ios/Flutter/GoogleMaps.xcconfig
           flutter build ipa --release \
             --dart-define=APP_ENV="${IOS_DART_ENV}" \
             --export-options-plist=ios/ExportOptions.plist
