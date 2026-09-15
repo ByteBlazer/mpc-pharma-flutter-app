@@ -59,6 +59,9 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
   final _signatureController = SignatureController(
     penStrokeWidth: 3,
     penColor: Colors.black,
+    onDrawStart: () {
+      FocusManager.instance.primaryFocus?.unfocus();
+    },
   );
   bool _updateCustomerLocation = false;
   bool _isSimulationMode = false;
@@ -256,14 +259,24 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
     }
   }
 
+  void _dismissKeyboard() {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   @override
   Widget build(BuildContext context) {
     final height = MediaQuery.sizeOf(context).height * 0.92;
-    return SizedBox(
-      height: height,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    return GestureDetector(
+      onTap: _dismissKeyboard,
+      behavior: HitTestBehavior.deferToChild,
+      child: SizedBox(
+        height: height,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: keyboardInset),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
             child: Row(
@@ -287,6 +300,7 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
           const SizedBox(height: 2),
           Expanded(
             child: ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               children: [
                 ...widget.docs.asMap().entries.map(
@@ -365,7 +379,12 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _submitting ? null : _clearSignature,
+                    onPressed: _submitting
+                        ? null
+                        : () {
+                            _dismissKeyboard();
+                            _clearSignature();
+                          },
                     child: const Text('Clear signature'),
                   ),
                 ),
@@ -374,6 +393,9 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
                   enabled: !_submitting,
                   maxLines: 2,
                   minLines: 2,
+                  textInputAction: TextInputAction.done,
+                  onTapOutside: (_) => _dismissKeyboard(),
+                  onEditingComplete: _dismissKeyboard,
                   decoration: const InputDecoration(
                     labelText: 'Comments (optional)',
                     border: OutlineInputBorder(),
@@ -387,6 +409,7 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
                   onChanged: _submitting || _isSimulationMode
                       ? null
                       : (value) {
+                          _dismissKeyboard();
                           setState(
                             () => _updateCustomerLocation = value ?? true,
                           );
@@ -428,7 +451,12 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
                     const SizedBox(height: 12),
                   ],
                   FilledButton(
-                    onPressed: _submitting ? null : _submit,
+                    onPressed: _submitting
+                        ? null
+                        : () {
+                            _dismissKeyboard();
+                            _submit();
+                          },
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
@@ -444,7 +472,9 @@ class _MarkDeliveredSheetState extends State<MarkDeliveredSheet> {
               ),
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
