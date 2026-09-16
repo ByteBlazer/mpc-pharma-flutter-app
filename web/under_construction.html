@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="MPC Pharma — page under construction.">
+  <title>Under Construction — MPC Pharma</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #5e86b9;
+      --brand-deep: #3d5f8a;
+      --brand-soft: #8eb0d6;
+      --ink: #142033;
+      --mist: rgba(255, 255, 255, 0.78);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: "Outfit", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse 90% 70% at 12% 18%, rgba(142, 176, 214, 0.55), transparent 55%),
+        radial-gradient(ellipse 80% 60% at 88% 82%, rgba(61, 95, 138, 0.35), transparent 50%),
+        linear-gradient(155deg, #dce8f5 0%, #b8cfe6 42%, #7fa3c9 100%);
+      overflow-x: hidden;
+    }
+
+    .sky {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(2px);
+      opacity: 0.45;
+      animation: drift 18s ease-in-out infinite;
+    }
+
+    .orb-a {
+      width: 220px;
+      height: 220px;
+      top: 8%;
+      left: -40px;
+      background: radial-gradient(circle at 30% 30%, #fff, var(--brand-soft) 60%, transparent 70%);
+    }
+
+    .orb-b {
+      width: 160px;
+      height: 160px;
+      bottom: 12%;
+      right: -20px;
+      background: radial-gradient(circle at 40% 40%, #fff8, var(--brand-deep) 65%, transparent 75%);
+      animation-delay: -7s;
+      animation-duration: 22s;
+    }
+
+    .grid {
+      position: absolute;
+      inset: -20%;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+      background-size: 48px 48px;
+      transform: perspective(600px) rotateX(58deg);
+      transform-origin: center top;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.35), transparent 75%);
+      animation: grid-shift 28s linear infinite;
+    }
+
+    @keyframes drift {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(24px, -18px); }
+    }
+
+    @keyframes grid-shift {
+      from { background-position: 0 0, 0 0; }
+      to { background-position: 48px 48px, 48px 48px; }
+    }
+
+    .stage {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px 48px;
+      text-align: center;
+    }
+
+    .brand {
+      font-family: "Outfit", sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 7.5vw, 3.6rem);
+      letter-spacing: 0.02em;
+      color: #fff;
+      text-shadow: 0 8px 28px rgba(32, 58, 92, 0.35);
+      margin: 0 0 8px;
+      line-height: 1.05;
+      animation: rise 0.9s ease-out both;
+    }
+
+    .art {
+      width: min(420px, 92vw);
+      margin: 8px auto 20px;
+      animation: rise 1s ease-out 0.12s both;
+    }
+
+    .art svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      filter: drop-shadow(0 18px 30px rgba(32, 58, 92, 0.28));
+    }
+
+    .crane {
+      transform-origin: 118px 42px;
+      animation: sway 4.5s ease-in-out infinite;
+    }
+
+    .hook {
+      animation: hoist 3.2s ease-in-out infinite;
+    }
+
+    .spark {
+      animation: sparkle 2.4s ease-in-out infinite;
+    }
+
+    .spark-b { animation-delay: -0.9s; }
+    .spark-c { animation-delay: -1.6s; }
+
+    .road-dash {
+      stroke-dasharray: 10 14;
+      animation: dash-move 1.4s linear infinite;
+    }
+
+    @keyframes sway {
+      0%, 100% { transform: rotate(-2.5deg); }
+      50% { transform: rotate(2.5deg); }
+    }
+
+    @keyframes hoist {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(10px); }
+    }
+
+    @keyframes sparkle {
+      0%, 100% { opacity: 0.25; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+
+    @keyframes dash-move {
+      to { stroke-dashoffset: -24; }
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h1 {
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 700;
+      font-size: clamp(1.55rem, 4.5vw, 2.15rem);
+      margin: 0 0 10px;
+      color: var(--ink);
+      animation: rise 1s ease-out 0.22s both;
+    }
+
+    .lede {
+      max-width: 34rem;
+      margin: 0 auto;
+      font-size: clamp(1rem, 2.6vw, 1.12rem);
+      font-weight: 500;
+      color: rgba(20, 32, 51, 0.78);
+      animation: rise 1s ease-out 0.32s both;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 22px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: var(--mist);
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(8px);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--brand-deep);
+      animation: rise 1s ease-out 0.42s both;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--brand);
+      box-shadow: 0 0 0 0 rgba(94, 134, 185, 0.55);
+      animation: pulse 1.8s ease-out infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(94, 134, 185, 0.5); }
+      70% { box-shadow: 0 0 0 10px rgba(94, 134, 185, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(94, 134, 185, 0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky" aria-hidden="true">
+    <div class="grid"></div>
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+  </div>
+
+  <main class="stage">
+    <p class="brand">MPC Pharma</p>
+
+    <div class="art" aria-hidden="true">
+      <svg viewBox="0 0 420 260" xmlns="http://www.w3.org/2000/svg" role="img">
+        <defs>
+          <linearGradient id="truck" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7ea6d4"/>
+            <stop offset="100%" stop-color="#3d5f8a"/>
+          </linearGradient>
+          <linearGradient id="cabin" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#9fc0e2"/>
+            <stop offset="100%" stop-color="#5e86b9"/>
+          </linearGradient>
+          <linearGradient id="craneGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f4f8fc"/>
+            <stop offset="100%" stop-color="#c5d8ec"/>
+          </linearGradient>
+        </defs>
+
+        <!-- soft ground -->
+        <ellipse cx="210" cy="228" rx="168" ry="18" fill="rgba(32,58,92,0.12)"/>
+
+        <!-- road -->
+        <path d="M40 214 H380" stroke="rgba(255,255,255,0.55)" stroke-width="10" stroke-linecap="round"/>
+        <path class="road-dash" d="M48 214 H372" stroke="#3d5f8a" stroke-width="2.5" stroke-linecap="round"/>
+
+        <!-- delivery truck -->
+        <g transform="translate(78 148)">
+          <rect x="0" y="18" width="118" height="52" rx="8" fill="url(#truck)"/>
+          <rect x="118" y="30" width="58" height="40" rx="8" fill="url(#cabin)"/>
+          <rect x="138" y="38" width="28" height="18" rx="4" fill="#e8f1fa" opacity="0.9"/>
+          <circle cx="34" cy="72" r="14" fill="#1f334d"/>
+          <circle cx="34" cy="72" r="6" fill="#c9d9ea"/>
+          <circle cx="148" cy="72" r="14" fill="#1f334d"/>
+          <circle cx="148" cy="72" r="6" fill="#c9d9ea"/>
+          <rect x="14" y="28" width="28" height="22" rx="3" fill="rgba(255,255,255,0.22)"/>
+          <rect x="50" y="28" width="28" height="22" rx="3" fill="rgba(255,255,255,0.18)"/>
+          <rect x="86" y="28" width="22" height="22" rx="3" fill="rgba(255,255,255,0.14)"/>
+        </g>
+
+        <!-- crane -->
+        <g class="crane">
+          <rect x="286" y="86" width="12" height="118" rx="3" fill="url(#craneGrad)"/>
+          <path d="M292 92 L360 70 L360 78 L292 104 Z" fill="#eaf2fa"/>
+          <path d="M292 92 L230 118 L234 126 L292 104 Z" fill="#d5e4f3"/>
+          <circle cx="292" cy="92" r="7" fill="#3d5f8a"/>
+          <g class="hook">
+            <line x1="248" y1="122" x2="248" y2="158" stroke="#3d5f8a" stroke-width="2"/>
+            <rect x="236" y="158" width="24" height="16" rx="3" fill="#5e86b9"/>
+            <rect x="241" y="162" width="14" height="8" rx="2" fill="#dce8f5"/>
+          </g>
+        </g>
+
+        <!-- floating package -->
+        <g transform="translate(300 46)">
+          <rect width="42" height="34" rx="5" fill="#fff"/>
+          <path d="M0 12 H42" stroke="#5e86b9" stroke-width="3"/>
+          <path d="M21 0 V34" stroke="#5e86b9" stroke-width="3"/>
+        </g>
+
+        <!-- sparks / progress marks -->
+        <g fill="#fff" class="spark">
+          <circle cx="68" cy="96" r="3.5"/>
+        </g>
+        <g fill="#fff" class="spark spark-b">
+          <circle cx="342" cy="128" r="2.8"/>
+        </g>
+        <g fill="#fff" class="spark spark-c">
+          <circle cx="196" cy="72" r="3"/>
+        </g>
+      </svg>
+    </div>
+
+    <h1>We’re building something better</h1>
+    <p class="lede">
+      This page is under construction. Our team is putting the finishing touches
+      in place — please check back soon.
+    </p>
+    <div class="badge">
+      <span class="dot" aria-hidden="true"></span>
+      Work in progress
+    </div>
+  </main>
+</body>
+</html>
