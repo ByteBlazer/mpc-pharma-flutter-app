@@ -2011,19 +2011,26 @@ class _ResolutionRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(summary, style: const TextStyle(color: Colors.black)),
-          ),
-          if (canReopen)
-            TextButton(
-              onPressed: onReopen,
-              style: TextButton.styleFrom(
-                foregroundColor: linkColor,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: const Size(0, 32),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text('Not Resolved?'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(summary, style: const TextStyle(color: Colors.black)),
+                if (canReopen) ...[
+                  const SizedBox(height: 4),
+                  TextButton(
+                    onPressed: onReopen,
+                    style: TextButton.styleFrom(
+                      foregroundColor: linkColor,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 32),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Not Resolved?'),
+                  ),
+                ],
+              ],
             ),
+          ),
         ],
       ),
     );
